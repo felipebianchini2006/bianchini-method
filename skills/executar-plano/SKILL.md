@@ -1,6 +1,6 @@
 ---
-name: bianchini-method
-description: Use para EXECUTAR os planos de implementação gerados pelo sdd-planning (ex. "/bianchini-method all", "/bianchini-method 1 a 3", "/bianchini-method 1"). O melhor modelo disponível atua como orquestrador e revisor, classifica o peso de cada tarefa e delega a subagentes econômicos por nível. TDD por tarefa, revisão dupla, documentação viva atualizada, checkboxes marcados. Requer planos aprovados em docs/superpowers/plans/.
+name: executar-plano
+description: Use para EXECUTAR os planos de implementação gerados pelo sdd-planning (ex. "/executar-plano all", "/executar-plano 1 a 3", "/executar-plano 1"). O melhor modelo disponível atua como orquestrador e revisor, classifica o peso de cada tarefa e delega a subagentes econômicos por nível. TDD por tarefa, revisão dupla, documentação viva atualizada, checkboxes marcados. Requer planos aprovados em docs/superpowers/plans/.
 ---
 
 # Bianchini Method — execução orquestrada de planos SDD
@@ -24,7 +24,7 @@ Planos são identificados pelo prefixo numérico do arquivo (`...-01-`, `...-02-
 
 | Ambiente | Orquestrador + Revisor | Tarefa CRÍTICA | Tarefa PESADA | Tarefa LEVE/mecânica |
 |---|---|---|---|---|
-| Claude Code | **Fable 5** (raciocínio alto) | Opus 5 | Sonnet 5 | Sonnet 5 (ou Haiku se a tarefa for trivial) |
+| Claude Code | **Fable 5** (raciocínio alto) | Opus 5 | Sonnet 5 | Sonnet 5 |
 | Codex | **GPT 5.6 Sol** (high ou xhigh) | GPT 5.6 Terra (extra alto) | GPT 5.6 Terra (alto) | GPT 5.6 Luna (max) |
 
 O orquestrador NUNCA implementa tarefas ele mesmo (exceto correções triviais de 1-3 linhas durante revisão); seu trabalho é: classificar, delegar, revisar, decidir e manter a documentação viva íntegra.
