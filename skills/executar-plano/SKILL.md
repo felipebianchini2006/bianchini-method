@@ -1,11 +1,11 @@
 ---
 name: executar-plano
-description: Use para EXECUTAR os planos de implementação gerados pelo sdd-planning (ex. "/executar-plano all", "/executar-plano 1 a 3", "/executar-plano 1"). O melhor modelo disponível atua como orquestrador e revisor, classifica o peso de cada tarefa e delega a subagentes econômicos por nível. TDD por tarefa, revisão dupla, documentação viva atualizada, checkboxes marcados. Requer planos aprovados em docs/superpowers/plans/.
+description: Use para EXECUTAR os planos de implementação gerados pelo sdd-planning (ex. "/executar-plano all", "/executar-plano 1 a 3", "/executar-plano 1"). O melhor modelo disponível atua como orquestrador e revisor, classifica o peso de cada tarefa e delega a subagentes econômicos por nível. TDD por tarefa, revisão dupla, documentação viva atualizada, checkboxes marcados. Requer planos aprovados na versão ativa (docs/superpowers/vN/plans/).
 ---
 
 # Bianchini Method — execução orquestrada de planos SDD
 
-Executa os planos de `docs/superpowers/plans/` com orquestração pelo melhor modelo e implementação por subagentes econômicos, calibrados pelo peso real de cada tarefa.
+Executa os planos da **versão ativa** declarada em `docs/living/PROJECT_STATE.md` (`docs/superpowers/vN/plans/`; se não houver estrutura de versão, usar `docs/superpowers/plans/` como v1) com orquestração pelo melhor modelo e implementação por subagentes econômicos, calibrados pelo peso real de cada tarefa.
 
 **Anuncie ao iniciar:** "Executando via bianchini-method: planos <intervalo>, orquestrador <modelo>."
 
