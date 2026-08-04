@@ -1,4 +1,13 @@
-# sdd-planning — skill de planejamento Spec-Driven Development para Claude Code
+# Bianchini Method — planejamento e execução SDD para Claude Code e Codex
+
+Duas skills complementares:
+
+- **`sdd-planning`** — planejamento: escopo PDF + plano mestre + design → specs e planos TDD.
+- **`bianchini-method`** — execução: `/bianchini-method all` (tudo) · `/bianchini-method 1 a 3` (intervalo) · `/bianchini-method 1` (um plano). O melhor modelo (Fable 5 no Claude Code; GPT 5.6 Sol high/xhigh no Codex) orquestra e revisa; classifica o peso de cada tarefa e delega a subagentes econômicos (Opus 5/Sonnet 5; GPT 5.6 Terra alto/extra alto e Luna max). TDD por tarefa, revisão dupla, gates por plano, documentação viva sempre atualizada.
+
+---
+
+## sdd-planning — planejamento Spec-Driven Development
 
 Skill de agente que transforma **escopo comercial (PDF) + plano mestre (.md) + referência visual (pasta `design/` com HTML/ZIP do Cloud Design)** em especificações aprováveis e planos de implementação TDD executáveis por agentes de IA — usando o fluxo Spec-Driven Development do [Superpowers](https://github.com/obra/superpowers), sem escrever uma linha de código de produção.
 
@@ -22,9 +31,12 @@ Skill de agente que transforma **escopo comercial (PDF) + plano mestre (.md) + r
 ## Instalação
 
 ```bash
-mkdir -p ~/.claude/skills/sdd-planning
-curl -fsSL https://raw.githubusercontent.com/felipebianchini2006/sdd-planning-skill/main/skills/sdd-planning/SKILL.md \
-  -o ~/.claude/skills/sdd-planning/SKILL.md
+for s in sdd-planning bianchini-method; do
+  mkdir -p ~/.claude/skills/$s
+  curl -fsSL https://raw.githubusercontent.com/felipebianchini2006/sdd-planning-skill/main/skills/$s/SKILL.md \
+    -o ~/.claude/skills/$s/SKILL.md
+done
+# Codex: troque ~/.claude por ~/.codex
 ```
 
 ## Uso
