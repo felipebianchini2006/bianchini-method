@@ -3,7 +3,8 @@
 Duas skills complementares:
 
 - **`sdd-planning`** — planejamento: escopo PDF + plano mestre + design → specs e planos TDD.
-- **`executar-plano`** — execução: `/executar-plano all` (tudo) · `/executar-plano 1 a 3` (intervalo) · `/executar-plano 1` (um plano). O melhor modelo (Fable 5 no Claude Code; GPT 5.6 Sol high/xhigh no Codex) orquestra e revisa; classifica o peso de cada tarefa e delega a subagentes econômicos (Opus 5/Sonnet 5 — nunca Haiku; GPT 5.6 Terra alto/extra alto e Luna max). TDD por tarefa, revisão dupla, gates por plano, documentação viva sempre atualizada.
+- **`executar-plano`** — execução: `/executar-plano all` (tudo) · `/executar-plano 1 a 3` (intervalo) · `/executar-plano 1` (um plano). O melhor modelo (Fable 5 no Claude Code; GPT 5.6 Sol high/xhigh no Codex) orquestra e revisa; classifica o peso de cada tarefa e delega a subagentes econômicos (Opus 5/Sonnet 5 — nunca Haiku; GPT 5.6 Terra alto/extra alto e Luna max). TDD por tarefa, revisão proporcional ao peso, lotes de tarefas leves, gates incrementais, documentação viva com flush seguro.
+- **`corrigir-bug`** — correção: camada de política sobre `superpowers:systematic-debugging` — causa raiz confirmada, teste que reproduz o bug ANTES do fix, fix mínimo por subagente, revisão pelo melhor modelo, registro em KNOWN_ISSUES/DEVELOPMENT_LOG/TEST_EVIDENCE.
 
 ---
 
@@ -31,7 +32,7 @@ Skill de agente que transforma **escopo comercial (PDF) + plano mestre (.md) + r
 ## Instalação
 
 ```bash
-for s in sdd-planning executar-plano; do
+for s in sdd-planning executar-plano corrigir-bug; do
   mkdir -p ~/.claude/skills/$s
   curl -fsSL https://raw.githubusercontent.com/felipebianchini2006/bianchini-method/main/skills/$s/SKILL.md \
     -o ~/.claude/skills/$s/SKILL.md
