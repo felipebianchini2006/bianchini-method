@@ -57,12 +57,12 @@ O commit e o teste são o registro padrão de um bug resolvido.
 
 Atualizar:
 
-- `KNOWN_ISSUES.md` somente se o problema continuar aberto ou existir limitação conhecida;
-- `DECISIONS.md` somente se houver decisão de contrato ou arquitetura;
-- `PROJECT_STATE.md` somente se o bug alterar status, entrega ou bloqueio.
+- `docs/living/KNOWN_ISSUES.md` somente se o problema continuar aberto ou existir limitação conhecida;
+- `docs/living/DECISIONS.md` somente se houver decisão de contrato ou arquitetura;
+- `docs/living/PROJECT_STATE.md` somente se o bug alterar status, entrega ou bloqueio.
 
 Não atualizar `DEVELOPMENT_LOG` e `TEST_EVIDENCE` para cada bug por padrão.
 
 Se o bug revelar divergência entre código e spec, corrigir a fonte errada. Se exigir mudança de requisito ou contrato aprovado, parar e pedir decisão antes de alterar.
 
-Outros bugs encontrados entram em `KNOWN_ISSUES.md` apenas quando reais e relevantes. Não corrigi-los na mesma sessão salvo se bloquearem a reprodução.
+Outros bugs encontrados entram em `docs/living/KNOWN_ISSUES.md` apenas quando reais e relevantes. Não corrigi-los na mesma sessão salvo se bloquearem a reprodução.

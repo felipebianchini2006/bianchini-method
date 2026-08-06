@@ -4,7 +4,7 @@ Camada enxuta sobre o Superpowers para planejar, executar e corrigir projetos se
 
 ## Skills
 
-- **`sdd-planning`**: transforma escopo, plano mestre e design em uma especificação central e planos executáveis. Usa perfil Lean por padrão e só adiciona artefatos quando o risco real justificar.
+- **`sdd-planning`**: transforma escopo, plano mestre e design em uma especificação central e planos executáveis. Seleciona automaticamente um perfil proporcional ao risco ou respeita o perfil informado pelo usuário.
 - **`executar-plano`**: aplica política de modelos e checkpoints sobre `superpowers:subagent-driven-development`, reutilizando ledger, task briefs, relatórios e pacotes de revisão da skill-base.
 - **`corrigir-bug`**: aplica `superpowers:systematic-debugging` com fluxo proporcional à criticidade do bug.
 
@@ -33,6 +33,20 @@ Somente quando houver conteúdo real:
 
 Rastreabilidade detalhada, evidência consolidada, mapas visuais completos, specs complementares e revisão adversarial ficam restritos a projetos que realmente exigem esse nível de garantia.
 
+## Perfis de garantia
+
+- **Lean**: um spec central, auto-revisão, jornadas críticas e documentação viva mínima. Indicado para a maioria dos MVPs e sistemas comerciais.
+- **Standard**: permite até três specs complementares e revisão cruzada dos contratos e regras críticas. Indicado quando vários fatores de risco relevantes coexistem.
+- **Full**: garantia ampliada para auditoria, regulação, segurança elevada ou risco operacional grave.
+
+Sem argumento, `sdd-planning` usa `auto`: faz uma análise curta dos riscos e informa o perfil selecionado e o motivo. Um perfil manual é sempre respeitado; riscos adicionais são registrados e controles extras ficam restritos às áreas críticas indispensáveis, sem promover o projeto inteiro.
+
+## Versionamento e aprovação
+
+O primeiro ciclo de planejamento usa `docs/superpowers/v1/`. Planejamento pendente pode ser atualizado na versão atual; após aprovação ou execução, um novo ciclo usa o próximo número e o histórico não é sobrescrito. A versão ativa fica registrada em `docs/living/PROJECT_STATE.md`.
+
+Todo planejamento novo começa como `pending_approval`. A aprovação explícita registra o estado `approved`, a data e os planos aprovados em `docs/living/PROJECT_STATE.md`. `/executar-plano` executa somente planos com essa aprovação registrada; uma aprovação explícita na conversa atual pode ser registrada imediatamente antes da execução.
+
 ## Instalação
 
 ```bash
@@ -50,8 +64,22 @@ No repositório do projeto:
 
 ```text
 /sdd-planning
+/sdd-planning auto
+/sdd-planning lean
+/sdd-planning standard
+/sdd-planning full
 /executar-plano all
 /corrigir-bug <descrição>
+```
+
+Exemplos:
+
+```text
+/sdd-planning                  # seleção automática
+/sdd-planning lean             # força Lean
+/sdd-planning standard         # força Standard
+/sdd-planning full             # força Full
+/executar-plano 1 a 3          # executa o intervalo aprovado
 ```
 
 O fluxo normal é planejar, aprovar a especificação e os planos, executar pelo `executar-plano` e usar `corrigir-bug` somente para falhas fora da execução normal de uma tarefa.

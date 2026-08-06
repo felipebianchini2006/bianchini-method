@@ -5,7 +5,27 @@ description: Use para planejar um sistema a partir de escopo, plano mestre, desi
 
 # SDD Planning Lean
 
-**Anuncie ao iniciar:** "Usando sdd-planning no perfil <Lean|Standard|Full>."
+## Argumentos
+
+- sem argumento: equivalente a `auto`;
+- `auto`: selecionar o perfil após uma análise curta dos riscos;
+- `lean`: forçar Lean;
+- `standard`: forçar Standard;
+- `full`: forçar Full.
+
+Comandos suportados:
+
+```text
+/sdd-planning
+/sdd-planning auto
+/sdd-planning lean
+/sdd-planning standard
+/sdd-planning full
+```
+
+No modo `auto`, anunciar inicialmente: "Analisando o perfil de garantia via sdd-planning." Depois da leitura inicial, informar o perfil selecionado e o motivo.
+
+Em perfil manual, anunciar desde o início: "Usando sdd-planning no perfil <Lean|Standard|Full> informado pelo usuário."
 
 ## Objetivo
 
@@ -23,7 +43,9 @@ Produzir documentação suficiente para um agente implementar corretamente, sem 
 
 ## Perfil de garantia
 
-O padrão é **Lean**. Registrar em uma linha o perfil escolhido e o motivo.
+No modo `auto`, selecionar o perfil após a leitura inicial e registrar em uma linha o perfil escolhido e o motivo.
+
+Quando o perfil for forçado manualmente, respeitar a escolha e não promover automaticamente o projeto. Registrar os riscos relevantes encontrados e aplicar controles adicionais somente às áreas críticas indispensáveis, sem transformar o projeto inteiro em Standard ou Full.
 
 ### Lean
 
@@ -47,6 +69,14 @@ Usar apenas por solicitação explícita ou necessidade de auditoria, regulaçã
 
 ## Fluxo
 
+### 0. Definir a versão de planejamento
+
+- O primeiro ciclo usa `docs/superpowers/v1/`.
+- Planejamento ainda não aprovado pode ser atualizado na versão atual.
+- Um novo ciclo iniciado após aprovação ou execução usa o próximo número disponível.
+- Nunca sobrescrever planejamento histórico aprovado ou executado.
+- Registrar a versão ativa em `docs/living/PROJECT_STATE.md`.
+
 ### 1. Ler as fontes uma vez
 
 Localizar e ler, nesta ordem:
@@ -63,7 +93,14 @@ Se o design existir, ler `references/design-import.md`. Não carregar essa refer
 
 ### 2. Criar o spec central
 
-Invocar `superpowers:brainstorming`. Quando o escopo e o plano mestre já estiverem aprovados, usar o brainstorming como validação de lacunas e decisões, sem reabrir requisitos definidos.
+Invocar `superpowers:brainstorming` com esta adaptação:
+
+- quando não existir escopo aprovado, seguir o fluxo interativo normal;
+- quando escopo e plano mestre já estiverem aprovados, usar brainstorming em modo de validação;
+- considerar o escopo aceito como entrada já aprovada pelo responsável;
+- não reabrir requisitos definidos;
+- não fazer perguntas sem uma ambiguidade que realmente bloqueie uma decisão;
+- usar um único gate final para aprovação do spec e dos planos.
 
 Salvar diretamente em:
 
@@ -103,20 +140,24 @@ Criar ou atualizar:
 - `docs/living/DECISIONS.md`: somente decisões difíceis de reverter ou que mudam contratos;
 - `docs/living/KNOWN_ISSUES.md`: somente problemas realmente abertos.
 
+Todo planejamento novo começa em `docs/living/PROJECT_STATE.md` como `pending_approval`. Após aprovação explícita do usuário, atualizar o estado para `approved`, registrando a data e os planos aprovados. Uma aprovação explícita na conversa atual pode ser registrada antes da execução.
+
 Não criar por padrão `DEVELOPMENT_LOG`, `TEST_EVIDENCE`, `REQUIREMENTS_TRACEABILITY` ou `DESIGN_IMPLEMENTATION_MAP`. O Git, o ledger do SDD, os relatórios dos agentes e os gates de teste já cobrem essas funções. Criá-los somente quando o perfil Full ou uma exigência contratual justificar.
 
 ### 5. Criar os planos
 
-Invocar `superpowers:writing-plans`.
+Invocar `superpowers:writing-plans` com esta adaptação:
 
 - Um plano deve entregar software executável e testável de forma independente.
 - Preferir poucos planos. Separar apenas por dependência real ou entrega independente.
-- Alvo de **6 a 12 tarefas por plano**; máximo de 15 sem justificativa.
+- Manter arquivos exatos, interfaces, TDD, comandos e critérios verificáveis.
+- Usar de **6 a 12 tarefas revisáveis por plano**; máximo de 15 sem justificativa. Não exigir microetapas artificiais de 2 a 5 minutos.
 - Uma tarefa é a menor entrega que um revisor pode rejeitar separadamente.
 - Incorporar setup, configuração e documentação à tarefa que depende deles.
-- Código completo no plano somente para regras críticas, contratos ambíguos ou algoritmos difíceis. Para trabalho mecânico, informar arquivos, comportamento, interfaces, teste e comando esperado. Esta calibração substitui a repetição de código da skill-base quando ela não agrega decisão.
+- Código completo no plano somente para regras críticas, algoritmos difíceis e contratos ambíguos. Não repetir código completo em tarefas mecânicas; informar arquivos, comportamento, interfaces, teste e comando esperado.
 - Cada tarefa deve apontar apenas para as seções de spec que consome.
 - Não criar tarefas separadas apenas para atualizar documentação operacional.
+- Ao terminar, não oferecer execução inline nem escolha de modo. Devolver o controle ao `sdd-planning`; a execução começa exclusivamente por `/executar-plano`.
 
 ### 6. Revisar proporcionalmente
 
