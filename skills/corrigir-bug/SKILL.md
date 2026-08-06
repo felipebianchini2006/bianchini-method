@@ -1,35 +1,68 @@
 ---
 name: corrigir-bug
-description: Use para diagnosticar e corrigir bugs em projetos SDD (ex. "/corrigir-bug <descrição>"). Camada de política sobre superpowers:systematic-debugging — não substitui o método. Exige teste que reproduz o bug antes do fix, aplica política de modelos (melhor modelo diagnostica e revisa; econômico implementa) e atualiza a documentação viva. Nunca corrige sintoma sem causa raiz confirmada.
+description: Use para diagnosticar e corrigir bugs com causa raiz, reprodução e fix mínimo. Aplica fluxo proporcional ao risco sobre superpowers:systematic-debugging, sem obrigar múltiplos agentes e documentos para bugs simples.
 ---
 
-# Corrigir Bug — política de correção sobre o systematic-debugging
+# Corrigir Bug Lean
 
-Camada fina de política. O MÉTODO de diagnóstico é o `superpowers:systematic-debugging` — invocá-lo SEMPRE, primeiro, e segui-lo à risca. Esta skill define quem faz o quê, com que modelo, e o que fica registrado.
+**Anuncie ao iniciar:** "Corrigindo bug via systematic-debugging no nível <simples|crítico>."
 
-**Anuncie ao iniciar:** "Corrigindo bug via corrigir-bug + systematic-debugging."
+## Base obrigatória
 
-## Papéis e modelos
+Invocar `superpowers:systematic-debugging` primeiro e seguir suas fases. Usar `superpowers:test-driven-development` para o teste de regressão e `superpowers:verification-before-completion` antes de concluir.
+
+Nenhum fix antes de uma causa raiz sustentada por evidência.
+
+## Classificação
+
+### Simples
+
+Bug isolado, baixo risco, contrato inalterado e mudança pequena.
+
+- Um único agente econômico capaz pode diagnosticar, criar a reprodução, implementar e testar.
+- O orquestrador revisa o diff e a evidência.
+- Não despachar um agente separado apenas para repetir o diagnóstico.
+
+### Crítico
+
+Afeta segurança, autorização, pagamentos, integridade de dados, sincronização, migração, concorrência, geolocalização ou contrato compartilhado.
+
+- O melhor modelo confirma a causa raiz.
+- Um implementador adequado aplica o fix mínimo e o teste.
+- Um revisor capaz verifica causa, escopo, regressão e contrato.
 
 | Papel | Claude Code | Codex |
 |---|---|---|
-| Diagnóstico (causa raiz) + revisão do fix | **Fable 5** | **GPT 5.6 Sol** (high/xhigh) |
-| Implementação do fix + teste | Sonnet 5 (bug simples) / Opus 5 (bug em código crítico: domínio, offline, geo, segurança) | GPT 5.6 Luna max (simples) / Terra extra alto (crítico) |
+| Diagnóstico/revisão crítica | Fable 5 | GPT 5.6 Sol high/xhigh |
+| Implementação crítica | Opus 5 | GPT 5.6 Terra extra alto |
+| Bug simples | Sonnet 5 | GPT 5.6 Luna max ou Terra alto |
 
-O diagnosticador NÃO implementa; o implementador NÃO decide causa raiz.
+Usar o nível equivalente se o modelo nomeado não estiver disponível.
 
 ## Fluxo
 
-1. **Diagnóstico (orquestrador):** invocar `superpowers:systematic-debugging` e seguir até causa raiz CONFIRMADA com evidência (reprodução observada, não hipótese). Proibido propor fix antes disso.
-2. **Teste RED primeiro (regra inviolável):** antes de qualquer correção, escrever teste automatizado que REPRODUZ o bug e observar a falha pelo motivo correto. Bug sem teste reproduzível = registrar em `KNOWN_ISSUES.md` o limite da reprodução e só então decidir com o usuário.
-3. **Fix mínimo (subagente, modelo por criticidade):** implementação cirúrgica — só o necessário para o teste passar. Sem refatoração oportunista, sem "aproveitar para melhorar" (Karpathy). Rodar teste novo + testes vizinhos do módulo.
-4. **Revisão (orquestrador):** (a) o fix ataca a causa raiz, não o sintoma; (b) diff mínimo e rastreável; (c) teste falharia sem o fix (verificar revertendo mentalmente ou com `git stash` se barato); (d) nenhuma regressão nos testes vizinhos.
-5. **Registro:** `KNOWN_ISSUES.md` (issue fechada ou atualizada), `DEVELOPMENT_LOG.md` (entrada: bug, causa raiz, fix, commit), `TEST_EVIDENCE.md` (comando + resultado do teste novo). Se o bug revelou lacuna de spec/plano: emendar o documento citando a spec — nunca deixar código e spec divergentes.
-6. **Commit:** `fix: <causa raiz em 1 linha>` incluindo o teste. Se em worktree de execução de plano, seguir o fluxo do plano; se em main, branch própria.
+1. Reproduzir de forma consistente e reunir evidência.
+2. Confirmar a causa raiz, não apenas o componente onde o erro aparece.
+3. Criar teste automatizado RED. Quando isso não for tecnicamente viável, usar o menor script reproduzível ou procedimento manual determinístico e registrar a limitação.
+4. Aplicar um único fix cirúrgico, sem refatoração oportunista.
+5. Rodar o teste novo e os testes diretamente vizinhos.
+6. Revisar o diff e verificar que o teste falharia sem o fix.
+7. Commitar como `fix: <causa raiz em uma linha>`.
 
-## Regras
+Após três hipóteses ou fixes sem sucesso, parar e revisar a arquitetura conforme `systematic-debugging`. Não empilhar tentativas.
 
-- Bug crítico ou importante NUNCA vai para `KNOWN_ISSUES.md` como forma de adiamento sem decisão explícita do responsável.
-- Fix que exige mudança de contrato/interface fixada em spec: PARAR e pedir decisão (ordem de autoridade — spec vence código).
-- Máximo 2 ciclos de correção do fix reprovado; no 3º, escalar modelo do implementador um nível.
-- Se durante o diagnóstico surgirem OUTROS bugs: registrar em `KNOWN_ISSUES.md` e não corrigi-los nesta sessão (escopo cirúrgico), salvo se bloquearem a reprodução.
+## Documentação
+
+O commit e o teste são o registro padrão de um bug resolvido.
+
+Atualizar:
+
+- `KNOWN_ISSUES.md` somente se o problema continuar aberto ou existir limitação conhecida;
+- `DECISIONS.md` somente se houver decisão de contrato ou arquitetura;
+- `PROJECT_STATE.md` somente se o bug alterar status, entrega ou bloqueio.
+
+Não atualizar `DEVELOPMENT_LOG` e `TEST_EVIDENCE` para cada bug por padrão.
+
+Se o bug revelar divergência entre código e spec, corrigir a fonte errada. Se exigir mudança de requisito ou contrato aprovado, parar e pedir decisão antes de alterar.
+
+Outros bugs encontrados entram em `KNOWN_ISSUES.md` apenas quando reais e relevantes. Não corrigi-los na mesma sessão salvo se bloquearem a reprodução.
