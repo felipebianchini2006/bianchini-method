@@ -85,10 +85,14 @@ Ao concluir cada plano, executar seus comandos de saída. Reexecutar somente o e
 
 Quando o intervalo contém vários planos, adiar a revisão ampla de branch e `finishing-a-development-branch` até o último plano selecionado. Os gates de cada plano continuam obrigatórios. Fazer uma única revisão ampla no final do intervalo, além das revisões por tarefa, e não finalizar a branch separadamente após cada plano.
 
+Se o intervalo incluir o último plano aprovado e `docs/living/PROJECT_STATE.md` registrar `final_gate: homologar-sistema`, invocar `homologar-sistema` automaticamente depois dos gates locais e antes da revisão ampla final. Manter as correções encontradas na mesma branch; somente após aceite executar a única revisão ampla e `superpowers:finishing-a-development-branch`.
+
+Se ambiente ou integração externa impedir a homologação, não finalizar o projeto como entregue. Registrar `BLOQUEADO`, o que foi validado com fake ou sandbox e o requisito restante. Bugs da homologação são corrigidos exclusivamente por `corrigir-bug`.
+
 ## Paradas permitidas
 
 Parar somente por bloqueio externo indispensável, contradição entre specs, decisão do responsável realmente necessária ou gate irrecuperável. Não pedir autorização entre tarefas ou planos do intervalo solicitado.
 
 ## Resposta final
 
-Informar planos concluídos, gates executados, commits principais, decisões alteradas e bloqueios abertos. Não repetir relatórios completos dos subagentes.
+Informar planos concluídos, gates executados, resultado da homologação, caminhos do resumo e manual PDF, commits principais, decisões alteradas e bloqueios abertos. Não repetir relatórios completos dos subagentes.

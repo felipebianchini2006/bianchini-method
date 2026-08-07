@@ -136,9 +136,20 @@ No perfil Lean, preferir seções no spec central. No Standard, limitar a três 
 
 Criar ou atualizar:
 
-- `docs/living/PROJECT_STATE.md`: versão ativa, planos, status por plano, bloqueios e próximo passo;
+- `docs/living/PROJECT_STATE.md`: versão ativa, planos, status por plano, bloqueios, próximo passo e o gate final abaixo;
 - `docs/living/DECISIONS.md`: somente decisões difíceis de reverter ou que mudam contratos;
 - `docs/living/KNOWN_ISSUES.md`: somente problemas realmente abertos.
+
+Registrar no `PROJECT_STATE.md`:
+
+```yaml
+final_gate: homologar-sistema
+release_platforms: [plataformas previstas]
+release_profiles: [perfis previstos]
+manual_pdf: required
+```
+
+O manual PDF é obrigatório por padrão. Uma exceção precisa estar explicitamente aprovada no estado do projeto.
 
 Todo planejamento novo começa em `docs/living/PROJECT_STATE.md` como `pending_approval`. Após aprovação explícita do usuário, atualizar o estado para `approved`, registrando a data e os planos aprovados. Uma aprovação explícita na conversa atual pode ser registrada antes da execução.
 
@@ -152,6 +163,7 @@ Invocar `superpowers:writing-plans` com esta adaptação:
 - Preferir poucos planos. Separar apenas por dependência real ou entrega independente.
 - Manter arquivos exatos, interfaces, TDD, comandos e critérios verificáveis.
 - Usar de **6 a 12 tarefas revisáveis por plano**; máximo de 15 sem justificativa. Não exigir microetapas artificiais de 2 a 5 minutos.
+- Não criar um plano extenso de jornadas finais. Cada plano mantém somente seu gate local e os requisitos técnicos de release que realmente implementa; `homologar-sistema` monta a matriz final a partir do escopo concluído.
 - Uma tarefa é a menor entrega que um revisor pode rejeitar separadamente.
 - Incorporar setup, configuração e documentação à tarefa que depende deles.
 - Código completo no plano somente para regras críticas, algoritmos difíceis e contratos ambíguos. Não repetir código completo em tarefas mecânicas; informar arquivos, comportamento, interfaces, teste e comando esperado.
