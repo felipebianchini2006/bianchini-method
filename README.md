@@ -7,6 +7,7 @@ Camada enxuta sobre o Superpowers para planejar, executar, homologar e corrigir 
 - **`sdd-planning`**: transforma escopo, plano mestre e design em uma especificação central e planos executáveis. Seleciona automaticamente um perfil proporcional ao risco ou respeita o perfil informado pelo usuário.
 - **`executar-plano`**: aplica política de modelos e checkpoints sobre `superpowers:subagent-driven-development`, reutilizando ledger, task briefs, relatórios e pacotes de revisão da skill-base.
 - **`homologar-sistema`**: valida o release candidate por perfis e plataformas contratadas, controla correções bloqueantes e gera o manual PDF da versão testada.
+- **`status-projeto`**: resume fase, planos, gate final, bloqueios e próximo comando sem exigir que o usuário abra os arquivos do projeto.
 - **`corrigir-bug`**: aplica `superpowers:systematic-debugging` com fluxo proporcional à criticidade do bug.
 
 ## Princípios
@@ -51,7 +52,7 @@ Todo planejamento novo começa como `pending_approval`. A aprovação explícita
 ## Instalação
 
 ```bash
-for s in sdd-planning executar-plano homologar-sistema corrigir-bug; do
+for s in sdd-planning executar-plano homologar-sistema status-projeto corrigir-bug; do
   mkdir -p ~/.claude/skills/$s
   cp -R skills/$s/. ~/.claude/skills/$s/
 done
@@ -71,6 +72,7 @@ No repositório do projeto:
 /sdd-planning full
 /executar-plano all
 /homologar-sistema
+/status-projeto
 /corrigir-bug <descrição>
 ```
 
