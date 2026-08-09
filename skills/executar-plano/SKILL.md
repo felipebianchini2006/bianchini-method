@@ -55,6 +55,14 @@ Escolher o menor modelo capaz de concluir em poucos turnos. Não registrar tabel
 
 Orquestração e revisão final usam o melhor modelo disponível. Se um nome não existir no ambiente, usar o nível equivalente disponível.
 
+## Decisões durante a execução
+
+Quando surgirem duas ou mais opções técnicas compatíveis com o escopo aprovado, decidir autonomamente e continuar. Avaliar arquitetura vigente, padrões já usados no repositório, contratos, risco, simplicidade, testabilidade e custo de manutenção; escolher a opção que seria apresentada como recomendada.
+
+Não interromper o desenvolvimento para pedir ao usuário que escolha entre a recomendação e alternativas inferiores. Resolver primeiro qualquer dúvida que possa ser eliminada lendo código, documentação, testes ou histórico. Registrar a escolha no relatório da tarefa e atualizar `docs/living/DECISIONS.md` somente se ela for difícil de reverter ou alterar arquitetura ou contrato.
+
+Pedir decisão ao responsável somente quando nenhuma opção puder ser escolhida tecnicamente sem mudar escopo, regra de negócio ou contrato aprovado, ou quando a ação exigir autorização externa, custo novo relevante, operação destrutiva ou alteração de produção.
+
 ## Execução por tarefa
 
 - Manter uma tarefa por dispatch, como exige o `subagent-driven-development`.
@@ -92,6 +100,8 @@ Se ambiente ou integração externa impedir a homologação, não finalizar o pr
 ## Paradas permitidas
 
 Parar somente por bloqueio externo indispensável, contradição entre specs, decisão do responsável realmente necessária ou gate irrecuperável. Não pedir autorização entre tarefas ou planos do intervalo solicitado.
+
+A existência de múltiplas opções técnicas não é uma parada permitida: aplicar a regra de decisão autônoma e seguir com a recomendada.
 
 ## Resposta final
 
