@@ -14,7 +14,7 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md). Resolva o
 ## 1. Preflight e rota
 
 1. Executar `bm.py route`.
-2. V1: exigir Superpowers e usar integralmente o executor legado. Se ausente, `BLOQUEADO`. Não usar nenhuma etapa v2 abaixo.
+2. V1: exigir Superpowers e usar integralmente o executor legado. Se ausente, `BLOQUEADO`. Não usar nenhuma etapa v2 enquanto a fase estiver em andamento. Depois do encerramento completo, executar a transição da seção 8.
 3. V2: executar `bm.py validate-state` e `bm.py snapshot verify`.
 4. Executar `bm.py repo-hygiene check --repo <repo>`; bloquear `.superpowers/` rastreado ou ausência do ignore versionado.
 5. Se aprovação ainda estiver pending, registrar apenas aprovação explícita inequívoca do digest atual. Concluir a transação descrita em `sdd-planning`: verificar snapshot, commitar localmente somente pacote/estado/manifesto e exigir árvore limpa. O comando de execução não vale como aprovação.
@@ -125,10 +125,28 @@ Se o host não invocar skills por nome, ler e cumprir diretamente `corrigir-bug`
 
 Manual/PDF só entra na entrega quando `manual_pdf` e o escopo exigirem.
 
+## 8. Transição automática após encerramento legado
+
+Quando uma fase v1 concluir todos os gates, verificação final e entrega do próprio fluxo legado, não pedir nova aprovação de migração e não iniciar outro ciclo v1.
+
+1. concluir e commitar integralmente a fase legado; exigir `git status --porcelain` vazio;
+2. executar somente então:
+
+```bash
+<bm.py> legacy-transition --repo <repo> --state <PROJECT_STATE.md> --completed
+```
+
+3. confirmar que o estado legado foi preservado em `docs/bianchini/legacy/transitions/`, que o estado ativo valida como v2 `idle` e que `repo-hygiene check` passa;
+4. em `AGENTS.md` e `CLAUDE.md`, quando existirem, substituir apenas o workflow ativo legado pelo Bianchini Method v2; preservar regras próprias do projeto e referências históricas;
+5. adicionar essas instruções à transição preparada pelo CLI, validar novamente e criar commit local atômico `chore: transition completed legacy project to Bianchini Method v2`;
+6. confirmar árvore limpa. O próximo escopo usa `/sdd-planning` standalone com `planning_version: v1`.
+
+`--completed` é uma afirmação operacional do executor: nunca usar antes do encerramento real, em fase bloqueada ou com trabalho não commitado. A transição não reexecuta nem converte o plano concluído. Se qualquer precondição falhar, manter v1 e bloquear sem escrita parcial deliberada.
+
 ## Paradas
 
 Parar por Superpowers ausente em v1, estado/snapshot inválido, worktree insegura, aprovação ausente, mudança de contrato, defeito direto bloqueante, ação sensível sem autorização, breaker, gate irrecuperável ou dependência externa indispensável.
 
 ## Saída
 
-Informar rota, planos/modos, workspaces, gates, homologação, revisão final, commits, ledgers/checkpoints, manual quando aplicável e bloqueios. Não fazer push, merge, deploy ou publicação por inferência.
+Informar rota, planos/modos, workspaces, gates, homologação, revisão final, commits, ledgers/checkpoints, transição legado → v2 quando aplicável, manual e bloqueios. Não fazer push, merge, deploy ou publicação por inferência.

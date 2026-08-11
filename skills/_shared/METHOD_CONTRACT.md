@@ -12,9 +12,21 @@ Com estado existente, execute `bm.py route docs/living/PROJECT_STATE.md`. Sem es
 
 - Superpowers disponível: devolver `v1-superpowers` e seguir integralmente o fluxo legado, seus caminhos, ledger, dispatch, revisão e retomada.
 - Superpowers ausente: `BLOQUEADO`; informar a dependência e não executar com o motor v2.
-- Nunca migrar, renumerar, normalizar estado em disco ou criar artefatos v2 automaticamente.
+- Nunca migrar, renumerar, normalizar estado ou criar artefatos v2 no meio de uma fase legado.
 
-Migração para v2 só existe após autorização explícita do responsável. Nesse caso, executar `bm.py route --repo <repo> --new-project --migrate-to-v2`, preservar planos legados sob `docs/` como históricos, atualizar as regras do repositório e criar um estado bootstrap v2 com `planning_status: in_progress`. O bootstrap pode ter `plans: []` somente enquanto o novo planejamento ainda está sendo produzido; antes de `pending_approval`, deve existir ao menos um plano completo.
+Durante um ciclo ativo, migração para v2 só existe após autorização explícita do responsável. Nesse caso, executar `bm.py route --repo <repo> --new-project --migrate-to-v2`, preservar planos legados sob `docs/` como históricos, atualizar as regras do repositório e criar um estado bootstrap v2 com `planning_status: in_progress`. O bootstrap pode ter `plans: []` somente enquanto o novo planejamento ainda está sendo produzido; antes de `pending_approval`, deve existir ao menos um plano completo.
+
+### Encerramento definitivo do legado
+
+Depois que o executor v1 concluir e commitar todos os gates, verificação final e entrega, a migração deixa de exigir nova aprovação e passa a ser parte obrigatória do encerramento:
+
+```bash
+bm.py legacy-transition --repo <repo> --state <PROJECT_STATE.md> --completed
+```
+
+O comando exige repositório Git limpo e estado legado commitado, preserva seus bytes em `docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md`, aplica a higiene de `/.superpowers/`, substitui o estado ativo por v2 `idle` e prepara as mudanças no índice. O executor atualiza somente as regras ativas de `AGENTS.md`/`CLAUDE.md`, valida, cria um commit local atômico e deixa a árvore limpa. O plano concluído não é convertido nem reexecutado; o próximo escopo começa standalone em `planning_version: v1`.
+
+`--completed` nunca pode ser usado como atalho: fase em andamento, bloqueada ou não commitada permanece v1. O estado `idle` é reproduzível, não possui escopo aprovado, spec, revisão, plano, aprovação ou execução ativa. `/sdd-planning` transforma `idle` em `in_progress` somente quando houver novo escopo aprovado.
 
 Valores legados reconhecidos apenas para leitura/status:
 
@@ -31,6 +43,7 @@ Valores legados reconhecidos apenas para leitura/status:
 `method_version: 2` e `method_mode: standalone-adaptive` usam somente o motor deste pacote. Superpowers não é lido nem necessário.
 
 - marcador ausente sem legado: somente `sdd-planning` inicia v2;
+- estado v2 `idle`: encerramento legado concluído; o próximo `/sdd-planning` é standalone e não usa Superpowers;
 - marcador ausente com `docs/superpowers/vN/`: tratar como v1 provisório;
 - marcador inválido, duplicado ou futuro: `BLOQUEADO`, sem downgrade.
 

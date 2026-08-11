@@ -26,9 +26,11 @@ escopo aprovado
 method_version: 1 # ou estado legado existente sem method_version
 ```
 
-Continuam integralmente no fluxo legado Superpowers. A v2 preserva caminhos, ledger, dispatch, revisão e retomada existentes. Se Superpowers não estiver disponível, a execução v1 bloqueia claramente; nunca usa o executor standalone nem migra automaticamente.
+Continuam integralmente no fluxo legado Superpowers enquanto a fase atual estiver em andamento. A v2 preserva caminhos, ledger, dispatch, revisão e retomada existentes. Se Superpowers não estiver disponível, a execução v1 bloqueia claramente; nunca usa o executor standalone no meio da fase.
 
 Quando o responsável autorizar explicitamente, `route --migrate-to-v2` inicia uma migração controlada: preserva documentação v1 sob `docs/`, atualiza as instruções do repositório e cria um estado bootstrap v2. Sem essa autorização, a compatibilidade legado continua vencendo.
+
+Ao concluir e commitar todos os gates e a entrega da última fase legado, `executar-plano` roda `legacy-transition --completed`: arquiva o estado v1, aplica a higiene da raiz e cria um estado v2 `idle`. O próximo escopo abre `planning_version: v1` por `/sdd-planning` standalone, sem nova aprovação de migração e sem reexecutar a fase encerrada.
 
 ### Projetos v2
 
@@ -69,7 +71,7 @@ Fix rounds: Lean 2, Standard 3, Full 5. Não há quantidade mínima de tarefas o
 O CLI usa somente a biblioteca padrão Python e fornece:
 
 ```text
-validate-state  route  snapshot  policy  workspace(create|check|locate|resume)
+validate-state  route  legacy-transition  snapshot  policy  workspace(create|check|locate|resume)
 repo-hygiene(check|migrate)  task-brief  report  review-package
 checkpoint  proof-map  telemetry  status
 ```

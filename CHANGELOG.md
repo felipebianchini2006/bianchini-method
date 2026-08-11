@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.3 — Encerramento legado com transição automática
+
+- mantém toda fase v1 no Superpowers até gates, verificação, entrega e commit finais;
+- adiciona `legacy-transition --completed` com preflight de árvore limpa e estado commitado;
+- preserva o estado v1 byte a byte e cria estado v2 `idle` para o próximo escopo;
+- inicia o primeiro ciclo standalone como `planning_version: v1`, sem chamada a skills Superpowers;
+- mantém migração de ciclo legado ainda ativo dependente de autorização explícita.
+
 ## 2.3.2 — Migração explícita e higiene da raiz
 
 - adiciona rota explícita e auditável de projetos v1 para v2;

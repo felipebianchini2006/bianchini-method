@@ -135,10 +135,64 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
     approval = state["approval"]
     plans = state["plans"]
     plan_ids = [item["id"] for item in plans]
-    if not plans and state["planning_status"] != "in_progress":
+    planning_status = state["planning_status"]
+    if not plans and planning_status not in {"idle", "in_progress"}:
         errors.append(
-            "state.plans: ao menos um plano é obrigatório fora do bootstrap in_progress"
+            "state.plans: ao menos um plano é obrigatório fora de idle/in_progress"
         )
+    if planning_status == "idle":
+        if state["scope"] != {
+            "status": "pending",
+            "source": None,
+            "approved_at": None,
+        }:
+            errors.append("state.scope: idle exige escopo pendente e sem fonte aprovada")
+        if state["planning"] != {"spec": None, "review": None}:
+            errors.append("state.planning: idle não pode apontar spec ou revisão")
+        if approval["status"] != "pending":
+            errors.append("state.approval.status: idle exige aprovação pending")
+        if approval.get("approved_at") is not None or approval.get("approved_by") is not None:
+            errors.append("state.approval: idle não pode conter aprovação anterior")
+        if approval["approved_plans"]:
+            errors.append("state.approval.approved_plans: idle exige lista vazia")
+        if approval["package"].get("manifest_digest") is not None:
+            errors.append("state.approval.package.manifest_digest: idle exige null")
+        if approval["package"]["files"]:
+            errors.append("state.approval.package.files: idle exige lista vazia")
+        if plans:
+            errors.append("state.plans: idle exige lista vazia")
+        if state.get("active_execution") is not None:
+            errors.append("state.active_execution: idle exige null")
+        idle_verification = {
+            "fast": {"commands": [], "status": "pending"},
+            "plan": {"commands": [], "status": "pending"},
+            "release": {"commands": [], "status": "pending"},
+        }
+        if state["verification"] != idle_verification:
+            errors.append("state.verification: idle exige gates pendentes e sem comandos")
+        idle_release = {
+            "status": "pending",
+            "platforms": [],
+            "profiles": [],
+            "candidate": None,
+            "final_gate": "homologar-sistema",
+            "homologation": "pending",
+            "final_review": "pending",
+            "delivery": "pending",
+        }
+        if state["release"] != idle_release:
+            errors.append("state.release: idle exige release reinicializado")
+        if state["architecture_audit_status"] != "not_run":
+            errors.append("state.architecture_audit_status: idle exige not_run")
+        if state["blockers"]:
+            errors.append("state.blockers: idle exige lista vazia")
+        if state.get("telemetry", {}).get("enabled"):
+            errors.append("state.telemetry.enabled: idle exige false")
+    else:
+        if state["scope"]["status"] != "approved" or not state["scope"]["source"]:
+            errors.append("state.scope: ciclo ativo exige escopo aprovado e fonte local")
+        if not state["planning"]["spec"] or not state["planning"]["review"]:
+            errors.append("state.planning: ciclo ativo exige spec e revisão")
     if len(plan_ids) != len(set(plan_ids)):
         errors.append("state.plans: IDs duplicados")
     active = state.get("active_execution")
@@ -348,6 +402,10 @@ def confined_path(root: Path, value: str, label: str) -> Path:
 
 ROOT_SUPERPOWERS_IGNORE = "/.superpowers/"
 ROOT_SUPERPOWERS_ARCHIVE = "docs/bianchini/legacy/root-superpowers"
+LEGACY_STATE_ARCHIVE = "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md"
+IDLE_NEXT_ACTION = (
+    "Aguardar novo escopo; então executar /sdd-planning para iniciar o ciclo v1 standalone."
+)
 
 
 def tracked_root_superpowers(root: Path) -> list[str]:
@@ -471,6 +529,165 @@ def repository_hygiene(
         "ignore_rule": ROOT_SUPERPOWERS_IGNORE,
         "archive_root": archive_root.relative_to(root).as_posix(),
         "staged": True,
+    }
+
+
+def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
+    if not re.fullmatch(r"v[1-9][0-9]*", planning_version):
+        raise BMError("planning_version inválida; esperado v1, v2, ...")
+    return {
+        "method_version": 2,
+        "method_mode": "standalone-adaptive",
+        "planning_version": planning_version,
+        "planning_status": "idle",
+        "execution_policy": "adaptive",
+        "assurance_profile": "lean",
+        "architecture_audit": "optional",
+        "architecture_audit_status": "not_run",
+        "manual_pdf": "scope",
+        "scope": {"status": "pending", "source": None, "approved_at": None},
+        "planning": {"spec": None, "review": None},
+        "approval": {
+            "status": "pending",
+            "approved_at": None,
+            "approved_by": None,
+            "approved_plans": [],
+            "package": {
+                "algorithm": "sha256-manifest-v1",
+                "manifest_path": (
+                    f"artifacts/bianchini/{planning_version}/approval/manifest.sha256"
+                ),
+                "manifest_digest": None,
+                "files": [],
+            },
+        },
+        "plans": [],
+        "verification": {
+            "fast": {"commands": [], "status": "pending"},
+            "plan": {"commands": [], "status": "pending"},
+            "release": {"commands": [], "status": "pending"},
+        },
+        "release": {
+            "status": "pending",
+            "platforms": [],
+            "profiles": [],
+            "candidate": None,
+            "final_gate": "homologar-sistema",
+            "homologation": "pending",
+            "final_review": "pending",
+            "delivery": "pending",
+        },
+        "active_execution": None,
+        "telemetry": {
+            "enabled": False,
+            "path": f"artifacts/bianchini/{planning_version}/telemetry.jsonl",
+        },
+        "blockers": [],
+        "next_action": IDLE_NEXT_ACTION,
+    }
+
+
+def legacy_transition(
+    repo: Path,
+    state_path: Path,
+    completed: bool,
+    archive: str = LEGACY_STATE_ARCHIVE,
+) -> dict[str, Any]:
+    root = repo.resolve()
+    top = Path(run_git(["rev-parse", "--show-toplevel"], root)).resolve()
+    if top != root:
+        raise BMError(f"--repo deve apontar para a raiz Git: {top}")
+    candidate = state_path if state_path.is_absolute() else root / state_path
+    resolved_state = candidate.resolve()
+    try:
+        state_relative = resolved_state.relative_to(root)
+    except ValueError as error:
+        raise BMError("estado legado deve ficar dentro do repositório") from error
+    if candidate.is_symlink() or not resolved_state.is_file():
+        raise BMError("estado legado deve ser arquivo regular dentro do repositório")
+
+    current = load_state(resolved_state)
+    if current.get("method_version") == 2:
+        validated = validate_state(resolved_state)
+        if validated["planning_status"] != "idle":
+            raise BMError(
+                "BLOQUEADO: projeto já está em v2 com ciclo ativo",
+                EXIT_BLOCKED,
+            )
+        return {
+            "transitioned": False,
+            "already_transitioned": True,
+            "route": "v2-standalone",
+            "planning_status": "idle",
+            "planning_version": validated["planning_version"],
+            "state": state_relative.as_posix(),
+        }
+    if current.get("method_version") != 1:
+        raise BMError("BLOQUEADO: somente estado legado v1 pode transicionar", EXIT_BLOCKED)
+    if not completed:
+        raise BMError(
+            "BLOQUEADO: --completed é obrigatório e só pode ser informado após gates, entrega e encerramento legado",
+            EXIT_BLOCKED,
+        )
+    dirty = run_git(["status", "--porcelain=v1", "--untracked-files=all"], root)
+    if dirty:
+        changed = [line[3:] if len(line) > 3 else line for line in dirty.splitlines()]
+        raise BMError(
+            "BLOQUEADO: transição legado → v2 exige fase concluída commitada e árvore limpa: "
+            + ", ".join(changed[:8]),
+            EXIT_BLOCKED,
+        )
+    try:
+        tracked = run_git(
+            ["ls-files", "--error-unmatch", "--", state_relative.as_posix()], root
+        )
+    except BMError as error:
+        raise BMError(
+            "BLOQUEADO: estado legado deve estar commitado no HEAD", EXIT_BLOCKED
+        ) from error
+    if tracked != state_relative.as_posix():
+        raise BMError("BLOQUEADO: estado legado deve estar commitado no HEAD", EXIT_BLOCKED)
+
+    legacy_bytes = resolved_state.read_bytes()
+    archive_path = confined_path(root, archive, "arquivo histórico do estado legado")
+    if archive_path == resolved_state:
+        raise BMError("arquivo histórico deve ser diferente do estado ativo")
+    if archive_path.exists() and (
+        archive_path.is_symlink()
+        or not archive_path.is_file()
+        or archive_path.read_bytes() != legacy_bytes
+    ):
+        raise BMError(
+            f"BLOQUEADO: arquivo histórico já existe com conteúdo diferente: {archive}",
+            EXIT_BLOCKED,
+        )
+
+    repository_hygiene(root, True)
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    if not archive_path.exists():
+        archive_path.write_bytes(legacy_bytes)
+    next_state = idle_v2_state("v1")
+    resolved_state.write_text(
+        json.dumps(next_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    validate_state(resolved_state)
+    run_git(
+        ["add", "--", state_relative.as_posix(), archive_path.relative_to(root).as_posix()],
+        root,
+    )
+    repository_hygiene(root, False)
+    staged = run_git(["diff", "--cached", "--name-only"], root).splitlines()
+    return {
+        "transitioned": True,
+        "already_transitioned": False,
+        "route": "v2-standalone",
+        "planning_status": "idle",
+        "planning_version": "v1",
+        "state": state_relative.as_posix(),
+        "legacy_archive": archive_path.relative_to(root).as_posix(),
+        "staged": sorted(staged),
+        "next_action": IDLE_NEXT_ACTION,
     }
 
 
@@ -1224,6 +1441,12 @@ def parser() -> argparse.ArgumentParser:
     hygiene.add_argument("--repo", type=Path, default=Path.cwd())
     hygiene.add_argument("--destination", default=ROOT_SUPERPOWERS_ARCHIVE)
 
+    transition = commands.add_parser("legacy-transition")
+    transition.add_argument("--repo", type=Path, default=Path.cwd())
+    transition.add_argument("--state", type=Path, required=True)
+    transition.add_argument("--completed", action="store_true")
+    transition.add_argument("--archive", default=LEGACY_STATE_ARCHIVE)
+
     snap = commands.add_parser("snapshot")
     snap.add_argument("action", choices=["create", "verify"])
     snap.add_argument("state", type=Path)
@@ -1322,6 +1545,15 @@ def main() -> int:
                     args.repo,
                     args.action == "migrate",
                     args.destination,
+                )
+            )
+        elif args.command == "legacy-transition":
+            emit(
+                legacy_transition(
+                    args.repo,
+                    args.state,
+                    args.completed,
+                    args.archive,
                 )
             )
         elif args.command == "snapshot":

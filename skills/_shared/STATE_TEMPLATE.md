@@ -81,8 +81,9 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
 ## Semântica
 
 - `planning_version` versiona o ciclo documental (`v1`, `v2`...), não o método.
+- `planning_status: idle` é criado somente no encerramento automático de um projeto legado. Nesse estado, `scope` fica pending/sem fonte, `planning.spec` e `planning.review` ficam nulos, aprovação e manifesto ficam vazios, `plans: []` e `active_execution: null`. O próximo `/sdd-planning` mantém `planning_version: v1` e muda para `in_progress` ao receber novo escopo aprovado.
 - Migração explícita pode iniciar com `planning_status: in_progress`, aprovação pending e `plans: []`. Esse bootstrap serve somente para fixar a rota v2; deve receber planos reais antes de `pending_approval`, snapshot ou aprovação.
-- `planning_status`: `in_progress | pending_approval | approved | blocked`.
+- `planning_status`: `idle | in_progress | pending_approval | approved | blocked`.
 - `assurance_profile`: `lean | standard | full`.
 - `architecture_audit`: `disabled | optional | required`; é uma auditoria manual e report-only, nunca ativada automaticamente por risco ou perfil.
 - `architecture_audit_status: passed` significa relatório concluído, não certificação nem gate de aprovação.

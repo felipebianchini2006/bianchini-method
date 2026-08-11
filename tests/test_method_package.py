@@ -209,6 +209,37 @@ class RoutingAndStateScenarios(unittest.TestCase):
             self.assertEqual(invalid.returncode, 2)
             self.assertIn("ao menos um plano", invalid.stderr)
 
+    def test_idle_state_is_valid_only_without_scope_plan_or_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            state_path = repo / "docs/living/PROJECT_STATE.md"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text("method_version: 1\nstatus: completed\n", encoding="utf-8")
+            git(repo, "add", "docs/living/PROJECT_STATE.md")
+            git(repo, "commit", "-m", "complete legacy phase")
+
+            transitioned = cli_json(
+                "legacy-transition",
+                "--repo",
+                str(repo),
+                "--state",
+                "docs/living/PROJECT_STATE.md",
+                "--completed",
+            )
+            self.assertTrue(transitioned["transitioned"])
+            valid = cli("validate-state", str(state_path))
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+
+            state = json.loads(read(state_path))
+            state["approval"]["package"]["files"] = ["docs/old-plan.md"]
+            state["release"]["homologation"] = "accepted"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            invalid = cli("validate-state", str(state_path))
+            self.assertEqual(invalid.returncode, 2)
+            self.assertIn("idle exige lista vazia", invalid.stderr)
+            self.assertIn("idle exige release reinicializado", invalid.stderr)
+
     def test_v1_with_superpowers_uses_legacy_route(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             superpowers = Path(temp) / "superpowers"
@@ -588,6 +619,108 @@ class AdaptivePolicyScenarios(unittest.TestCase):
 
 
 class WorkspaceAndArtifactScenarios(unittest.TestCase):
+    def test_completed_legacy_phase_transitions_to_idle_v2_and_archives_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            legacy = b"method_version: 1\nstatus: completed\ncycle: legacy-final\n"
+            state_path = repo / "docs/living/PROJECT_STATE.md"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_bytes(legacy)
+            root_artifact = repo / ".superpowers/sdd/final-report.md"
+            root_artifact.parent.mkdir(parents=True)
+            root_artifact.write_text("legacy evidence\n", encoding="utf-8")
+            git(repo, "add", "docs/living/PROJECT_STATE.md")
+            git(repo, "add", "-f", ".superpowers/sdd/final-report.md")
+            git(repo, "commit", "-m", "complete legacy delivery")
+
+            refused = cli(
+                "legacy-transition",
+                "--repo",
+                str(repo),
+                "--state",
+                "docs/living/PROJECT_STATE.md",
+            )
+            self.assertEqual(refused.returncode, 3)
+            self.assertIn("--completed é obrigatório", refused.stderr)
+            self.assertEqual(state_path.read_bytes(), legacy)
+
+            result = cli_json(
+                "legacy-transition",
+                "--repo",
+                str(repo),
+                "--state",
+                "docs/living/PROJECT_STATE.md",
+                "--completed",
+            )
+            archive = repo / "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md"
+            moved_artifact = (
+                repo
+                / "docs/bianchini/legacy/root-superpowers/sdd/final-report.md"
+            )
+            state = json.loads(read(state_path))
+            self.assertTrue(result["transitioned"])
+            self.assertEqual(result["route"], "v2-standalone")
+            self.assertEqual(state["method_version"], 2)
+            self.assertEqual(state["planning_status"], "idle")
+            self.assertEqual(state["planning_version"], "v1")
+            self.assertEqual(state["plans"], [])
+            self.assertEqual(state["scope"]["status"], "pending")
+            self.assertIsNone(state["scope"]["source"])
+            self.assertEqual(archive.read_bytes(), legacy)
+            self.assertEqual(moved_artifact.read_text(encoding="utf-8"), "legacy evidence\n")
+            self.assertFalse(root_artifact.exists())
+            self.assertEqual(
+                cli_json("route", str(state_path))["route"], "v2-standalone"
+            )
+            self.assertEqual(cli_json("status", str(state_path))["planning_status"], "idle")
+            self.assertTrue(
+                cli_json("repo-hygiene", "check", "--repo", str(repo))["valid"]
+            )
+            staged = git(repo, "diff", "--cached", "--name-only").splitlines()
+            self.assertIn("docs/living/PROJECT_STATE.md", staged)
+            self.assertIn(
+                "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md", staged
+            )
+
+            repeated = cli_json(
+                "legacy-transition",
+                "--repo",
+                str(repo),
+                "--state",
+                "docs/living/PROJECT_STATE.md",
+                "--completed",
+            )
+            self.assertTrue(repeated["already_transitioned"])
+            self.assertFalse(repeated["transitioned"])
+
+    def test_legacy_transition_blocks_dirty_repository_without_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            legacy = b"method_version: 1\nstatus: completed\n"
+            state_path = repo / "docs/living/PROJECT_STATE.md"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_bytes(legacy)
+            git(repo, "add", "docs/living/PROJECT_STATE.md")
+            git(repo, "commit", "-m", "complete legacy phase")
+            (repo / "uncommitted.txt").write_text("user work\n", encoding="utf-8")
+
+            result = cli(
+                "legacy-transition",
+                "--repo",
+                str(repo),
+                "--state",
+                str(state_path),
+                "--completed",
+            )
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("árvore limpa", result.stderr)
+            self.assertEqual(state_path.read_bytes(), legacy)
+            self.assertFalse(
+                (repo / "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md").exists()
+            )
+
     def test_repo_hygiene_archives_tracked_root_artifacts_and_adds_ignore(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -1278,6 +1411,18 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("/.superpowers/", contract)
         self.assertIn("docs/bianchini/legacy/root-superpowers/", contract)
         self.assertIn("/.superpowers/", read(ROOT / ".gitignore"))
+
+    def test_completed_legacy_execution_requires_automatic_idle_v2_transition(self) -> None:
+        planning = read(SKILLS["sdd-planning"])
+        executor = read(SKILLS["executar-plano"])
+        contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
+        self.assertIn("legacy-transition --repo", executor)
+        self.assertIn("--completed", executor)
+        self.assertIn("não pedir nova aprovação de migração", executor)
+        self.assertIn("planning_status: idle", planning)
+        self.assertIn("Não chamar `writing-plans`", planning)
+        self.assertIn("Encerramento definitivo do legado", contract)
+        self.assertIn("árvore limpa", contract)
 
     def test_homologation_and_manual_contracts_are_explicit(self) -> None:
         homologation = read(SKILLS["homologar-sistema"])

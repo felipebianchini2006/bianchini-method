@@ -27,7 +27,7 @@
     "method_mode": { "const": "standalone-adaptive" },
     "planning_version": { "type": "string", "pattern": "^v[1-9][0-9]*$" },
     "planning_status": {
-      "enum": ["in_progress", "pending_approval", "approved", "blocked"]
+      "enum": ["idle", "in_progress", "pending_approval", "approved", "blocked"]
     },
     "execution_policy": { "const": "adaptive" },
     "assurance_profile": { "enum": ["lean", "standard", "full"] },
@@ -40,8 +40,8 @@
       "type": "object",
       "required": ["status", "source"],
       "properties": {
-        "status": { "const": "approved" },
-        "source": { "type": "string" },
+        "status": { "enum": ["pending", "approved"] },
+        "source": { "type": ["string", "null"] },
         "approved_at": { "type": ["string", "null"] }
       }
     },
@@ -49,8 +49,8 @@
       "type": "object",
       "required": ["spec", "review"],
       "properties": {
-        "spec": { "type": "string" },
-        "review": { "type": "string" }
+        "spec": { "type": ["string", "null"] },
+        "review": { "type": ["string", "null"] }
       }
     },
     "approval": {
@@ -73,7 +73,6 @@
             "manifest_digest": { "type": ["string", "null"] },
             "files": {
               "type": "array",
-              "minItems": 1,
               "items": {
                 "type": "string",
                 "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"

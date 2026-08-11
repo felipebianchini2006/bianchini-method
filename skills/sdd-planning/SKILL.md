@@ -15,9 +15,12 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_sha
 2. Com estado, executar `bm.py route <state>`; sem estado, executar `bm.py route --repo <repo> --new-project`.
 3. Se v1, exigir Superpowers e entregar o planejamento ao fluxo legado. Sem Superpowers, declarar `BLOQUEADO`; não criar documentos v2.
 4. Se a rota for `v2-new`, iniciar v2 pelo template e validar com `bm.py validate-state`.
-5. Se versão ambígua/inválida, bloquear sem inferir migração.
+5. Se a rota for `v2-standalone` com `planning_status: idle`, iniciar o próximo ciclo sem Superpowers: manter a `planning_version` reservada, materializar o novo escopo aprovado e trocar para `in_progress` antes de produzir spec/planos.
+6. Se versão ambígua/inválida, bloquear sem inferir migração.
 
 Exceção: se o responsável pedir explicitamente a migração do projeto atual, executar `route --migrate-to-v2`, nunca inferir essa decisão. Preservar `docs/superpowers/` como histórico, atualizar `AGENTS.md`/`CLAUDE.md` para remover o workflow ativo legado e criar estado bootstrap v2 com `planning_status: in_progress` e `plans: []`. O próximo planejamento deve substituir o bootstrap antes de `pending_approval`.
+
+Um estado v2 `idle` criado automaticamente por `executar-plano` após a conclusão real do último ciclo legado já é migrado e autorizado. Não chamar `writing-plans`, brainstorming ou qualquer skill Superpowers; iniciar diretamente este fluxo standalone. Não renumerar para `v2`: `planning_version: v1` identifica o primeiro planejamento feito pelo método v2.
 
 Executar `bm.py repo-hygiene check --repo <repo>`. Se houver `.superpowers/` rastreado e a migração estiver autorizada, executar `repo-hygiene migrate`; caso contrário, bloquear. A raiz deve conter `/.superpowers/` no `.gitignore`; documentos persistentes pertencem a `docs/bianchini/`, nunca a `.superpowers/`.
 
@@ -128,7 +131,7 @@ Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
 - política adaptativa em cada plano;
 - três estágios de `verification`.
 
-Durante bootstrap explícito de migração, `plans: []` é permitido somente com `planning_status: in_progress` e aprovação pending. Antes de gerar snapshot ou pedir aprovação, criar os planos reais e remover o estado bootstrap.
+Em `idle`, escopo/spec/revisão ainda são nulos e `plans: []`; ao receber o novo escopo aprovado, trocar para `in_progress` e preencher as fontes locais. Durante bootstrap explícito de migração, `plans: []` também é permitido em `in_progress` com aprovação pending. Antes de gerar snapshot ou pedir aprovação, criar os planos reais e remover o estado bootstrap.
 
 Depois:
 
