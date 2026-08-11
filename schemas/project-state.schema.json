@@ -50,6 +50,9 @@
       "required": ["spec", "review"],
       "properties": {
         "quality_version": { "const": 1 },
+        "research_mode": {
+          "enum": ["repo_only", "targeted_web", "full", null]
+        },
         "research": { "type": ["string", "null"] },
         "spec": { "type": ["string", "null"] },
         "review": { "type": ["string", "null"] }

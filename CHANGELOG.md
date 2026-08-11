@@ -1,10 +1,17 @@
 # Changelog
 
+## 2.4.3 — Hardening cirúrgico de estado e planejamento
+
+- bloqueia estado corrompido ou ambíguo sem evidência legado;
+- exige prova objetiva para encerrar v1 e torna a higiene transacional;
+- adapta pesquisa, risco agregado e orçamento ao contexto realmente carregado;
+- centraliza os limites operacionais no resultado de `planning-audit`.
+
 ## 2.4.2 — Lean volta a ser realmente pequeno
 
-- define faixa típica Lean de 1–4 planos e teto estrito abaixo de 8;
-- reduz os demais tetos Lean para 16 unidades, 2 plataformas e 8.000 palavras;
-- registra warning entre 5 e 7 planos para evitar usar o teto como meta;
+- define uma faixa típica enxuta e teto estrito controlado pelo audit;
+- reduz os demais tetos Lean proporcionalmente;
+- registra warning acima da faixa típica para evitar usar o teto como meta;
 - mantém escalada para Standard/Full e preservação integral do escopo.
 
 ## 2.4.1 — Preservação obrigatória do escopo aprovado
@@ -77,7 +84,7 @@
 - implementa CLI stdlib para rota, schema, snapshot, worktree, política, briefs, relatórios, revisão e checkpoint;
 - proíbe implementação v2 na branch principal ou worktree primária;
 - implementa políticas `grouped`, `slice` e `strict` com revisão/testes proporcionais;
-- aplica fix rounds Lean 2, Standard 3 e Full 5 com breaker determinístico;
+- aplica fix rounds proporcionais ao perfil com breaker determinístico;
 - remove qualquer mínimo indireto de tarefas;
 - torna homologação automation-first e manual/PDF dependente do escopo;
 - substitui testes de strings por fixtures e cenários comportamentais executáveis.

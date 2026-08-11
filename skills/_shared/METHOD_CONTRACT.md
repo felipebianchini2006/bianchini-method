@@ -8,23 +8,25 @@ Com estado existente, execute `bm.py route docs/living/PROJECT_STATE.md`. Sem es
 
 ### Projeto v1
 
-`method_version: 1` sempre usa o fluxo legado baseado em Superpowers. Um arquivo de estado existente sem `method_version` também é v1 por compatibilidade. Localize a instalação e passe `--superpowers-path <caminho>` ao roteador.
+`method_version: 1` sempre usa o fluxo legado baseado em Superpowers. Um arquivo sem marcador só é v1 implícito quando `load_state` encontra evidência reconhecida, como `docs/superpowers/`; JSON corrompido ou arquivo desconhecido bloqueia. Localize a instalação e passe `--superpowers-path <caminho>` ao roteador.
 
 - Superpowers disponível: devolver `v1-superpowers` e seguir integralmente o fluxo legado, seus caminhos, ledger, dispatch, revisão e retomada.
 - Superpowers ausente: `BLOQUEADO`; informar a dependência e não executar com o motor v2.
 - Nunca migrar, renumerar, normalizar estado ou criar artefatos v2 no meio de uma fase legado.
 
-Durante um ciclo ativo, migração para v2 só existe após autorização explícita do responsável. Nesse caso, executar `bm.py route --repo <repo> --new-project --migrate-to-v2`, preservar planos legados sob `docs/` como históricos, atualizar as regras do repositório e criar um estado bootstrap v2 com `planning_status: in_progress`. O bootstrap pode ter `plans: []` somente enquanto o novo planejamento ainda está sendo produzido; antes de `pending_approval`, deve existir ao menos um plano completo.
+Durante um ciclo ativo, migração para v2 só existe após autorização explícita do responsável. Nesse caso, executar `bm.py route --repo <repo> --new-project --migrate-to-v2`, preservar planos legados sob `docs/` como históricos e criar um estado bootstrap v2 com `planning_status: in_progress`. Para regras do repositório, respeitar exclusivamente a política delimitada abaixo. O bootstrap pode ter `plans: []` somente enquanto o novo planejamento ainda está sendo produzido; antes de `pending_approval`, deve existir ao menos um plano completo.
 
 ### Encerramento definitivo do legado
 
 Depois que o executor v1 concluir e commitar todos os gates, verificação final e entrega, a migração deixa de exigir nova aprovação e passa a ser parte obrigatória do encerramento:
 
 ```bash
-bm.py legacy-transition --repo <repo> --state <PROJECT_STATE.md> --completed
+bm.py legacy-transition --repo <repo> --state <PROJECT_STATE.md> --completed [--completion-proof <arquivo>]
 ```
 
-O comando exige repositório Git limpo e estado legado commitado, preserva seus bytes em `docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md`, aplica a higiene de `/.superpowers/`, substitui o estado ativo por v2 `idle` e prepara as mudanças no índice. O executor atualiza somente as regras ativas de `AGENTS.md`/`CLAUDE.md`, valida, cria um commit local atômico e deixa a árvore limpa. O plano concluído não é convertido nem reexecutado; o próximo escopo começa standalone em `planning_version: v1`.
+O comando exige repositório Git limpo, estado legado commitado, `--completed` e evidência objetiva de conclusão. Aceita marcador final reconhecido no estado; sem marcador, `--completion-proof` deve apontar para arquivo regular, sem symlink, rastreado e commitado no HEAD, com evidência de gates, entrega ou aceite. O resultado registra caminho e SHA-256 do proof. Depois preserva os bytes legados em `docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md`, aplica a higiene de `/.superpowers/`, substitui o estado ativo por v2 `idle` e prepara as mudanças no índice.
+
+Nunca editar conteúdo livre de `AGENTS.md` ou `CLAUDE.md` durante a transição. Sem seção já delimitada por `<!-- bianchini-method:start -->` e `<!-- bianchini-method:end -->`, apenas relatar uma sugestão; com marcadores, qualquer edição fica limitada ao bloco.
 
 `--completed` nunca pode ser usado como atalho: fase em andamento, bloqueada ou não commitada permanece v1. O estado `idle` é reproduzível, não possui escopo aprovado, spec, revisão, plano, aprovação ou execução ativa. `/sdd-planning` transforma `idle` em `in_progress` somente quando houver novo escopo aprovado.
 
@@ -73,15 +75,7 @@ Regras:
 - escalar o modo quando risco descoberto aumentar; não reduzir sem atualizar plano aprovado;
 - calcular política com `bm.py policy` e registrar o JSON no ledger.
 
-Fix rounds máximos por perfil:
-
-| Perfil | Rodadas |
-|---|---|
-| `lean` | 2 |
-| `standard` | 3 |
-| `full` | 5 |
-
-Ao atingir o máximo, `breaker: true`: parar patches, reavaliar causa/arquitetura e bloquear se o problema for estrutural.
+Usar os fix rounds máximos retornados por `bm.py policy`. Ao atingir o máximo, `breaker: true`: parar patches, reavaliar causa/arquitetura e bloquear se o problema for estrutural.
 
 ## Workspace obrigatório v2
 
@@ -153,7 +147,7 @@ O pacote contém escopo local, pesquisa da stack, spec, planos, revisão de plan
 
 ## Pesquisa e simplificação do planejamento
 
-Todo novo planejamento v2 usa `planning.quality_version: 1` e inclui `STACK_RESEARCH.md`. Levantar versões e padrões já presentes no repositório; pesquisar somente decisões aplicáveis ao escopo em documentação oficial, normas, RFCs, repositórios upstream e avisos do fornecedor. Registrar URL, versão/recorte, data de acesso e consequência no design. Conteúdo promocional ou opinião não substitui fonte primária.
+Todo novo planejamento v2 usa `planning.quality_version: 1`, registra `planning.research_mode` e inclui `STACK_RESEARCH.md`. Selecionar o menor modo suficiente: `repo_only` para stack estabelecida sem integração/decisão sensível nova; `targeted_web` para API, biblioteca, pagamento, autenticação, mobile, infraestrutura ou decisão sensível a versão; `full` somente para garantia Full explícita, auditoria/regulação, arquitetura nova de alto impacto ou várias decisões críticas. `repo_only` inventaria manifests, lockfiles, CI, testes e padrões locais sem exigir URL. Os modos web exigem fontes primárias oficiais, URL e data. Registrar sempre o modo, o motivo e somente decisões aplicadas.
 
 O escopo aprovado define resultados e invariantes, não a decomposição operacional. Preservar 100% dele; simplificar implementação nunca significa retirar requisito. Reescrever planos legados ou externos em slices de entrega autocontidos; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências e exploração manual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
 
@@ -163,7 +157,7 @@ Antes do snapshot, executar:
 bm.py planning-audit docs/living/PROJECT_STATE.md --root <repo> --strict
 ```
 
-O gate exige pesquisa primária estruturada, unidades completas, comandos reproduzíveis e orçamento proporcional ao perfil: Lean normalmente 1–4 planos, com teto de 7 planos/16 unidades/2 plataformas/8.000 palavras; Standard 16/40/6/24.000; Full 32/80/12/48.000. Tetos não são metas nem mínimos. Exceder Lean ou Standard exige escalar o perfil mantendo todo o escopo. Acima de Full, usar `indivisible` com justificativa e otimizar contexto; nunca reduzir escopo automaticamente.
+O gate exige pesquisa proporcional, unidades completas, comandos reproduzíveis e orçamento proporcional ao perfil. Seguir os limites e a recomendação retornados por `planning-audit`; eles têm fonte executável única no CLI, são tetos e nunca metas ou mínimos. Exceder o perfil exige escalar mantendo todo o escopo. Acima de Full, usar `indivisible` com justificativa e otimizar contexto; nunca reduzir escopo automaticamente.
 
 `deferred_scope` não é ferramenta de economia. Só pode conter requisito aprovado quando o responsável tiver autorizado explicitamente a divisão antes do planejamento, com `scope_split_approved: true`, autor e horário. Sem essa prova, o audit e o snapshot bloqueiam. “Menor ciclo”, simplicidade, custo ou limite de contexto não constituem autorização.
 
@@ -180,6 +174,7 @@ bm.py snapshot verify <state> --root <repo>
 
 ## Economia de contexto
 
+- `planning-audit` informa `package_words` apenas como tamanho documental e limita contexto operacional por `shared_context_words`, `max_plan_words` e `max_execution_unit_words`;
 - planejamento lê fontes uma vez e grava síntese com ponteiros;
 - execução lê plano atual e somente seus `spec_refs`;
 - grouped usa um brief/revisão por grupo; slice, por slice; strict, por tarefa;

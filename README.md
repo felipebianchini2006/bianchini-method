@@ -28,7 +28,7 @@ method_version: 1 # ou estado legado existente sem method_version
 
 Continuam integralmente no fluxo legado Superpowers enquanto a fase atual estiver em andamento. A v2 preserva caminhos, ledger, dispatch, revisão e retomada existentes. Se Superpowers não estiver disponível, a execução v1 bloqueia claramente; nunca usa o executor standalone no meio da fase.
 
-Quando o responsável autorizar explicitamente, `route --migrate-to-v2` inicia uma migração controlada: preserva documentação v1 sob `docs/`, atualiza as instruções do repositório e cria um estado bootstrap v2. Sem essa autorização, a compatibilidade legado continua vencendo.
+Quando o responsável autorizar explicitamente, `route --migrate-to-v2` inicia uma migração controlada: preserva documentação v1 sob `docs/` e cria um estado bootstrap v2. `AGENTS.md` e `CLAUDE.md` nunca são reescritos livremente. Sem essa autorização, a compatibilidade legado continua vencendo.
 
 Ao concluir e commitar todos os gates e a entrega da última fase legado, `executar-plano` roda `legacy-transition --completed`: arquiva o estado v1, aplica a higiene da raiz e cria um estado v2 `idle`. O próximo escopo abre `planning_version: v1` por `/sdd-planning` standalone, sem nova aprovação de migração e sem reexecutar a fase encerrada.
 
@@ -51,7 +51,7 @@ Não dependem do Superpowers. Usam estado validado, worktree obrigatória, artef
 | médio | `slice` | por slice vertical | por seam do slice |
 | alto/crítico | `strict` | por tarefa | RED/GREEN por tarefa |
 
-Fix rounds: Lean 2, Standard 3, Full 5. Não há quantidade mínima de tarefas ou agentes.
+Os fix rounds são retornados por `bm.py policy`. Não há quantidade mínima de tarefas ou agentes.
 
 ## Skills
 
@@ -80,7 +80,7 @@ Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é b
 
 `workspace create` também exige repositório limpo e pacote aprovado integralmente commitado. A identidade inclui ciclo e plano (`bm/v1-p01`, `bm/v2-p01`), impedindo reuso acidental entre planejamentos.
 
-Novos planejamentos incluem `STACK_RESEARCH.md` com fontes oficiais, data e impacto no design. `planning-audit --strict` bloqueia pesquisa sem evidência primária, placeholders, comandos em prosa e planos dependentes de fontes legadas. Lean é pequeno: normalmente 1–4 planos, com teto de 7; Standard e Full absorvem escopos maiores sem retirar requisitos aprovados. Qualquer `deferred_scope` exige autorização explícita registrada do responsável. O snapshot reaplica o gate automaticamente.
+Novos planejamentos incluem `STACK_RESEARCH.md` em modo `repo_only`, `targeted_web` ou `full`. `planning-audit --strict` retorna os limites vigentes, bloqueia evidência insuficiente, placeholders, comandos em prosa e planos dependentes de fontes legadas. Lean permanece tipicamente pequeno e sem mínimo; Standard e Full absorvem escopos/risco maiores sem retirar requisitos aprovados. Qualquer `deferred_scope` exige autorização explícita registrada do responsável. O snapshot reaplica o gate automaticamente.
 
 `/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; documentos ativos v2 ficam em `docs/bianchini/<planning_version>/`.
 

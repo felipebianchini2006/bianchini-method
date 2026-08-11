@@ -18,7 +18,7 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_sha
 5. Se a rota for `v2-standalone` com `planning_status: idle`, iniciar o próximo ciclo sem Superpowers: manter a `planning_version` reservada, materializar o novo escopo aprovado e trocar para `in_progress` antes de produzir spec/planos.
 6. Se versão ambígua/inválida, bloquear sem inferir migração.
 
-Exceção: se o responsável pedir explicitamente a migração do projeto atual, executar `route --migrate-to-v2`, nunca inferir essa decisão. Preservar `docs/superpowers/` como histórico, atualizar `AGENTS.md`/`CLAUDE.md` para remover o workflow ativo legado e criar estado bootstrap v2 com `planning_status: in_progress` e `plans: []`. O próximo planejamento deve substituir o bootstrap antes de `pending_approval`.
+Exceção: se o responsável pedir explicitamente a migração do projeto atual, executar `route --migrate-to-v2`, nunca inferir essa decisão. Preservar `docs/superpowers/` como histórico e criar estado bootstrap v2 com `planning_status: in_progress` e `plans: []`. Não editar conteúdo livre de `AGENTS.md`/`CLAUDE.md`; sem bloco `bianchini-method` delimitado, apenas relatar uma sugestão. O próximo planejamento deve substituir o bootstrap antes de `pending_approval`.
 
 Um estado v2 `idle` criado automaticamente por `executar-plano` após a conclusão real do último ciclo legado já é migrado e autorizado. Não chamar `writing-plans`, brainstorming ou qualquer skill Superpowers; iniciar diretamente este fluxo standalone. Não renumerar para `v2`: `planning_version: v1` identifica o primeiro planejamento feito pelo método v2.
 
@@ -38,12 +38,13 @@ Ordem: decisão recente do responsável, escopo aprovado, plano mestre, spec/ADR
 
 Ler [`references/stack-research.md`](references/stack-research.md). Antes de decidir arquitetura:
 
-1. inventariar stack, versões, manifests, CI, deploy e padrões já usados;
-2. pesquisar práticas atuais aplicáveis ao escopo em fontes primárias;
-3. comparar recomendação, compatibilidade com o projeto e custo de adoção;
-4. escolher o menor fluxo robusto e registrar o impacto de cada decisão.
+1. inventariar stack, versões, manifests, lockfiles, CI, testes, deploy e padrões já usados;
+2. selecionar e registrar o menor `planning.research_mode` suficiente: `repo_only`, `targeted_web` ou `full`;
+3. pesquisar fontes primárias oficiais somente quando o modo exigir;
+4. comparar recomendação, compatibilidade com o projeto e custo de adoção;
+5. escolher o menor fluxo robusto e registrar o impacto de cada decisão.
 
-Salvar `docs/bianchini/<planning_version>/STACK_RESEARCH.md` com as seções exigidas pelo gate. Incluir esse arquivo no pacote aprovado. Pesquisa não autoriza upgrade, dependência, refatoração ou ampliação de escopo. Quando uma informação atual puder ter mudado, verificá-la na internet; para questões técnicas, usar documentação oficial, norma/RFC, repositório upstream ou aviso do fornecedor.
+Salvar `docs/bianchini/<planning_version>/STACK_RESEARCH.md` com modo, motivo e seções exigidas pelo gate. `repo_only` não exige URL externa; `targeted_web` e `full` exigem fontes oficiais e data de acesso. Incluir o arquivo no pacote aprovado. Pesquisa não autoriza upgrade, dependência, refatoração ou ampliação de escopo.
 
 ## 4. Simplificar sem reduzir escopo
 
@@ -57,7 +58,7 @@ Fazer uma passagem explícita antes de escrever os planos:
 - remover camadas, abstrações e tarefas sem critério de aceite próprio;
 - preferir contratos públicos e slices verticais a tarefas por arquivo ou tecnologia.
 
-Nunca mover requisito aprovado para `deferred_scope` a fim de satisfazer orçamento. Escalar primeiro `assurance_profile`: Lean é pequeno, normalmente 1–4 planos e no máximo 7 planos/16 unidades/2 plataformas/8.000 palavras; Standard até 16/40/6/24.000; Full até 32/80/12/48.000. Os números são tetos, nunca metas ou mínimos. Acima de Full, manter o escopo e justificar `indivisible`; otimizar ponteiros e execução, não retirar entregas.
+Nunca mover requisito aprovado para `deferred_scope` a fim de satisfazer orçamento. Seguir os limites e a recomendação retornados por `planning-audit`; eles são tetos, nunca metas ou mínimos. Lean continua tipicamente pequeno e sem mínimo artificial. Acima de Full, manter o escopo e justificar `indivisible`; otimizar ponteiros e execução, não retirar entregas.
 
 Usar `split` somente quando o responsável tiver autorizado explicitamente a divisão antes do planejamento. Registrar `scope_split_approved: true`, autor e horário. Sem autorização, deixar `deferred_scope: []`; se o escopo não couber, escalar o perfil. Não interpretar “seja simples”, “evite overengineering” ou o próprio orçamento como autorização para adiar requisito.
 
@@ -65,9 +66,11 @@ Usar `split` somente quando o responsável tiver autorizado explicitamente a div
 
 Escolher `lean`, `standard` ou `full` pelo maior entre risco e complexidade do escopo completo:
 
-- `lean`: baixo risco, integração isolada e pacote pequeno; 5–7 planos exigem justificar por que ainda é Lean;
-- `standard`: risco médio, múltiplos perfis/plataformas ou integração coordenada;
-- `full`: regulação, risco crítico, múltiplos subsistemas ou escopo amplo.
+- `lean`: baixo risco agregado, integração isolada e pacote pequeno;
+- `standard`: risco médio/alto ou crítico localizado, múltiplos perfis/plataformas ou integração coordenada;
+- `full`: pedido explícito, auditoria/regulação, capacidade acima de Standard ou múltiplos subsistemas críticos interdependentes.
+
+Uma unidade crítica isolada usa `strict`, `per_task`, RED/GREEN e gates críticos, elevando o projeto no máximo para Standard. Não promover todo o projeto a Full por uma única unidade.
 
 Executar `bm.py policy` para cada plano. A auditoria arquitetural é manual e report-only: não a executar automaticamente por perfil ou risco. Definir `architecture_audit: disabled|optional|required` conforme decisão explícita do responsável. Se ele contratar o relatório no pacote (`required`), incluir o arquivo no manifesto quando existir; candidatos de melhoria não bloqueiam aprovação.
 
@@ -151,7 +154,7 @@ Gate indispensável indisponível é bloqueio, nunca `passed` presumido.
 Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
 
 - `planning_version: v1` no primeiro ciclo;
-- `planning.quality_version: 1` e caminho local de `STACK_RESEARCH.md`;
+- `planning.quality_version: 1`, `planning.research_mode` e caminho local de `STACK_RESEARCH.md`;
 - `planning_status: pending_approval`;
 - `execution_policy: adaptive`;
 - `assurance_profile: lean|standard|full`;

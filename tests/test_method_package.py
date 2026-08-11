@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import shutil
@@ -29,6 +30,10 @@ SKILLS = {name: ROOT / "skills" / name / "SKILL.md" for name in SKILL_NAMES}
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -149,6 +154,28 @@ class PackageIntegrityTests(unittest.TestCase):
         content = read(ROOT / "skills" / "_shared" / "scripts" / "bm.py")
         for dependency in ("yaml", "jsonschema", "click", "pydantic"):
             self.assertNotRegex(content, rf"(?m)^(?:from|import)\s+{dependency}\b")
+
+    def test_operational_planning_limits_live_only_in_cli(self) -> None:
+        documentation = "\n".join(
+            read(path)
+            for path in (
+                ROOT / "README.md",
+                ROOT / "CHANGELOG.md",
+                ROOT / "skills/_shared/METHOD_CONTRACT.md",
+                ROOT / "skills/sdd-planning/SKILL.md",
+            )
+        )
+        for duplicated_limits in (
+            "7 planos/16 unidades",
+            "Standard 16/40",
+            "Full 32/80",
+            "8.000 palavras",
+            "24.000",
+            "48.000",
+            "Lean 2, Standard 3, Full 5",
+            "`lean` | 2",
+        ):
+            self.assertNotIn(duplicated_limits, documentation)
 
     def test_sharded_runner_covers_every_test_class(self) -> None:
         runner = read(ROOT / "scripts/run_test_shards.py")
@@ -281,6 +308,25 @@ class RoutingAndStateScenarios(unittest.TestCase):
         result = cli_json("route", str(FIXTURES / "project-state-v2.json"))
         self.assertEqual(result["route"], "v2-standalone")
         self.assertFalse(result["superpowers_required"])
+
+    def test_corrupted_v2_json_never_falls_back_to_legacy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = root / "PROJECT_STATE.md"
+            state.write_text('{"method_version": 2, BROKEN', encoding="utf-8")
+            result = cli("route", str(state), "--repo", str(root))
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("PROJECT_STATE inválido", result.stderr)
+            self.assertNotIn("Superpowers indisponível", result.stderr)
+
+    def test_unknown_state_without_legacy_evidence_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = root / "PROJECT_STATE.md"
+            state.write_text("# arquivo desconhecido\nstatus geral indefinido\n", encoding="utf-8")
+            result = cli("route", str(state), "--repo", str(root))
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("não foi possível determinar method_version com segurança", result.stderr)
 
     def test_v2_state_validates_and_status_is_structured(self) -> None:
         validated = cli_json("validate-state", str(FIXTURES / "project-state-v2.json"))
@@ -500,7 +546,12 @@ class SnapshotScenarios(unittest.TestCase):
 
 
 class PlanningQualityScenarios(unittest.TestCase):
-    def make_project(self, root: Path, plan_count: int = 1) -> Path:
+    def make_project(
+        self,
+        root: Path,
+        plan_count: int = 1,
+        research_mode: str = "targeted_web",
+    ) -> Path:
         scope = root / "docs/bianchini/v1/inputs/APPROVED_SCOPE.md"
         research = root / "docs/bianchini/v1/STACK_RESEARCH.md"
         spec = root / "docs/bianchini/v1/specs/system.md"
@@ -510,6 +561,8 @@ class PlanningQualityScenarios(unittest.TestCase):
         scope.write_text("# Escopo aprovado\n\nEntregar API de registros.\n", encoding="utf-8")
         research.write_text(
             "# Stack Research — v1\n\n"
+            f"Research mode: {research_mode}\n"
+            "Motivo: menor modo suficiente para as decisões do ciclo.\n\n"
             "## Stack detectada\n\n- Python 3.13 e pytest.\n\n"
             "## Fontes primárias\n\n"
             "- Fonte primária: Python 3.13 documentation\n"
@@ -538,6 +591,7 @@ class PlanningQualityScenarios(unittest.TestCase):
         }
         state["planning"] = {
             "quality_version": 1,
+            "research_mode": research_mode,
             "research": "docs/bianchini/v1/STACK_RESEARCH.md",
             "spec": "docs/bianchini/v1/specs/system.md",
             "review": "docs/bianchini/v1/PLANNING_REVIEW.md",
@@ -629,6 +683,44 @@ class PlanningQualityScenarios(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("Fonte primária", result.stderr)
             self.assertIn("URL HTTPS", result.stderr)
+
+    def test_repo_only_research_is_valid_without_external_url(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root, research_mode="repo_only")
+            research = root / "docs/bianchini/v1/STACK_RESEARCH.md"
+            research.write_text(
+                "# Stack Research — v1\n\n"
+                "Research mode: repo_only\n"
+                "Motivo: stack estabelecida e nenhuma integração nova.\n\n"
+                "## Stack detectada\n\n- Python 3.13 já fixado no repositório.\n\n"
+                "## Inventário local\n\n"
+                "- Manifests: pyproject.toml.\n"
+                "- Lockfiles: nenhum.\n"
+                "- CI: workflow existente.\n"
+                "- Testes: unittest.\n"
+                "- Padrões locais: CLI somente stdlib.\n\n"
+                "## Decisões aplicadas\n\n- Reusar o CLI existente.\n\n"
+                "## Riscos e lacunas\n\n- Nenhum conhecido.\n",
+                encoding="utf-8",
+            )
+            result = cli_json(
+                "planning-audit", str(state), "--root", str(root), "--strict"
+            )
+            self.assertEqual(result["research_mode"], "repo_only")
+
+    def test_full_research_requires_critical_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root, research_mode="full")
+            state = json.loads(read(state_path))
+            state["assurance_profile"] = "full"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            result = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("seção obrigatória do modo full", result.stderr)
 
     def test_strict_audit_rejects_placeholders_prose_and_legacy_refs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -734,27 +826,60 @@ class PlanningQualityScenarios(unittest.TestCase):
             self.assertEqual(accepted["metrics"]["execution_units"], 60)
             self.assertEqual(accepted["budget_exceeded"], [])
 
-    def test_critical_risk_escalates_profile_even_for_small_scope(self) -> None:
+    def test_isolated_critical_unit_uses_strict_without_promoting_project_to_full(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            state_path = self.make_project(root)
+            state_path = self.make_project(root, plan_count=3)
             state = json.loads(read(state_path))
-            state["plans"][0].update(
+            state["plans"][2].update(
                 {"risk": "critical", "execution": "strict", "review": "per_task"}
             )
-            state_path.write_text(json.dumps(state), encoding="utf-8")
-            blocked = cli(
-                "planning-audit", str(state_path), "--root", str(root), "--strict"
-            )
-            self.assertEqual(blocked.returncode, 2)
-            self.assertIn("escale para full", blocked.stderr)
-
-            state["assurance_profile"] = "full"
+            state["assurance_profile"] = "standard"
             state_path.write_text(json.dumps(state), encoding="utf-8")
             accepted = cli_json(
                 "planning-audit", str(state_path), "--root", str(root), "--strict"
             )
+            self.assertEqual(accepted["recommended_profile"], "standard")
+            self.assertNotEqual(accepted["recommended_profile"], "full")
+            self.assertEqual(state["plans"][2]["execution"], "strict")
+
+    def test_interdependent_critical_plans_recommend_full(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root, plan_count=2, research_mode="full")
+            state = json.loads(read(state_path))
+            state["assurance_profile"] = "full"
+            for plan in state["plans"]:
+                plan.update({"risk": "critical", "execution": "strict", "review": "per_task"})
+            state["plans"][1]["depends_on"] = [state["plans"][0]["id"]]
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            research = root / "docs/bianchini/v1/STACK_RESEARCH.md"
+            research.write_text(
+                read(research)
+                + "\n## Escopo da pesquisa\n\n- Dois subsistemas críticos.\n"
+                + "\n## Decisões críticas\n\n- Ordem e isolamento dos gates.\n",
+                encoding="utf-8",
+            )
+            accepted = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
             self.assertEqual(accepted["recommended_profile"], "full")
+
+    def test_package_size_alone_does_not_promote_assurance_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            research = root / "docs/bianchini/v1/STACK_RESEARCH.md"
+            research.write_text(read(research) + ("contexto informativo " * 30_000), encoding="utf-8")
+            accepted = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(accepted["recommended_profile"], "lean")
+            self.assertGreater(accepted["metrics"]["package_words"], 48_000)
+            self.assertNotIn("active_context_words", accepted["metrics"])
+            self.assertIn("shared_context_words", accepted["metrics"])
+            self.assertIn("max_plan_words", accepted["metrics"])
+            self.assertIn("max_execution_unit_words", accepted["metrics"])
 
     def test_deferred_scope_requires_explicit_owner_authorization(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -807,6 +932,35 @@ class PlanningQualityScenarios(unittest.TestCase):
             )
             self.assertEqual(strict.returncode, 2)
             self.assertIn("quality_version", strict.stderr)
+
+    def test_approved_quality_package_without_research_mode_remains_compatible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            state["planning"].pop("research_mode")
+            state["planning_status"] = "approved"
+            state["approval"].update(
+                {
+                    "status": "approved",
+                    "approved_at": "2026-08-11T00:01:00Z",
+                    "approved_by": "owner",
+                    "approved_plans": [state["plans"][0]["id"]],
+                }
+            )
+            state["approval"]["package"]["manifest_digest"] = "a" * 64
+            state["plans"][0]["status"] = "approved"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            research = root / "docs/bianchini/v1/STACK_RESEARCH.md"
+            research.write_text(
+                re.sub(r"(?m)^(?:Research mode|Motivo):.*\n", "", read(research)),
+                encoding="utf-8",
+            )
+            accepted = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(accepted["research_mode"], "targeted_web")
+            self.assertIn("somente para compatibilidade", accepted["warnings"][0])
 
 
 class AdaptivePolicyScenarios(unittest.TestCase):
@@ -1032,6 +1186,84 @@ class WorkspaceAndArtifactScenarios(unittest.TestCase):
                 (repo / "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md").exists()
             )
 
+    def test_legacy_transition_completed_flag_blocks_in_progress_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            state_path = repo / "docs/living/PROJECT_STATE.md"
+            state_path.parent.mkdir(parents=True)
+            legacy = b"method_version: 1\nstatus: in_progress\n"
+            state_path.write_bytes(legacy)
+            git(repo, "add", "docs/living/PROJECT_STATE.md")
+            git(repo, "commit", "-m", "legacy phase active")
+            result = cli(
+                "legacy-transition", "--repo", str(repo), "--state",
+                "docs/living/PROJECT_STATE.md", "--completed",
+            )
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("estado legado ainda está", result.stderr)
+            self.assertEqual(state_path.read_bytes(), legacy)
+
+    def test_legacy_transition_requires_marker_or_completion_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            state_path = repo / "docs/living/PROJECT_STATE.md"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text("method_version: 1\ncycle: final\n", encoding="utf-8")
+            git(repo, "add", "docs/living/PROJECT_STATE.md")
+            git(repo, "commit", "-m", "legacy state without completion marker")
+            result = cli(
+                "legacy-transition", "--repo", str(repo), "--state",
+                "docs/living/PROJECT_STATE.md", "--completed",
+            )
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("--completion-proof", result.stderr)
+
+    def test_legacy_transition_rejects_untracked_completion_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            state_path = repo / "docs/living/PROJECT_STATE.md"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text("method_version: 1\ncycle: final\n", encoding="utf-8")
+            (repo / ".gitignore").write_text(
+                "/.superpowers/\n/proof.md\n", encoding="utf-8"
+            )
+            git(repo, "add", ".gitignore", "docs/living/PROJECT_STATE.md")
+            git(repo, "commit", "-m", "legacy state without completion marker")
+            (repo / "proof.md").write_text(
+                "Entrega concluída; gates passed e aceite registrado.\n", encoding="utf-8"
+            )
+            result = cli(
+                "legacy-transition", "--repo", str(repo), "--state",
+                "docs/living/PROJECT_STATE.md", "--completed",
+                "--completion-proof", "proof.md",
+            )
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("proof deve estar rastreado e commitado", result.stderr)
+
+    def test_legacy_transition_accepts_committed_completion_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            state_path = repo / "docs/living/PROJECT_STATE.md"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text("method_version: 1\ncycle: final\n", encoding="utf-8")
+            proof = repo / "proof.md"
+            proof.write_text(
+                "Entrega concluída; gates passed e aceite registrado.\n", encoding="utf-8"
+            )
+            git(repo, "add", "docs/living/PROJECT_STATE.md", "proof.md")
+            git(repo, "commit", "-m", "record legacy completion proof")
+            result = cli_json(
+                "legacy-transition", "--repo", str(repo), "--state",
+                "docs/living/PROJECT_STATE.md", "--completed",
+                "--completion-proof", "proof.md",
+            )
+            self.assertEqual(result["completion_proof"]["path"], "proof.md")
+            self.assertEqual(result["completion_proof"]["sha256"], file_sha256(proof))
+
     def test_repo_hygiene_archives_tracked_root_artifacts_and_adds_ignore(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -1077,6 +1309,32 @@ class WorkspaceAndArtifactScenarios(unittest.TestCase):
             self.assertEqual(result.returncode, 3)
             self.assertIn("mudanças alheias", result.stderr)
             self.assertTrue(report.is_file())
+
+    def test_repo_hygiene_conflict_is_transactional(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            source_a = repo / ".superpowers/sdd/a.txt"
+            source_b = repo / ".superpowers/sdd/b.txt"
+            source_a.parent.mkdir(parents=True)
+            source_a.write_text("a source\n", encoding="utf-8")
+            source_b.write_text("b source\n", encoding="utf-8")
+            git(repo, "add", "-f", ".superpowers/sdd/a.txt", ".superpowers/sdd/b.txt")
+            git(repo, "commit", "-m", "track two legacy artifacts")
+            destination = repo / "docs/bianchini/legacy/root-superpowers/sdd/b.txt"
+            destination.parent.mkdir(parents=True)
+            destination.write_text("conflict\n", encoding="utf-8")
+            git(repo, "add", destination.relative_to(repo).as_posix())
+            git(repo, "commit", "-m", "create conflicting destination")
+
+            result = cli("repo-hygiene", "migrate", "--repo", str(repo))
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("conteúdo diferente", result.stderr)
+            self.assertEqual(source_a.read_text(encoding="utf-8"), "a source\n")
+            self.assertEqual(source_b.read_text(encoding="utf-8"), "b source\n")
+            self.assertFalse(
+                (repo / "docs/bianchini/legacy/root-superpowers/sdd/a.txt").exists()
+            )
 
     def test_workspace_target_inside_repository_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1727,9 +1985,10 @@ class SkillBehaviorContracts(unittest.TestCase):
             "PLANO Task N",
         ):
             self.assertIn(expected, planning)
-        self.assertIn("Standard 16/40/6/24.000", contract)
-        self.assertIn("teto de 7 planos/16 unidades", contract)
+        self.assertIn("limites e a recomendação retornados por `planning-audit`", contract)
+        self.assertIn("fonte executável única no CLI", contract)
         self.assertIn("nunca reduzir escopo automaticamente", contract)
+        self.assertIn("Research mode: repo_only", research)
         self.assertIn("Acessado em: YYYY-MM-DD", research)
         self.assertIn("documentação oficial", research)
 
@@ -1753,7 +2012,9 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("planning_status: idle", planning)
         self.assertIn("Não chamar `writing-plans`", planning)
         self.assertIn("Encerramento definitivo do legado", contract)
-        self.assertIn("árvore limpa", contract)
+        self.assertIn("repositório Git limpo", contract)
+        self.assertIn("--completion-proof", contract)
+        self.assertIn("Nunca editar conteúdo livre de `AGENTS.md`", contract)
 
     def test_homologation_and_manual_contracts_are_explicit(self) -> None:
         homologation = read(SKILLS["homologar-sistema"])

@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,21 +45,66 @@ def state_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def load_state(path: Path) -> dict[str, Any]:
+def legacy_evidence(path: Path, repo: Path | None, text: str) -> bool:
+    candidates: list[Path] = []
+    if repo is not None:
+        candidates.append(repo.resolve())
+    for parent in (path.resolve().parent, *path.resolve().parents):
+        if (parent / ".git").exists() or (parent / "docs/superpowers").exists():
+            candidates.append(parent)
+    if any(
+        (candidate / "docs/superpowers").exists()
+        or (candidate / ".superpowers/sdd").exists()
+        for candidate in candidates
+    ):
+        return True
+    return bool(re.search(r"(?i)\bdocs/superpowers/(?:v\d+|plans?|specs?)/", text))
+
+
+def load_state(path: Path, repo: Path | None = None) -> dict[str, Any]:
     text = state_text(path)
-    fenced = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
-    candidate = fenced.group(1) if fenced else text.strip()
+    fenced = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+    json_fence_present = bool(re.search(r"```json\b", text, re.IGNORECASE))
+    candidate = fenced.group(1).strip() if fenced else text.strip()
     try:
         value = json.loads(candidate)
-    except json.JSONDecodeError:
-        legacy = re.search(r"(?m)^\s*method_version:\s*(\d+)\s*$", text)
-        if legacy:
-            return {"method_version": int(legacy.group(1)), "_legacy_text": text}
-        return {"method_version": 1, "_implicit_legacy": True, "_legacy_text": text}
+    except json.JSONDecodeError as error:
+        if json_fence_present or candidate.startswith(("{", "[")):
+            raise BMError(
+                f"BLOQUEADO: PROJECT_STATE inválido: JSON corrompido na linha {error.lineno}",
+                EXIT_BLOCKED,
+            ) from error
+        marker_values = re.findall(
+            r"(?m)^\s*method_version:\s*(\d+)\s*(?:#.*)?$", text
+        )
+        markers = {int(match) for match in marker_values}
+        if len(marker_values) > 1 or len(markers) > 1:
+            raise BMError(
+                "BLOQUEADO: PROJECT_STATE inválido: method_version duplicado ou conflitante",
+                EXIT_BLOCKED,
+            )
+        if markers == {1}:
+            return {"method_version": 1, "_legacy_text": text}
+        if markers:
+            raise BMError(
+                "BLOQUEADO: estado v2 deve ser JSON válido; versão declarada não suportada",
+                EXIT_BLOCKED,
+            )
+        if legacy_evidence(path, repo, text):
+            return {"method_version": 1, "_implicit_legacy": True, "_legacy_text": text}
+        raise BMError(
+            "BLOQUEADO: não foi possível determinar method_version com segurança",
+            EXIT_BLOCKED,
+        )
     if not isinstance(value, dict):
         raise BMError("PROJECT_STATE deve ser um objeto")
     if "method_version" not in value:
-        return {**value, "method_version": 1, "_implicit_legacy": True}
+        if legacy_evidence(path, repo, text):
+            return {**value, "method_version": 1, "_implicit_legacy": True}
+        raise BMError(
+            "BLOQUEADO: não foi possível determinar method_version com segurança",
+            EXIT_BLOCKED,
+        )
     return value
 
 
@@ -340,7 +386,7 @@ def route_project(
     if migrate_to_v2:
         legacy_detected = (repo / "docs" / "superpowers").exists()
         if state_path is not None and state_path.is_file():
-            state = load_state(state_path)
+            state = load_state(state_path, repo)
             if state.get("method_version") == 2:
                 validate_state(state_path)
                 return {"route": "v2-standalone", "superpowers_required": False}
@@ -367,7 +413,7 @@ def route_project(
         if new_project:
             return {"route": "v2-new", "superpowers_required": False}
         raise BMError("BLOQUEADO: estado ausente; confirme se o projeto é novo", EXIT_BLOCKED)
-    state = load_state(state_path)
+    state = load_state(state_path, repo)
     version = state.get("method_version")
     if version == 1:
         available = has_superpowers(superpowers_path)
@@ -428,6 +474,20 @@ LEGACY_STATE_ARCHIVE = "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final
 IDLE_NEXT_ACTION = (
     "Aguardar novo escopo; então executar /sdd-planning para iniciar o ciclo v1 standalone."
 )
+LEGACY_COMPLETED_STATUSES = {
+    "completed",
+    "done",
+    "delivered",
+    "accepted",
+    "concluido",
+}
+LEGACY_BLOCKING_STATUSES = {
+    "in_progress",
+    "pending",
+    "active",
+    "blocked",
+    "em_andamento",
+}
 
 
 def tracked_root_superpowers(root: Path) -> list[str]:
@@ -458,6 +518,15 @@ def ensure_versioned_superpowers_ignore(root: Path) -> bool:
     content += ROOT_SUPERPOWERS_IGNORE + "\n"
     gitignore.write_text(content.lstrip("\n"), encoding="utf-8")
     return True
+
+
+def path_uses_symlink(root: Path, target: Path) -> bool:
+    current = root.resolve()
+    for part in target.relative_to(root).parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
 
 
 def repository_hygiene(
@@ -506,44 +575,146 @@ def repository_hygiene(
     archive_root = confined_path(root, destination, "destino da higiene")
     if archive_root == root or ".superpowers" in archive_root.relative_to(root).parts:
         raise BMError("destino da higiene deve ficar fora de .superpowers")
-    moved: list[dict[str, str]] = []
+    migration_plan: list[dict[str, Any]] = []
+    target_names: set[str] = set()
     for source_name in tracked:
         source_relative = Path(source_name)
         if not source_relative.parts or source_relative.parts[0] != ".superpowers":
             raise BMError(f"caminho Git inesperado: {source_name}")
+        source_lexical = root / source_relative
         source = confined_path(root, source_name, "artefato raiz")
-        if source.is_symlink() or not source.is_file():
+        if path_uses_symlink(root, source_lexical) or not source.is_file():
             raise BMError(f"artefato rastreado ausente ou não regular: {source_name}")
         relative_tail = Path(*source_relative.parts[1:])
         target_relative = Path(destination) / relative_tail
+        target_lexical = root / target_relative
         target = confined_path(root, target_relative.as_posix(), "arquivo histórico")
-        if target.exists():
+        if target_relative.as_posix() in target_names:
+            raise BMError(
+                f"BLOQUEADO: destinos históricos duplicados: {target_relative}",
+                EXIT_BLOCKED,
+            )
+        target_names.add(target_relative.as_posix())
+        if path_uses_symlink(root, target_lexical):
+            raise BMError(
+                f"BLOQUEADO: destino histórico atravessa symlink: {target_relative}",
+                EXIT_BLOCKED,
+            )
+        target_exists = target.exists()
+        if target_exists:
             if (
                 target.is_symlink()
                 or not target.is_file()
                 or target.read_bytes() != source.read_bytes()
+                or (target.stat().st_mode & 0o111) != (source.stat().st_mode & 0o111)
             ):
                 raise BMError(
-                    f"destino histórico já existe com conteúdo diferente: {target_relative}"
+                    f"BLOQUEADO: destino histórico já existe com conteúdo diferente: {target_relative}",
+                    EXIT_BLOCKED,
                 )
-            source.unlink()
-        else:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            source.replace(target)
-        moved.append({"from": source_name, "to": target_relative.as_posix()})
+        missing_parents: list[Path] = []
+        parent = target.parent
+        while parent != root and not parent.exists():
+            missing_parents.append(parent)
+            parent = parent.parent
+        migration_plan.append(
+            {
+                "source_name": source_name,
+                "source": source,
+                "source_bytes": source.read_bytes(),
+                "source_mode": source.stat().st_mode,
+                "target_relative": target_relative,
+                "target": target,
+                "target_exists": target_exists,
+                "missing_parents": missing_parents,
+            }
+        )
 
-    ignore_added = ensure_versioned_superpowers_ignore(root)
-    run_git(["add", "--", ".gitignore"], root)
-    if tracked:
-        run_git(["add", "-u", "--", ".superpowers"], root)
-        run_git(["add", "--", destination], root)
-    remaining = tracked_root_superpowers(root)
-    if remaining:
+    gitignore = root / ".gitignore"
+    if (
+        gitignore.is_symlink()
+        or path_uses_symlink(root, gitignore)
+        or (gitignore.exists() and not gitignore.is_file())
+    ):
         raise BMError(
-            "BLOQUEADO: migração não removeu todos os artefatos raiz: "
-            + ", ".join(remaining),
+            "BLOQUEADO: .gitignore deve ser arquivo regular dentro do repositório",
             EXIT_BLOCKED,
         )
+    original_gitignore = gitignore.read_bytes() if gitignore.exists() else None
+    applied: list[dict[str, Any]] = []
+    ignore_added = False
+    try:
+        for item in migration_plan:
+            source = item["source"]
+            target = item["target"]
+            if item["target_exists"]:
+                source.unlink()
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source.replace(target)
+            applied.append(item)
+        ignore_added = ensure_versioned_superpowers_ignore(root)
+        run_git(["add", "--", ".gitignore"], root)
+        if tracked:
+            run_git(["add", "-u", "--", ".superpowers"], root)
+            run_git(["add", "--", destination], root)
+        remaining = tracked_root_superpowers(root)
+        if remaining:
+            raise BMError(
+                "migração não removeu todos os artefatos raiz: " + ", ".join(remaining)
+            )
+        repository_hygiene(root, False)
+    except Exception as error:
+        restored: list[str] = []
+        rollback_errors: list[str] = []
+        for item in reversed(applied):
+            try:
+                source = item["source"]
+                target = item["target"]
+                source.parent.mkdir(parents=True, exist_ok=True)
+                if item["target_exists"]:
+                    source.write_bytes(item["source_bytes"])
+                    source.chmod(item["source_mode"])
+                elif target.exists():
+                    target.replace(source)
+                restored.append(item["source_name"])
+            except OSError as rollback_error:
+                rollback_errors.append(f"{item['source_name']}: {rollback_error}")
+        try:
+            if original_gitignore is None:
+                if gitignore.exists():
+                    gitignore.unlink()
+            else:
+                gitignore.write_bytes(original_gitignore)
+            subprocess.run(
+                ["git", "reset", "-q", "HEAD", "--", ".gitignore", ".superpowers", destination],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        except OSError as rollback_error:
+            rollback_errors.append(f".gitignore/index: {rollback_error}")
+        created_parents = {
+            parent for item in migration_plan for parent in item["missing_parents"]
+        }
+        for parent in sorted(created_parents, key=lambda value: len(value.parts), reverse=True):
+            try:
+                parent.rmdir()
+            except OSError:
+                pass
+        detail = f"restaurados: {', '.join(sorted(restored)) or 'nenhum movimento aplicado'}"
+        if rollback_errors:
+            detail += "; falhas de rollback: " + ", ".join(rollback_errors)
+        raise BMError(
+            f"BLOQUEADO: falha durante aplicação da higiene; {detail}; causa: {error}",
+            EXIT_BLOCKED,
+        ) from error
+
+    moved = [
+        {"from": item["source_name"], "to": item["target_relative"].as_posix()}
+        for item in migration_plan
+    ]
     return {
         "valid": True,
         "moved": moved,
@@ -570,6 +741,7 @@ def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
         "scope": {"status": "pending", "source": None, "approved_at": None},
         "planning": {
             "quality_version": 1,
+            "research_mode": None,
             "research": None,
             "spec": None,
             "review": None,
@@ -622,11 +794,88 @@ def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
     }
 
 
+def normalize_legacy_status(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value.strip().lower())
+    normalized = "".join(character for character in normalized if not unicodedata.combining(character))
+    return re.sub(r"[\s-]+", "_", normalized.strip(" \t\r\n\"',;]}"))
+
+
+def legacy_status_values(text: str) -> list[str]:
+    values = re.findall(
+        r"(?im)(?:^|[,{])[ \t]*(?:[-*][ \t]*)?[\"']?(?:[a-z][a-z0-9_]*_)?status[\"']?"
+        r"[ \t]*:[ \t]*[\"']?([^\n,}\]]+)",
+        text,
+    )
+    return [normalize_legacy_status(value) for value in values if value.strip()]
+
+
+def legacy_completion_marker(text: str) -> dict[str, Any] | None:
+    statuses = legacy_status_values(text)
+    blocking = sorted(set(statuses) & LEGACY_BLOCKING_STATUSES)
+    if blocking:
+        raise BMError(
+            "BLOQUEADO: estado legado ainda está " + ", ".join(blocking),
+            EXIT_BLOCKED,
+        )
+    completed = sorted(set(statuses) & LEGACY_COMPLETED_STATUSES)
+    if completed:
+        return {"source": "legacy_state", "statuses": completed}
+    return None
+
+
+def validate_completion_proof(root: Path, proof: Path | None) -> dict[str, str]:
+    if proof is None:
+        raise BMError(
+            "BLOQUEADO: estado legado sem marcador objetivo de conclusão; informe --completion-proof <arquivo>",
+            EXIT_BLOCKED,
+        )
+    candidate = proof if proof.is_absolute() else root / proof
+    lexical = candidate.absolute()
+    resolved = candidate.resolve()
+    try:
+        relative = resolved.relative_to(root)
+        lexical.relative_to(root)
+    except ValueError as error:
+        raise BMError("BLOQUEADO: completion proof deve ficar dentro do repositório", EXIT_BLOCKED) from error
+    if candidate.is_symlink() or path_uses_symlink(root, lexical) or not resolved.is_file():
+        raise BMError("BLOQUEADO: completion proof deve ser arquivo regular sem symlink", EXIT_BLOCKED)
+    relative_name = relative.as_posix()
+    try:
+        tracked = run_git(["ls-files", "--error-unmatch", "--", relative_name], root)
+        run_git(["cat-file", "-e", f"HEAD:{relative_name}"], root)
+    except BMError as error:
+        raise BMError(
+            "BLOQUEADO: completion proof deve estar rastreado e commitado no HEAD",
+            EXIT_BLOCKED,
+        ) from error
+    if tracked != relative_name:
+        raise BMError(
+            "BLOQUEADO: completion proof deve estar rastreado e commitado no HEAD",
+            EXIT_BLOCKED,
+        )
+    proof_text = resolved.read_text(encoding="utf-8")
+    evidence = re.search(
+        r"(?i)\b(gates?|verification|verifica[cç][aã]o|delivery|entrega|accept(?:ed|ance)?|aceite)\b",
+        proof_text,
+    )
+    outcome = re.search(
+        r"(?i)\b(passed|completed|done|accepted|approved|conclu[ií]d[oa]|entregue|aprovad[oa])\b",
+        proof_text,
+    )
+    if not evidence or not outcome:
+        raise BMError(
+            "BLOQUEADO: completion proof não registra gates, entrega ou aceite concluído",
+            EXIT_BLOCKED,
+        )
+    return {"path": relative_name, "sha256": file_digest(resolved)}
+
+
 def legacy_transition(
     repo: Path,
     state_path: Path,
     completed: bool,
     archive: str = LEGACY_STATE_ARCHIVE,
+    completion_proof: Path | None = None,
 ) -> dict[str, Any]:
     root = repo.resolve()
     top = Path(run_git(["rev-parse", "--show-toplevel"], root)).resolve()
@@ -641,7 +890,7 @@ def legacy_transition(
     if candidate.is_symlink() or not resolved_state.is_file():
         raise BMError("estado legado deve ser arquivo regular dentro do repositório")
 
-    current = load_state(resolved_state)
+    current = load_state(resolved_state, root)
     if current.get("method_version") == 2:
         validated = validate_state(resolved_state)
         if validated["planning_status"] != "idle":
@@ -683,6 +932,12 @@ def legacy_transition(
     if tracked != state_relative.as_posix():
         raise BMError("BLOQUEADO: estado legado deve estar commitado no HEAD", EXIT_BLOCKED)
 
+    completion_evidence = legacy_completion_marker(state_text(resolved_state))
+    proof_result: dict[str, str] | None = None
+    if completion_evidence is None:
+        proof_result = validate_completion_proof(root, completion_proof)
+        completion_evidence = {"source": "completion_proof"}
+
     legacy_bytes = resolved_state.read_bytes()
     archive_path = confined_path(root, archive, "arquivo histórico do estado legado")
     if archive_path == resolved_state:
@@ -713,7 +968,7 @@ def legacy_transition(
     )
     repository_hygiene(root, False)
     staged = run_git(["diff", "--cached", "--name-only"], root).splitlines()
-    return {
+    result = {
         "transitioned": True,
         "already_transitioned": False,
         "route": "v2-standalone",
@@ -722,8 +977,12 @@ def legacy_transition(
         "state": state_relative.as_posix(),
         "legacy_archive": archive_path.relative_to(root).as_posix(),
         "staged": sorted(staged),
+        "completion_evidence": completion_evidence,
         "next_action": IDLE_NEXT_ACTION,
     }
+    if proof_result is not None:
+        result["completion_proof"] = proof_result
+    return result
 
 
 TELEMETRY_METRICS = (
@@ -848,19 +1107,25 @@ PLANNING_LIMITS_BY_PROFILE = {
         "plans": 7,
         "execution_units": 16,
         "platforms": 2,
-        "active_context_words": 8_000,
+        "shared_context_words": 8_000,
+        "max_plan_words": 8_000,
+        "max_execution_unit_words": 4_000,
     },
     "standard": {
         "plans": 16,
         "execution_units": 40,
         "platforms": 6,
-        "active_context_words": 24_000,
+        "shared_context_words": 24_000,
+        "max_plan_words": 16_000,
+        "max_execution_unit_words": 8_000,
     },
     "full": {
         "plans": 32,
         "execution_units": 80,
         "platforms": 12,
-        "active_context_words": 48_000,
+        "shared_context_words": 48_000,
+        "max_plan_words": 32_000,
+        "max_execution_unit_words": 16_000,
     },
 }
 PLANNING_PROFILES = ("lean", "standard", "full")
@@ -886,13 +1151,24 @@ NON_COMMAND_PREFIXES = {
     "validar",
     "verificar",
 }
-RESEARCH_HEADINGS = (
+WEB_RESEARCH_HEADINGS = (
     "## Stack detectada",
     "## Fontes primárias",
     "## Decisões aplicadas",
     "## Alternativas rejeitadas",
     "## Riscos e lacunas",
 )
+REPO_RESEARCH_HEADINGS = (
+    "## Stack detectada",
+    "## Inventário local",
+    "## Decisões aplicadas",
+    "## Riscos e lacunas",
+)
+FULL_RESEARCH_HEADINGS = (
+    "## Escopo da pesquisa",
+    "## Decisões críticas",
+)
+RESEARCH_MODES = ("repo_only", "targeted_web", "full")
 UNIT_FIELDS = (
     "Execution",
     "Review",
@@ -933,9 +1209,29 @@ def recommended_planning_profile(
             capacity_profile = profile
             break
     risks = {plan.get("risk") for plan in plans}
-    if "critical" in risks:
+    critical_ids = {plan.get("id") for plan in plans if plan.get("risk") == "critical"}
+    dependencies = {
+        plan.get("id"): set(plan.get("depends_on", [])) for plan in plans
+    }
+
+    def depends_on_critical(plan_id: Any, seen: set[Any] | None = None) -> bool:
+        visited = set() if seen is None else seen
+        if plan_id in visited:
+            return False
+        visited.add(plan_id)
+        for dependency in dependencies.get(plan_id, set()):
+            if dependency in critical_ids:
+                return True
+            if depends_on_critical(dependency, visited):
+                return True
+        return False
+
+    interdependent_critical = len(critical_ids) > 1 and any(
+        depends_on_critical(plan_id) for plan_id in critical_ids
+    )
+    if interdependent_critical:
         risk_profile = "full"
-    elif risks & {"medium", "high"}:
+    elif risks & {"medium", "high", "critical"}:
         risk_profile = "standard"
     else:
         risk_profile = "lean"
@@ -959,13 +1255,15 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
             "quality_contract": "legacy-compatible",
             "profile": state["assurance_profile"],
             "recommended_profile": "lean",
-            "metrics": {key: 0 for key in limits},
+            "metrics": {**{key: 0 for key in limits}, "package_words": 0},
             "limits": limits,
             "warnings": [],
         }
 
     package_files = set(state["approval"]["package"]["files"])
     research_value = state["planning"].get("research")
+    research_mode = state["planning"].get("research_mode")
+    inferred_legacy_research_mode = False
     spec_value = state["planning"].get("spec")
     review_value = state["planning"].get("review")
     plan_values = [plan["path"] for plan in state["plans"]]
@@ -973,6 +1271,10 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
     if enforced:
         if not quality_enabled:
             errors.append("planning.quality_version: esperado 1 para novo planejamento")
+        if research_mode is not None and research_mode not in RESEARCH_MODES:
+            errors.append(
+                "planning.research_mode: esperado repo_only, targeted_web ou full"
+            )
         for value in contract_values:
             if not isinstance(value, str) or not value:
                 errors.append("pacote: pesquisa, spec, revisão e planos devem ter caminhos locais")
@@ -984,17 +1286,52 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         if research_path is None or not research:
             errors.append("pesquisa: STACK_RESEARCH.md local é obrigatório")
         else:
-            for heading in RESEARCH_HEADINGS:
-                if heading not in research:
-                    errors.append(f"pesquisa: seção obrigatória ausente: {heading}")
-            if "https://" not in research:
-                errors.append("pesquisa: ao menos uma URL HTTPS de fonte primária é obrigatória")
-            if "Fonte primária:" not in research:
-                errors.append("pesquisa: classifique explicitamente cada referência como Fonte primária")
-            if not re.search(r"(?i)Acessado em:\s*\d{4}-\d{2}-\d{2}", research):
-                errors.append("pesquisa: registre Acessado em: YYYY-MM-DD")
+            if research_mode is None and state["approval"]["status"] == "approved":
+                research_mode = (
+                    "targeted_web"
+                    if "https://" in research and "Fonte primária:" in research
+                    else "repo_only"
+                )
+                inferred_legacy_research_mode = True
+                warnings.append(
+                    "planning.research_mode ausente em pacote aprovado anterior; "
+                    f"inferido como {research_mode} somente para compatibilidade"
+                )
+            elif research_mode is None:
+                errors.append(
+                    "planning.research_mode: esperado repo_only, targeted_web ou full"
+                )
+            if not inferred_legacy_research_mode:
+                declared_mode = re.search(r"(?mi)^Research mode:\s*(\S+)\s*$", research)
+                if not declared_mode or declared_mode.group(1) != research_mode:
+                    errors.append("pesquisa: Research mode deve coincidir com planning.research_mode")
+                if not re.search(r"(?mi)^Motivo:\s*\S", research):
+                    errors.append("pesquisa: registre Motivo para o menor modo suficiente")
+            if research_mode == "repo_only":
+                for heading in REPO_RESEARCH_HEADINGS:
+                    if heading not in research:
+                        errors.append(f"pesquisa: seção obrigatória ausente: {heading}")
+                for field in ("Manifests:", "Lockfiles:", "CI:", "Testes:", "Padrões locais:"):
+                    if field not in research:
+                        errors.append(f"pesquisa repo_only: inventário ausente: {field}")
+            elif research_mode in {"targeted_web", "full"}:
+                for heading in WEB_RESEARCH_HEADINGS:
+                    if heading not in research:
+                        errors.append(f"pesquisa: seção obrigatória ausente: {heading}")
+                if "https://" not in research:
+                    errors.append("pesquisa: ao menos uma URL HTTPS de fonte primária é obrigatória")
+                if "Fonte primária:" not in research:
+                    errors.append("pesquisa: classifique explicitamente cada referência como Fonte primária")
+                if not re.search(r"(?i)Acessado em:\s*\d{4}-\d{2}-\d{2}", research):
+                    errors.append("pesquisa: registre Acessado em: YYYY-MM-DD")
+                if research_mode == "full":
+                    for heading in FULL_RESEARCH_HEADINGS:
+                        if heading not in research:
+                            errors.append(
+                                f"pesquisa: seção obrigatória do modo full ausente: {heading}"
+                            )
 
-    active_contents: list[str] = []
+    shared_context = ""
     for value, label in (
         (research_value, "planning.research"),
         (spec_value, "planning.spec"),
@@ -1003,10 +1340,12 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         path, content = planning_file(root, value, label)
         if enforced and (path is None or not content):
             errors.append(f"{label}: arquivo ausente ou vazio")
-        if content:
-            active_contents.append(content)
+        if content and label == "planning.spec":
+            shared_context = content
 
     unit_count = 0
+    plan_words: list[int] = []
+    execution_unit_words: list[int] = []
     for plan in state["plans"]:
         path, content = planning_file(root, plan["path"], f"plan {plan['id']}")
         if enforced and (path is None or not content):
@@ -1014,7 +1353,7 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
             continue
         if not content:
             continue
-        active_contents.append(content)
+        plan_words.append(word_count(content))
         matches = list(PLANNING_UNIT.finditer(content))
         unit_count += len(matches)
         if enforced and not matches:
@@ -1028,6 +1367,7 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         for index, match in enumerate(matches):
             end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
             section = content[match.start():end]
+            execution_unit_words.append(word_count(section))
             for field in UNIT_FIELDS:
                 if not re.search(rf"(?mi)^\*\*{re.escape(field)}:\*\*\s*\S", section):
                     errors.append(
@@ -1065,7 +1405,9 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         "plans": len(state["plans"]),
         "execution_units": unit_count,
         "platforms": len(state.get("release", {}).get("platforms", [])),
-        "active_context_words": sum(word_count(content) for content in active_contents),
+        "shared_context_words": word_count(shared_context),
+        "max_plan_words": max(plan_words, default=0),
+        "max_execution_unit_words": max(execution_unit_words, default=0),
         "package_words": package_words,
     }
     profile = state["assurance_profile"]
@@ -1138,6 +1480,7 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         "quality_contract": "planning-quality-v1" if quality_enabled else "legacy-compatible",
         "profile": profile,
         "recommended_profile": recommended_profile,
+        "research_mode": research_mode,
         "metrics": metrics,
         "limits": limits,
         "budget_exceeded": exceeded,
@@ -1560,7 +1903,7 @@ def write_review_package(cwd: Path, base: str, head: str, brief: Path, report: P
 
 
 def write_checkpoint(state: Path, ledger: Path, cwd: Path, output: Path) -> dict[str, Any]:
-    state_value = load_state(state)
+    state_value = load_state(state, cwd)
     if state_value.get("method_version") == 2:
         state_value = validate_state(state)
     ledger_lines = ledger.read_text(encoding="utf-8").splitlines()[-80:] if ledger.is_file() else []
@@ -1644,7 +1987,7 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
 
 
 def state_summary(path: Path, root: Path | None = None) -> dict[str, Any]:
-    state = load_state(path)
+    state = load_state(path, root)
     if state.get("method_version") == 1:
         return {
             "method_version": 1,
@@ -1784,6 +2127,7 @@ def parser() -> argparse.ArgumentParser:
     transition.add_argument("--repo", type=Path, default=Path.cwd())
     transition.add_argument("--state", type=Path, required=True)
     transition.add_argument("--completed", action="store_true")
+    transition.add_argument("--completion-proof", type=Path)
     transition.add_argument("--archive", default=LEGACY_STATE_ARCHIVE)
 
     snap = commands.add_parser("snapshot")
@@ -1895,10 +2239,11 @@ def main() -> int:
             emit(
                 legacy_transition(
                     args.repo,
-                    args.state,
-                    args.completed,
-                    args.archive,
-                )
+                args.state,
+                args.completed,
+                args.archive,
+                args.completion_proof,
+            )
             )
         elif args.command == "snapshot":
             emit(snapshot(args.state, args.root, args.action == "verify"))

@@ -137,11 +137,11 @@ Quando uma fase v1 concluir todos os gates, verificação final e entrega do pr�
 ```
 
 3. confirmar que o estado legado foi preservado em `docs/bianchini/legacy/transitions/`, que o estado ativo valida como v2 `idle` e que `repo-hygiene check` passa;
-4. em `AGENTS.md` e `CLAUDE.md`, quando existirem, substituir apenas o workflow ativo legado pelo Bianchini Method v2; preservar regras próprias do projeto e referências históricas;
-5. adicionar essas instruções à transição preparada pelo CLI, validar novamente e criar commit local atômico `chore: transition completed legacy project to Bianchini Method v2`;
+4. não editar conteúdo livre de `AGENTS.md` ou `CLAUDE.md`; se já existir bloco entre `<!-- bianchini-method:start -->` e `<!-- bianchini-method:end -->`, limitar qualquer atualização a ele, senão apenas relatar sugestão;
+5. validar novamente e criar commit local atômico `chore: transition completed legacy project to Bianchini Method v2`;
 6. confirmar árvore limpa. O próximo escopo usa `/sdd-planning` standalone com `planning_version: v1`.
 
-`--completed` é uma afirmação operacional do executor: nunca usar antes do encerramento real, em fase bloqueada ou com trabalho não commitado. A transição não reexecuta nem converte o plano concluído. Se qualquer precondição falhar, manter v1 e bloquear sem escrita parcial deliberada.
+`--completed` nunca basta sozinho: o CLI exige marcador objetivo no estado ou `--completion-proof` rastreado e commitado. A transição não reexecuta nem converte o plano concluído. Se qualquer precondição falhar, manter v1 e bloquear sem escrita parcial deliberada.
 
 ## Paradas
 

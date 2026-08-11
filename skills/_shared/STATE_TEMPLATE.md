@@ -20,6 +20,7 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
   },
   "planning": {
     "quality_version": 1,
+    "research_mode": "targeted_web",
     "research": "docs/bianchini/v1/STACK_RESEARCH.md",
     "spec": "docs/bianchini/v1/specs/YYYY-MM-DD-sistema-system-design.md",
     "review": "docs/bianchini/v1/PLANNING_REVIEW.md"
@@ -96,6 +97,7 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
 - Migração explícita pode iniciar com `planning_status: in_progress`, aprovação pending e `plans: []`. Esse bootstrap serve somente para fixar a rota v2; deve receber planos reais antes de `pending_approval`, snapshot ou aprovação.
 - `planning_status`: `idle | in_progress | pending_approval | approved | blocked`.
 - `planning.quality_version: 1` ativa pesquisa primária, simplificação e orçamento verificáveis. Estados v2 anteriores sem esse campo continuam legíveis; novos planejamentos devem usá-lo.
+- `planning.research_mode`: `repo_only | targeted_web | full`; usar o menor modo suficiente e registrar o motivo no `STACK_RESEARCH.md`.
 - `planning.research` aponta para `STACK_RESEARCH.md`, incluído no pacote aprovado.
 - `complexity_review`: `within_budget`, `split` ou `indivisible`. O orçamento escala com `assurance_profile`; ele nunca autoriza remover requisito aprovado.
 - `deferred_scope` só pode receber requisito do escopo aprovado quando o responsável tiver autorizado explicitamente a divisão antes do planejamento. Nesse caso, registrar `scope_split_approved: true`, autor e horário. Sem isso, `planning-audit --strict` bloqueia.
