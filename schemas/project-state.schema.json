@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bianchini.method/schemas/project-state.schema.json",
+  "title": "Bianchini Method v2 Project State",
+  "type": "object",
+  "required": [
+    "method_version",
+    "method_mode",
+    "planning_version",
+    "planning_status",
+    "execution_policy",
+    "assurance_profile",
+    "architecture_audit",
+    "architecture_audit_status",
+    "manual_pdf",
+    "scope",
+    "planning",
+    "approval",
+    "plans",
+    "verification",
+    "release",
+    "blockers",
+    "next_action"
+  ],
+  "properties": {
+    "method_version": { "const": 2 },
+    "method_mode": { "const": "standalone-adaptive" },
+    "planning_version": { "type": "string", "pattern": "^v[1-9][0-9]*$" },
+    "planning_status": {
+      "enum": ["in_progress", "pending_approval", "approved", "blocked"]
+    },
+    "execution_policy": { "const": "adaptive" },
+    "assurance_profile": { "enum": ["lean", "standard", "full"] },
+    "architecture_audit": { "enum": ["disabled", "optional", "required"] },
+    "architecture_audit_status": {
+      "enum": ["not_run", "pending", "passed", "blocked"]
+    },
+    "manual_pdf": { "enum": ["none", "quick_start", "full", "scope"] },
+    "scope": {
+      "type": "object",
+      "required": ["status", "source"],
+      "properties": {
+        "status": { "const": "approved" },
+        "source": { "type": "string" },
+        "approved_at": { "type": ["string", "null"] }
+      }
+    },
+    "planning": {
+      "type": "object",
+      "required": ["spec", "review"],
+      "properties": {
+        "spec": { "type": "string" },
+        "review": { "type": "string" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "required": ["status", "approved_plans", "package"],
+      "properties": {
+        "status": { "enum": ["pending", "approved", "rejected", "invalidated"] },
+        "approved_at": { "type": ["string", "null"] },
+        "approved_by": { "type": ["string", "null"] },
+        "approved_plans": { "type": "array", "items": { "type": "string" } },
+        "package": {
+          "type": "object",
+          "required": ["algorithm", "manifest_path", "manifest_digest", "files"],
+          "properties": {
+            "algorithm": { "const": "sha256-manifest-v1" },
+            "manifest_path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+            },
+            "manifest_digest": { "type": ["string", "null"] },
+            "files": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+              }
+            }
+          }
+        }
+      }
+    },
+    "plans": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "status",
+          "risk",
+          "execution",
+          "review",
+          "test_seams",
+          "depends_on",
+          "ledger",
+          "gates"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "status": { "enum": ["planned", "approved", "in_progress", "completed", "blocked"] },
+          "risk": { "enum": ["low", "medium", "high", "critical"] },
+          "execution": { "enum": ["grouped", "slice", "strict"] },
+          "review": { "enum": ["plan_gate", "per_slice", "per_task"] },
+          "test_seams": { "type": "array", "items": { "type": "string" } },
+          "depends_on": { "type": "array", "items": { "type": "string" } },
+          "ledger": { "type": "string" },
+          "gates": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": ["fast", "plan", "release"],
+      "properties": {
+        "fast": { "$ref": "#/$defs/verificationStage" },
+        "plan": { "$ref": "#/$defs/verificationStage" },
+        "release": { "$ref": "#/$defs/verificationStage" }
+      }
+    },
+    "release": {
+      "type": "object",
+      "required": ["status", "final_gate", "homologation", "final_review", "delivery"],
+      "properties": {
+        "status": { "enum": ["pending", "candidate", "homologated", "ready", "blocked"] },
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "profiles": { "type": "array", "items": { "type": "string" } },
+        "candidate": {
+          "type": ["object", "null"],
+          "required": ["id", "revision", "build", "checksum"],
+          "properties": {
+            "id": { "type": "string", "pattern": ".+" },
+            "revision": { "type": "string", "pattern": ".+" },
+            "build": { "type": "string", "pattern": ".+" },
+            "checksum": { "type": "string", "pattern": ".+" }
+          }
+        },
+        "final_gate": { "const": "homologar-sistema" },
+        "homologation": { "enum": ["pending", "in_progress", "accepted", "blocked"] },
+        "final_review": { "enum": ["pending", "in_progress", "approved", "changes_requested", "blocked"] },
+        "delivery": { "enum": ["pending", "ready", "blocked"] }
+      }
+    },
+    "active_execution": {
+      "type": ["object", "null"],
+      "required": ["plan_id", "unit", "workspace"],
+      "properties": {
+        "plan_id": { "type": "string" },
+        "unit": { "type": "string" },
+        "gate": { "type": ["string", "null"] },
+        "workspace": { "type": "string" }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "required": ["enabled", "path"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+        }
+      }
+    },
+    "blockers": { "type": "array", "items": { "type": "object" } },
+    "next_action": { "type": "string" }
+  },
+  "$defs": {
+    "verificationStage": {
+      "type": "object",
+      "required": ["commands", "status"],
+      "properties": {
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "status": { "enum": ["pending", "passed", "failed", "not_run", "blocked"] }
+      }
+    }
+  }
+}

@@ -1,191 +1,157 @@
 ---
 name: sdd-planning
-description: Use para planejar um sistema a partir de escopo, plano mestre, design e estado real do repositório. Gera a menor quantidade de especificações e planos necessária, usando Superpowers, TDD e arquitetura mínima. Somente planejamento, nunca implementação.
+description: Use somente com invocação explícita de /sdd-planning, ou para continuar um projeto cujo PROJECT_STATE declare method_version 2. Em estado v1, apenas roteia ao legado; não disputa ativação com skills gerais de planejamento.
 ---
 
-# SDD Planning Lean
+# SDD Planning
 
-## Argumentos
+**Anuncie:** "Planejando com Bianchini Method <v1 legado|v2 standalone>."
 
-- sem argumento: equivalente a `auto`;
-- `auto`: selecionar o perfil após uma análise curta dos riscos;
-- `lean`: forçar Lean;
-- `standard`: forçar Standard;
-- `full`: forçar Full.
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md) e [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md). Resolva o caminho absoluto de [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py) uma vez.
 
-Comandos suportados:
+## 1. Rotear
 
-```text
-/sdd-planning
-/sdd-planning auto
-/sdd-planning lean
-/sdd-planning standard
-/sdd-planning full
-```
+1. Ler regras do repositório e `PROJECT_STATE.md`, se existir.
+2. Com estado, executar `bm.py route <state>`; sem estado, executar `bm.py route --repo <repo> --new-project`.
+3. Se v1, exigir Superpowers e entregar o planejamento ao fluxo legado. Sem Superpowers, declarar `BLOQUEADO`; não criar documentos v2.
+4. Se a rota for `v2-new`, iniciar v2 pelo template e validar com `bm.py validate-state`.
+5. Se versão ambígua/inválida, bloquear sem inferir migração.
 
-No modo `auto`, anunciar inicialmente: "Analisando o perfil de garantia via sdd-planning." Depois da leitura inicial, informar o perfil selecionado e o motivo.
+Esta skill somente planeja. Não criar código, scaffolding, migração ou dependência de produção.
 
-Em perfil manual, anunciar desde o início: "Usando sdd-planning no perfil <Lean|Standard|Full> informado pelo usuário."
+## 2. Ler fontes uma vez
 
-## Objetivo
+Ordem: decisão recente do responsável, escopo aprovado, plano mestre, spec/ADR, design, documentação, código/testes/histórico.
 
-Produzir documentação suficiente para um agente implementar corretamente, sem transformar documentação, revisão e rastreabilidade em um segundo produto.
+- Materializar escopo conversacional ou URL mutável em `docs/bianchini/<planning_version>/inputs/APPROVED_SCOPE.md`.
+- Registrar no `PLANNING_REVIEW.md` apenas fatos, conflitos, premissas, riscos e ponteiros.
+- Não reabrir decisão aprovada nem copiar documentos inteiros.
 
-## Regras absolutas
+## 3. Classificar garantia
 
-- Somente planejamento. Não criar código de produção, scaffolding, dependências, migrações ou telas.
-- Usar `superpowers:brainstorming` para validar o desenho e `superpowers:writing-plans` para os planos. Ler as versões atuais das skills.
-- Reutilizar o documento gerado pelo brainstorming como **spec central**. Nunca escrever uma segunda especificação com o mesmo conteúdo.
-- Escolher a arquitetura mais simples que atende o escopo atual. Proibidas abstrações e infraestrutura especulativas.
-- Referenciar arquivos e seções em vez de copiar conteúdo entre documentos.
-- Não fixar versões ou bibliotecas sem necessidade. Consultar documentação atual apenas para APIs instáveis, decisões não óbvias ou versões que precisem ser fixadas.
-- Documentos em português do Brasil; identificadores de código em inglês.
+Escolher `lean`, `standard` ou `full` pelo risco real:
 
-## Perfil de garantia
+- `lean`: baixo risco, integração isolada;
+- `standard`: risco médio, múltiplos perfis/plataformas ou integração coordenada;
+- `full`: regulação, risco crítico ou garantias ampliadas.
 
-No modo `auto`, selecionar o perfil após a leitura inicial e registrar em uma linha o perfil escolhido e o motivo.
+Executar `bm.py policy` para cada plano. A auditoria arquitetural é manual e report-only: não a executar automaticamente por perfil ou risco. Definir `architecture_audit: disabled|optional|required` conforme decisão explícita do responsável. Se ele contratar o relatório no pacote (`required`), incluir o arquivo no manifesto quando existir; candidatos de melhoria não bloqueiam aprovação.
 
-Quando o perfil for forçado manualmente, respeitar a escolha e não promover automaticamente o projeto. Registrar os riscos relevantes encontrados e aplicar controles adicionais somente às áreas críticas indispensáveis, sem transformar o projeto inteiro em Standard ou Full.
+## 4. Criar spec central
 
-### Lean
+Caminho v2:
 
-Usar na maioria dos MVPs e sistemas comerciais:
+`docs/bianchini/<planning_version>/specs/YYYY-MM-DD-<sistema>-system-design.md`
 
-- um spec central;
-- zero specs complementares por padrão;
-- auto-revisão do orquestrador;
-- validação das jornadas críticas;
-- documentação viva mínima.
-
-### Standard
-
-Usar quando houver pelo menos dois fatores relevantes: sincronização offline, geolocalização, pagamentos ou comissões complexas, dados sensíveis, mais de quatro perfis com permissões distintas, múltiplos aplicativos, jobs críticos ou várias integrações externas dependentes entre si.
-
-Pode adicionar até três specs complementares. Revisão cruzada somente dos contratos compartilhados e regras críticas.
-
-### Full
-
-Usar apenas por solicitação explícita ou necessidade de auditoria, regulação, segurança elevada ou risco operacional grave. Ao escolher Full, ler `references/full-assurance.md`.
-
-## Fluxo
-
-### 0. Definir a versão de planejamento
-
-- O primeiro ciclo usa `docs/superpowers/v1/`.
-- Planejamento ainda não aprovado pode ser atualizado na versão atual.
-- Um novo ciclo iniciado após aprovação ou execução usa o próximo número disponível.
-- Nunca sobrescrever planejamento histórico aprovado ou executado.
-- Registrar a versão ativa em `docs/living/PROJECT_STATE.md`.
-
-### 1. Ler as fontes uma vez
-
-Localizar e ler, nesta ordem:
-
-1. escopo aceito, incluindo PDF;
-2. plano mestre;
-3. design de referência, se existir;
-4. `AGENTS.md`, `CLAUDE.md` e `README.md`;
-5. estrutura, código e histórico Git existentes.
-
-Criar uma síntese curta com fatos confirmados, premissas, conflitos e bloqueios reais. Resolver conflitos pela ordem: decisão recente do responsável, escopo aceito, plano mestre, spec aprovada, ADR e código.
-
-Se o design existir, ler `references/design-import.md`. Não carregar essa referência quando não houver design.
-
-### 2. Criar o spec central
-
-Invocar `superpowers:brainstorming` com esta adaptação:
-
-- quando não existir escopo aprovado, seguir o fluxo interativo normal;
-- quando escopo e plano mestre já estiverem aprovados, usar brainstorming em modo de validação;
-- considerar o escopo aceito como entrada já aprovada pelo responsável;
-- não reabrir requisitos definidos;
-- não fazer perguntas sem uma ambiguidade que realmente bloqueie uma decisão;
-- usar um único gate final para aprovação do spec e dos planos.
-
-Salvar diretamente em:
-
-`docs/superpowers/vN/specs/YYYY-MM-DD-<sistema>-system-design.md`
-
-O spec central deve conter somente o necessário:
+Incluir somente:
 
 - objetivo, limites e não objetivos;
-- arquitetura e componentes;
-- perfis e permissões;
-- entidades, estados e regras de domínio;
-- contratos compartilhados realmente usados;
-- segurança e tratamento de dados aplicáveis;
-- estratégia de testes por risco;
-- jornadas críticas;
-- responsabilidades externas;
-- premissas, decisões e bloqueios.
+- arquitetura e contratos públicos;
+- entidades, estados, invariantes e permissões;
+- jornadas e critérios de aceite;
+- segurança/dados/migração/concorrência aplicáveis;
+- plataformas e integrações;
+- seams de teste observáveis;
+- manual/PDF somente se contratado;
+- decisões e bloqueios.
 
-Convenções como paginação, erros, nomes, datas e enums entram apenas se o projeto as utiliza. Não criar catálogos preventivos.
+Design visual existente usa [`references/design-import.md`](references/design-import.md). Full usa [`references/full-assurance.md`](references/full-assurance.md). Abrir cada referência apenas quando aplicável.
 
-### 3. Decidir se precisa de specs complementares
+## 5. Criar planos por entregas reais
 
-Criar uma spec complementar somente quando o subsistema:
+Caminho:
 
-- possui regras críticas próprias;
-- será implementado por agente independente;
-- tem contrato compartilhado difícil de manter no spec central; ou
-- não cabe com clareza no contexto do spec central.
+`docs/bianchini/<planning_version>/plans/P<NN>-<entrega>.md`
 
-No perfil Lean, preferir seções no spec central. No Standard, limitar a três specs. Cada complementar deve referenciar o central e conter apenas o delta do subsistema.
+Não há mínimo ou alvo de tarefas. Um plano pode ter uma ou duas tarefas quando essas são as entregas reais. Separar somente quando uma unidade puder ser rejeitada ou verificada independentemente.
 
-### 4. Criar documentação viva mínima
-
-Criar ou atualizar:
-
-- `docs/living/PROJECT_STATE.md`: versão ativa, planos, status por plano, bloqueios, próximo passo e o gate final abaixo;
-- `docs/living/DECISIONS.md`: somente decisões difíceis de reverter ou que mudam contratos;
-- `docs/living/KNOWN_ISSUES.md`: somente problemas realmente abertos.
-
-Registrar no `PROJECT_STATE.md`:
+Cabeçalho:
 
 ```yaml
-final_gate: homologar-sistema
-release_platforms: [plataformas previstas]
-release_profiles: [perfis previstos]
-manual_pdf: required
+plan_id: P01
+method_version: 2
+risk: low | medium | high | critical
+execution: grouped | slice | strict
+review: plan_gate | per_slice | per_task
+depends_on: []
+spec_refs: [<caminho#seção>]
 ```
 
-O manual PDF é obrigatório por padrão. Uma exceção precisa estar explicitamente aprovada no estado do projeto.
+Cada tarefa/slice/grupo declara:
 
-Todo planejamento novo começa em `docs/living/PROJECT_STATE.md` como `pending_approval`. Após aprovação explícita do usuário, atualizar o estado para `approved`, registrando a data e os planos aprovados. Uma aprovação explícita na conversa atual pode ser registrada antes da execução.
+```markdown
+### Tarefa N — <resultado observável>
 
-Não criar por padrão `DEVELOPMENT_LOG`, `TEST_EVIDENCE`, `REQUIREMENTS_TRACEABILITY` ou `DESIGN_IMPLEMENTATION_MAP`. O Git, o ledger do SDD, os relatórios dos agentes e os gates de teste já cobrem essas funções. Criá-los somente quando o perfil Full ou uma exigência contratual justificar.
+**Execution:** grouped | slice | strict
+**Review:** plan_gate | per_slice | per_task
+**Test seams:** <interfaces públicas verificadas>
+**Spec refs:** <seções exatas>
+**Files:** <caminhos>
+**Contract:** <entradas, saídas, invariantes>
+**Verification:** <comando e resultado esperado>
+**Done when:** <evidência objetiva>
+```
 
-### 5. Criar os planos
+### Política de decomposição
 
-Invocar `superpowers:writing-plans` com esta adaptação:
+- `grouped`: reunir mudanças baixas no mesmo seam; uma revisão no gate do plano.
+- `slice`: cada slice entrega comportamento vertical; revisão por slice.
+- `strict`: uma tarefa por unidade crítica, RED/GREEN e revisão independente.
+- Setup/config/docs pertencem à primeira unidade que os usa.
+- Não usar `TBD`, “tratar erros”, tarefas horizontais ou abstração futura.
 
-- Um plano deve entregar software executável e testável de forma independente.
-- Preferir poucos planos. Separar apenas por dependência real ou entrega independente.
-- Manter arquivos exatos, interfaces, TDD, comandos e critérios verificáveis.
-- Usar de **6 a 12 tarefas revisáveis por plano**; máximo de 15 sem justificativa. Não exigir microetapas artificiais de 2 a 5 minutos.
-- Não criar um plano extenso de jornadas finais. Cada plano mantém somente seu gate local e os requisitos técnicos de release que realmente implementa; `homologar-sistema` monta a matriz final a partir do escopo concluído.
-- Uma tarefa é a menor entrega que um revisor pode rejeitar separadamente.
-- Incorporar setup, configuração e documentação à tarefa que depende deles.
-- Código completo no plano somente para regras críticas, algoritmos difíceis e contratos ambíguos. Não repetir código completo em tarefas mecânicas; informar arquivos, comportamento, interfaces, teste e comando esperado.
-- Cada tarefa deve apontar apenas para as seções de spec que consome.
-- Não criar tarefas separadas apenas para atualizar documentação operacional.
-- Ao terminar, não oferecer execução inline nem escolha de modo. Devolver o controle ao `sdd-planning`; a execução começa exclusivamente por `/executar-plano`.
+## 6. Definir verificação
 
-### 6. Revisar proporcionalmente
+Descobrir comandos nativos do repositório e preencher:
 
-Sempre executar auto-revisão de cobertura, placeholders, consistência de tipos e escopo.
+- `verification.fast`: feedback mínimo do grupo/slice/tarefa;
+- `verification.plan`: gate completo por plano;
+- `verification.release`: regressão, E2E codificado e build do RC.
 
-Despachar revisão cruzada somente quando houver contratos entre specs ou planos, regras de autorização, pagamentos, sincronização, geolocalização ou outra área crítica. Revisar apenas esses pontos, não todos os documentos integralmente.
+Gate indispensável indisponível é bloqueio, nunca `passed` presumido.
 
-Criar `docs/superpowers/vN/PLANNING_REVIEW.md` com no máximo:
+## 7. Criar estado e pacote
 
-- fontes lidas;
-- perfil usado e motivo;
-- arquivos criados;
-- requisitos ou decisões bloqueadas;
-- riscos críticos;
-- resultado da revisão.
+Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
 
-## Encerramento
+- `planning_version: v1` no primeiro ciclo;
+- `planning_status: pending_approval`;
+- `execution_policy: adaptive`;
+- `assurance_profile: lean|standard|full`;
+- `architecture_audit: disabled|optional|required`;
+- `manual_pdf: scope` por padrão;
+- `telemetry.enabled: false` por padrão; habilitar somente por decisão explícita;
+- política adaptativa em cada plano;
+- três estágios de `verification`.
 
-Responder apenas com os caminhos do spec, planos, documentação viva alterada, bloqueios reais e pedido de aprovação. A implementação começa por `/executar-plano`, nunca diretamente por improviso.
+Depois:
+
+1. validar estado com `bm.py validate-state`;
+2. criar manifesto com `bm.py snapshot create`;
+3. gravar o digest retornado em `approval.package.manifest_digest`;
+4. validar estado novamente e verificar snapshot;
+5. pedir uma única aprovação do digest e de todos os planos.
+
+Não aprovar em nome do responsável. Se ele reduzir o conjunto, regenerar pacote inteiro; não existe aprovação parcial.
+
+Quando o responsável aprovar:
+
+1. registrar `planning_status: approved`, `approval.status: approved`, responsável, horário e planos;
+2. validar estado e executar `snapshot verify` novamente;
+3. adicionar somente os arquivos do pacote, `PROJECT_STATE.md` e o manifesto; se o manifesto estiver ignorado, usar inclusão explícita apenas para ele;
+4. criar commit local atômico `plan: approve <planning_version> package <digest-curto>`;
+5. confirmar `git status --porcelain` vazio.
+
+Não incluir mudanças alheias no commit, não fazer push e não criar worktree antes dele. Se já houver mudanças externas que impeçam árvore limpa, declarar `BLOQUEADO` e pedir ao responsável para commitá-las, guardá-las ou removê-las.
+
+## 8. Revisar planejamento
+
+Passagem Spec: cobertura, não objetivos, contratos, seams, dependências e plataformas.
+
+Passagem Qualidade: simplicidade, política de execução correta, gates executáveis, ausência de placeholders e custo proporcional.
+
+Salvar `PLANNING_REVIEW.md`. Corrigir achados antes do manifesto final.
+
+## Saída
+
+Informar rota v1/v2, perfil, arquitetura auditada ou opcional, spec, planos, estado validado, digest e bloqueios. Antes da aprovação, encerrar pedindo a decisão única; quando ela chegar, concluir o commit local do pacote sem implementar.

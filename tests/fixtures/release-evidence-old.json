@@ -1,0 +1,20 @@
+[
+  {
+    "command": "pytest -q",
+    "result": "passed",
+    "rc": "rc-1",
+    "revision": "old-revision",
+    "build": "build-41",
+    "checksum": "sha256:release-41",
+    "evidence": "artifacts/old-test-report.txt"
+  },
+  {
+    "command": "playwright test",
+    "result": "passed",
+    "rc": "rc-1",
+    "revision": "old-revision",
+    "build": "build-41",
+    "checksum": "sha256:release-41",
+    "evidence": "artifacts/old-playwright-report/index.html"
+  }
+]

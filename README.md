@@ -1,93 +1,127 @@
-# Bianchini Method Lean
+# Bianchini Method v2 — Standalone Adaptive
 
-Camada enxuta sobre o Superpowers para planejar, executar, homologar e corrigir projetos sem duplicar o trabalho das skills-base.
+Sistema de seis skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
+
+## Fluxo v2
+
+```text
+escopo aprovado
+  -> sdd-planning
+  -> aprovação única
+  -> executar-plano
+  -> gates por plano
+  -> homologar-sistema (automação primeiro)
+  -> revisão final
+  -> entrega
+```
+
+`status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
+`auditar-arquitetura` é manual, report-only e executada apenas sob pedido explícito.
+
+## Compatibilidade
+
+### Projetos v1
+
+```yaml
+method_version: 1 # ou estado legado existente sem method_version
+```
+
+Continuam integralmente no fluxo legado Superpowers. A v2 preserva caminhos, ledger, dispatch, revisão e retomada existentes. Se Superpowers não estiver disponível, a execução v1 bloqueia claramente; nunca usa o executor standalone nem migra automaticamente.
+
+### Projetos v2
+
+```json
+{
+  "method_version": 2,
+  "method_mode": "standalone-adaptive"
+}
+```
+
+Não dependem do Superpowers. Usam estado validado, worktree obrigatória, artefatos persistentes e gates nativos do projeto.
+
+## Política adaptativa
+
+| Risco | Execução | Revisão | Testes |
+|---|---|---|---|
+| baixo | `grouped` | gate do plano | por seam do grupo |
+| médio | `slice` | por slice vertical | por seam do slice |
+| alto/crítico | `strict` | por tarefa | RED/GREEN por tarefa |
+
+Fix rounds: Lean 2, Standard 3, Full 5. Não há quantidade mínima de tarefas ou agentes.
 
 ## Skills
 
-- **`sdd-planning`**: transforma escopo, plano mestre e design em uma especificação central e planos executáveis. Seleciona automaticamente um perfil proporcional ao risco ou respeita o perfil informado pelo usuário.
-- **`executar-plano`**: aplica política de modelos e checkpoints sobre `superpowers:subagent-driven-development`, reutilizando ledger, task briefs, relatórios e pacotes de revisão da skill-base.
-- **`homologar-sistema`**: valida o release candidate por perfis e plataformas contratadas, controla correções bloqueantes e gera o manual PDF da versão testada.
-- **`status-projeto`**: resume fase, planos, gate final, bloqueios e próximo comando sem exigir que o usuário abra os arquivos do projeto.
-- **`corrigir-bug`**: aplica `superpowers:systematic-debugging` com fluxo proporcional à criticidade do bug.
+- `sdd-planning`: spec, planos, política, gates e aprovação única.
+- `executar-plano`: execução v1 legado ou v2 isolada/adaptativa.
+- `auditar-arquitetura`: relatório manual de hotspots e mudanças recentes.
+- `status-projeto`: estado, gates, bloqueios e próximo passo, sem mutação.
+- `corrigir-bug`: causa raiz, regressão adequada ao seam, fix mínimo e reteste.
+- `homologar-sistema`: regressão/E2E primeiro, exploração manual das lacunas e aceite.
 
-## Princípios
+## Estado e ferramentas
 
-1. Uma fonte de verdade para cada informação.
-2. Um único spec central por padrão.
-3. Menos planos, com tarefas maiores e revisáveis.
-4. Sem releitura integral quando um caminho ou trecho específico basta.
-5. Sem documentação operacional duplicada do Git, ledger e relatórios de teste.
-6. Revisão e validação proporcionais ao risco.
-7. Arquitetura mínima, sem abstrações ou infraestrutura especulativas.
+- Schema: [`schemas/project-state.schema.json`](schemas/project-state.schema.json).
+- Template: [`skills/_shared/STATE_TEMPLATE.md`](skills/_shared/STATE_TEMPLATE.md).
+- CLI standalone: [`scripts/bm.py`](scripts/bm.py), empacotado também em `skills/_shared/scripts/bm.py`.
 
-## Documentação padrão
+O CLI usa somente a biblioteca padrão Python e fornece:
 
-Sempre:
+```text
+validate-state  route  snapshot  policy  workspace(create|check|locate|resume)
+task-brief  report  review-package  checkpoint  proof-map  telemetry  status
+```
 
-- `docs/superpowers/vN/specs/<data>-<sistema>-system-design.md`
-- `docs/superpowers/vN/plans/`
-- `docs/living/PROJECT_STATE.md`
+Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é bloqueada.
 
-Somente quando houver conteúdo real:
+`workspace create` também exige repositório limpo e pacote aprovado integralmente commitado. A identidade inclui ciclo e plano (`bm/v1-p01`, `bm/v2-p01`), impedindo reuso acidental entre planejamentos.
 
-- `docs/living/DECISIONS.md`
-- `docs/living/KNOWN_ISSUES.md`
+## Homologação e manual
 
-Rastreabilidade detalhada, evidência consolidada, mapas visuais completos, specs complementares e revisão adversarial ficam restritos a projetos que realmente exigem esse nível de garantia.
+Homologação executa `verification.release`, E2E codificado e cria mapa de provas antes de interação manual. A exploração cobre somente lacunas, comportamento visual, acessibilidade, plataforma e integrações não provadas.
 
-## Perfis de garantia
+`manual_pdf: scope` é o padrão. Os valores são `none | quick_start | full | scope`; ausência de conversor não bloqueia projeto sem manual contratado.
 
-- **Lean**: um spec central, auto-revisão, jornadas críticas e documentação viva mínima. Indicado para a maioria dos MVPs e sistemas comerciais.
-- **Standard**: permite até três specs complementares e revisão cruzada dos contratos e regras críticas. Indicado quando vários fatores de risco relevantes coexistem.
-- **Full**: garantia ampliada para auditoria, regulação, segurança elevada ou risco operacional grave.
+Cada release candidate usa fingerprint obrigatório `id + revision + build + checksum`. Evidências de homologação só valem quando os quatro valores coincidem.
 
-Sem argumento, `sdd-planning` usa `auto`: faz uma análise curta dos riscos e informa o perfil selecionado e o motivo. Um perfil manual é sempre respeitado; riscos adicionais são registrados e controles extras ficam restritos às áreas críticas indispensáveis, sem promover o projeto inteiro.
+## Telemetria opt-in
 
-## Versionamento e aprovação
+Desabilitada por padrão. Quando habilitada no estado, registra localmente tokens informados pelo host, duração, fix rounds, falhas de gate e bugs de homologação. Não registra prompts, código, diffs ou dados pessoais.
 
-O primeiro ciclo de planejamento usa `docs/superpowers/v1/`. Planejamento pendente pode ser atualizado na versão atual; após aprovação ou execução, um novo ciclo usa o próximo número e o histórico não é sobrescrito. A versão ativa fica registrada em `docs/living/PROJECT_STATE.md`.
+`bm.py status <state> --root <repo> --format text` produz o painel humano; sem `--format text`, mantém JSON estável para automação.
 
-Todo planejamento novo começa como `pending_approval`. A aprovação explícita registra o estado `approved`, a data e os planos aprovados em `docs/living/PROJECT_STATE.md`. `/executar-plano` executa somente planos com essa aprovação registrada; uma aprovação explícita na conversa atual pode ser registrada imediatamente antes da execução.
+## Instalação local
 
-## Instalação
+Copie o diretório `skills` inteiro para preservar recursos compartilhados:
 
 ```bash
-for s in sdd-planning executar-plano homologar-sistema status-projeto corrigir-bug; do
-  mkdir -p ~/.claude/skills/$s
-  cp -R skills/$s/. ~/.claude/skills/$s/
-done
-
-# Codex: troque ~/.claude por ~/.codex
+cp -R skills/. ~/.codex/skills/
+# Claude Code: troque ~/.codex por ~/.claude
 ```
+
+Nenhuma instalação ou sincronização é executada automaticamente.
 
 ## Uso
 
-No repositório do projeto:
-
 ```text
 /sdd-planning
-/sdd-planning auto
-/sdd-planning lean
-/sdd-planning standard
-/sdd-planning full
+/auditar-arquitetura
 /executar-plano all
-/homologar-sistema
 /status-projeto
-/corrigir-bug <descrição>
+/corrigir-bug <sintoma>
+/homologar-sistema
 ```
 
-Exemplos:
+## Validação do pacote
 
-```text
-/sdd-planning                  # seleção automática
-/sdd-planning lean             # força Lean
-/sdd-planning standard         # força Standard
-/sdd-planning full             # força Full
-/executar-plano 1 a 3          # executa o intervalo aprovado
+```bash
+python3 scripts/run_test_shards.py
+python3 scripts/bm.py --help
 ```
 
-Fluxo normal:
+O runner recomendado executa cada classe em processo separado e libera recursos entre shards. A forma monolítica continua disponível para ambientes sem limitação:
 
-`/sdd-planning` -> `/executar-plano all` -> `/homologar-sistema` automático no fechamento -> entrega.
+```bash
+python3 -m unittest discover -s tests -v
+```
 
-`corrigir-bug` continua sendo a única skill de correção, inclusive durante a homologação.
+Os testes usam projetos-fixture v1 legado, v2 grouped e v2 strict, além de cenários temporários para worktree, path traversal, fingerprints antigo/incorreto, telemetria opt-in, breaker, homologação automation-first, bug visual, auditoria e manual fora do escopo.

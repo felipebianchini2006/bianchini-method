@@ -18,4 +18,4 @@ Mesmo no Full:
 - não revisar partes sem risco apenas para completar uma checklist;
 - não registrar saída de teste em mais de um lugar;
 - não criar documento vazio ou com seções não aplicáveis;
-- manter o Git e o ledger do SDD como histórico operacional primário.
+- manter o Git e o ledger do plano como histórico operacional primário.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Auditar Arquitetura"
+  short_description: "Relata hotspots e melhorias estruturais"
+  default_prompt: "Use $auditar-arquitetura manualmente para analisar mudanças recentes e gerar um relatório sem implementar."

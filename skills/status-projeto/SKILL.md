@@ -1,35 +1,41 @@
 ---
 name: status-projeto
-description: Use quando for necessário obter um resumo rápido e somente leitura do estado atual de um projeto Bianchini Method, sem o usuário precisar abrir specs, planos ou documentos vivos.
+description: Use com invocação explícita de /status-projeto ou pedido de status em projeto cujo PROJECT_STATE declare method_version 2. Para v1, somente informa a rota legado sem assumir execução standalone.
 ---
 
 # Status do Projeto
 
-**Anuncie ao iniciar:** "Identificando o status atual do projeto."
+**Anuncie:** "Lendo o estado verificável do projeto."
 
-## Coleta mínima
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Esta skill é somente leitura: não corrige estado, não executa plano e não cria artefato.
 
-1. Ler `AGENTS.md` para respeitar as regras locais.
-2. Consultar branch, alterações locais e último commit do Git.
-3. Ler `docs/living/PROJECT_STATE.md`. Ele é a fonte principal para versão ativa, aprovação, planos, fase, gate final, bloqueios e próximo passo.
-4. Ler `docs/living/KNOWN_ISSUES.md` somente se existir e houver problemas abertos.
-5. Consultar apenas a pasta de planos da versão ativa e o último `artifacts/qa/final/*/SUMMARY.md` quando for necessário confirmar contagens ou o gate de homologação.
+## Fluxo
 
-Não alterar arquivos, executar build/testes, criar plano ou despachar subagentes. Não inferir sucesso pela existência de arquivos: se o estado estiver ausente ou contraditório, informar `não registrado` ou `inconsistente`.
+1. Localizar `docs/living/PROJECT_STATE.md`.
+2. Executar `bm.py route` com caminho do Superpowers quando detectado.
+3. V1 com Superpowers: ler estado/status legado e informar que o executor continua legado.
+4. V1 sem Superpowers: informar `BLOQUEADO` e a dependência ausente; não sugerir execução v2 automática.
+5. V2: executar `bm.py validate-state` e `bm.py status <state> --root <repo> --format text`. Usar o JSON padrão somente para automação.
+6. Se estado v2 for inválido, reportar erros do schema e parar; não inferir valores.
 
-## Resposta
+## Resposta compacta
 
-Responder em uma tela, sem despejar YAML, listas de arquivos ou conteúdo dos documentos:
+Mostrar:
 
-```text
-Projeto: <nome>
-Branch: <branch> — <limpa|N alterações locais>
-Fase: <planejamento|aguardando aprovação|execução|homologação|bloqueado|entregue|não registrado>
-Planos: <concluídos/total e próximo plano>
-Gate final: <não configurado|pendente|aceito|bloqueado>
-Bloqueios: <nenhum registrado|resumo curto>
-Próximo passo: <ação objetiva>
-Comando: </sdd-planning|/executar-plano ...|/homologar-sistema|outro>
-```
+- método/rota e `planning_version`;
+- `planning_status`, digest e aprovação;
+- planos por status e unidade atual;
+- política `grouped|slice|strict` de cada plano ativo;
+- plano/unidade/gate atuais e próximo plano executável com seu modo;
+- `verification.fast`, `plan` e `release`;
+- auditoria arquitetural;
+- RC, homologação, revisão final e entrega;
+- bloqueios abertos;
+- telemetria local resumida, somente quando habilitada;
+- uma única `next_action`.
 
-Omitir campos sem aplicação somente quando isso reduzir ruído. Mostrar caminhos apenas se faltar uma fonte obrigatória ou existir inconsistência que o responsável precise corrigir.
+Não ler spec, planos completos ou ledgers quando o estado basta. Abrir apenas o checkpoint/ledger do plano ativo se o usuário pedir detalhe operacional.
+
+## Saída
+
+Responder com fatos do estado validado, caminhos relevantes e próximo passo. Distinguir claramente `planejado`, `implementado`, `gate aprovado`, `homologado` e `entregue`.

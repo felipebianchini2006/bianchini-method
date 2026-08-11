@@ -1,0 +1,24 @@
+[
+  {
+    "command": "pytest -q",
+    "result": "passed",
+    "rc": "rc-1",
+    "revision": "abc123",
+    "build": "build-42",
+    "checksum": "sha256:release-42",
+    "evidence": "artifacts/test-report.txt"
+  },
+  {
+    "command": "playwright test",
+    "result": "passed",
+    "rc": "rc-1",
+    "revision": "abc123",
+    "build": "build-42",
+    "checksum": "sha256:release-42",
+    "evidence": "artifacts/playwright-report/index.html"
+  },
+  {
+    "type": "manual_gap",
+    "journey": "contraste visual mobile"
+  }
+]

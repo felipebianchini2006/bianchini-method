@@ -1,108 +1,133 @@
 ---
 name: executar-plano
-description: Use para executar um ou mais planos aprovados gerados pelo sdd-planning. Aplica política enxuta de modelos e checkpoints sobre superpowers:subagent-driven-development, sem duplicar ledger, briefs, relatórios, revisão ou documentação operacional.
+description: Use somente com invocação explícita de /executar-plano ou quando PROJECT_STATE declarar method_version 2 e houver plano aprovado. Em estado v1, apenas roteia ao executor legado e não concorre com executores gerais.
 ---
 
-# Executar Plano Lean
+# Executar Plano
 
-**Anuncie ao iniciar:** "Executando planos <intervalo> via bianchini-method lean."
+**Anuncie:** "Executando <planos> no modo <v1 legado|grouped|slice|strict>."
 
-## Argumentos
+Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `status-projeto`; executar `all` somente quando o pedido atual já for explícito.
 
-- `all`: todos os planos pendentes em ordem;
-- `N a M` ou `N-M`: intervalo;
-- `N`: apenas um plano;
-- sem argumento: mostrar o status por plano e pedir o intervalo.
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md). Resolva o caminho de [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py).
 
-Usar a versão ativa indicada em `docs/living/PROJECT_STATE.md`. Não iniciar um plano se uma dependência anterior estiver incompleta.
+## 1. Preflight e rota
 
-Executar somente planos com estado `approved` registrado em `docs/living/PROJECT_STATE.md`, incluindo data e lista de planos aprovados. Se houver aprovação explícita na conversa atual, registrá-la antes de iniciar; sem aprovação registrada ou explícita, parar.
+1. Executar `bm.py route`.
+2. V1: exigir Superpowers e usar integralmente o executor legado. Se ausente, `BLOQUEADO`. Não usar nenhuma etapa v2 abaixo.
+3. V2: executar `bm.py validate-state` e `bm.py snapshot verify`.
+4. Se aprovação ainda estiver pending, registrar apenas aprovação explícita inequívoca do digest atual. Concluir a transação descrita em `sdd-planning`: verificar snapshot, commitar localmente somente pacote/estado/manifesto e exigir árvore limpa. O comando de execução não vale como aprovação.
+5. Confirmar planos em `approved_plans` e dependências concluídas. Auditoria arquitetural manual não é gate de execução; defeitos funcionais registrados continuam sujeitos aos gates normais.
+6. Exigir `git status --porcelain` vazio. Mudança preexistente bloqueia a criação da worktree; nunca omitir, copiar informalmente ou incluir mudança alheia no commit do planejamento.
 
-## Regra principal
+Snapshot divergente invalida aprovação e bloqueia. Não classificar mudança como “editorial”.
 
-Invocar `superpowers:subagent-driven-development` e reutilizar integralmente:
+## 2. Workspace isolado obrigatório
 
-- worktree;
-- ledger por plano;
-- `task-brief`;
-- relatório do implementador;
-- pacote de diff para revisão;
-- revisão de conformidade e qualidade;
-- fix loop;
-- revisão final.
+Criar um workspace por plano:
 
-Esta skill só define política adicional. Não criar um segundo ledger, uma segunda revisão ou um segundo pacote de contexto.
+```bash
+<bm.py> workspace create --repo <repo> --planning-version v1 --plan P01 --state <PROJECT_STATE.md>
+<bm.py> workspace resume --repo <repo> --planning-version v1 --plan P01
+<bm.py> workspace check --repo <workspace>
+```
 
-Os mecanismos acima são reutilizados por tarefa. A finalização da branch e a revisão ampla são controladas pelo intervalo solicitado, não por cada plano isoladamente.
+Usar a `planning_version` do estado, nunca valor fixo copiado do exemplo. A branch será `bm/<planning_version>-<plan_id>`. Entrar no caminho retornado antes de editar. `workspace check` deve passar no início e antes de cada commit. Main, master, detached HEAD e worktree primária são proibidos. Não existe fallback para branch atual.
 
-## Preparação
+Aquecer dependências uma vez no workspace, usando gerenciador e comandos do projeto.
 
-1. Ler `AGENTS.md`, `docs/living/PROJECT_STATE.md`, o spec central e os planos selecionados.
-2. Confirmar a aprovação conforme a regra de argumentos. Sem aprovação registrada ou explícita na conversa atual, parar.
-3. Usar `superpowers:using-git-worktrees` conforme exigido pela skill-base.
-4. Aquecer dependências somente quando necessário e no máximo uma vez por sessão. Não executar builds descartáveis por plano sem motivo.
-5. Fazer uma varredura curta de conflitos e bloqueios antes da primeira tarefa.
+## 3. Inicializar execução recuperável
 
-## Política de modelos
+No ledger do plano, registrar digest aprovado, base revision, workspace, branch, modo, perfil e máximo de fix rounds.
 
-Escolher o menor modelo capaz de concluir em poucos turnos. Não registrar tabela de classificação em arquivo; registrar apenas exceções ou escalonamentos.
+Quando `telemetry.enabled: true`, registrar ao fim de cada grupo/slice/tarefa apenas deltas numéricos com `bm.py telemetry record`: tokens informados pelo host, duração, fix rounds e falhas de gate. Não estimar tokens nem persistir prompt, diff ou conteúdo do projeto.
 
-| Nível | Exemplos | Claude Code | Codex |
-|---|---|---|---|
-| Crítico | autorização, pagamentos, offline, migração, concorrência, geolocalização | Opus 5 | GPT 5.6 Terra extra alto |
-| Padrão | integração entre módulos, tela com vários estados, infraestrutura real | Sonnet 5 | GPT 5.6 Terra alto |
-| Mecânico | CRUD claro, ajuste visual isolado, configuração simples | Sonnet 5 | GPT 5.6 Luna max |
+Gerar com o CLI:
 
-Orquestração e revisão final usam o melhor modelo disponível. Se um nome não existir no ambiente, usar o nível equivalente disponível.
+- `task-brief`: um por grupo, slice ou tarefa conforme modo;
+- `report`: relatório persistente do implementador;
+- `review-package`: entrada determinística da revisão;
+- `checkpoint`: após cada unidade aprovada, falha, bloqueio e antes de encerrar contexto.
 
-## Decisões durante a execução
+Retomada começa com `workspace resume`, lendo o caminho absoluto do checkpoint, estado, unidade atual e ledger tail. Não reler planos concluídos nem histórico da conversa.
 
-Quando surgirem duas ou mais opções técnicas compatíveis com o escopo aprovado, decidir autonomamente e continuar. Avaliar arquitetura vigente, padrões já usados no repositório, contratos, risco, simplicidade, testabilidade e custo de manutenção; escolher a opção que seria apresentada como recomendada.
+## 4. Executar pela política do plano
 
-Não interromper o desenvolvimento para pedir ao usuário que escolha entre a recomendação e alternativas inferiores. Resolver primeiro qualquer dúvida que possa ser eliminada lendo código, documentação, testes ou histórico. Registrar a escolha no relatório da tarefa e atualizar `docs/living/DECISIONS.md` somente se ela for difícil de reverter ou alterar arquitetura ou contrato.
+Antes da unidade, executar `bm.py policy` com perfil/risco e confirmar que o resultado coincide com `execution` e `review` aprovados. Divergência aumenta garantia automaticamente; redução exige novo pacote aprovado.
 
-Pedir decisão ao responsável somente quando nenhuma opção puder ser escolhida tecnicamente sem mudar escopo, regra de negócio ou contrato aprovado, ou quando a ação exigir autorização externa, custo novo relevante, operação destrutiva ou alteração de produção.
+### Grouped — baixo risco
 
-## Execução por tarefa
+- Agrupar tarefas do mesmo seam e sem conflitos de ownership.
+- Gerar um brief com `task-brief --tasks 1-3`; confirmar `kind: group`, `group_id`, hash do grupo e hashes das unidades. O CLI rejeita grupo com unidade não-grouped.
+- Executar `verification.fast` nos seams afetados, não RED/GREEN artificial por microtarefa.
+- Fazer auto-revisão do grupo e uma revisão Spec/Qualidade no `plan_gate`.
+- Commit atômico por grupo coerente.
 
-- Manter uma tarefa por dispatch, como exige o `subagent-driven-development`.
-- Se tarefas consecutivas forem pequenas demais para justificar agentes separados, corrigir o plano fundindo-as antes da execução. Não criar lote improvisado que quebre o ledger da skill-base.
-- Entregar contexto por **arquivos e caminhos**. Usar task brief, report file e review package. Não colar specs inteiras ou histórico acumulado no prompt.
-- Incluir apenas decisões posteriores que não estejam registradas nos arquivos.
-- O implementador segue TDD e registra comandos e resultados no relatório.
-- O revisor usa o relatório e o diff. Não repetir testes já executados sem motivo concreto.
-- Reexecutar independentemente apenas quando a evidência estiver incompleta, o teste for não determinístico ou a tarefa for crítica e o risco justificar.
-- Builds pesados, E2E amplo e suítes globais ficam no gate do plano ou na tarefa que os altera diretamente.
-- O fix loop e a escalada seguem a skill-base. Não criar limites concorrentes.
+### Slice — risco médio
 
-## Estado e documentação
+- Cada slice entrega comportamento vertical observável.
+- Gerar brief, relatório e teste comportamental por slice.
+- Usar RED/GREEN quando o teste detecta regressão real; validation-first para config/docs.
+- Revisar Spec/Qualidade uma vez por slice.
+- Commit atômico por slice.
 
-O ledger do SDD é a fonte de verdade por tarefa.
+### Strict — risco alto/crítico
 
-Atualizar `docs/living/PROJECT_STATE.md` somente:
+- Uma unidade crítica por dispatch/execução.
+- Exigir teste RED pela interface pública, implementação mínima GREEN e vizinhos de risco.
+- Exigir revisor independente quando a capacidade existir; sem revisor, registrar bloqueio para Full e compensação explícita para Standard.
+- Revisar cada tarefa e commit atômico.
 
-- ao iniciar ou concluir um plano;
-- ao encontrar bloqueio;
-- antes de encerrar a sessão.
+Nenhum modo implementa necessidade de tarefa futura. Testes observam seams públicos, não detalhes internos.
 
-Atualizar `docs/living/DECISIONS.md` apenas quando uma decisão de contrato ou arquitetura mudar. Atualizar `docs/living/KNOWN_ISSUES.md` apenas para problema realmente aberto. Não manter `DEVELOPMENT_LOG`, `TEST_EVIDENCE` ou checkboxes do plano como fontes paralelas por tarefa.
+## 5. Revisão e fix loop
 
-## Gates
+Eixos obrigatórios na cadência do modo:
 
-Ao concluir cada plano, executar seus comandos de saída. Reexecutar somente o estágio que falhou e seus dependentes.
+- **Spec:** comportamento, contratos, escopo e critérios.
+- **Qualidade:** correção, segurança, manutenção, compatibilidade e testes sensíveis.
 
-Quando o intervalo contém vários planos, adiar a revisão ampla de branch e `finishing-a-development-branch` até o último plano selecionado. Os gates de cada plano continuam obrigatórios. Fazer uma única revisão ampla no final do intervalo, além das revisões por tarefa, e não finalizar a branch separadamente após cada plano.
+Classificar `critical`, `important`, `minor`, `note`. Critical/important abre fix round; minor pode ser adiado com risco explícito para revisão final.
 
-Se o intervalo incluir o último plano aprovado e `docs/living/PROJECT_STATE.md` registrar `final_gate: homologar-sistema`, invocar `homologar-sistema` automaticamente depois dos gates locais e antes da revisão ampla final. Manter as correções encontradas na mesma branch; somente após aceite executar a única revisão ampla e `superpowers:finishing-a-development-branch`.
+Máximo retornado por `bm.py policy`:
 
-Se ambiente ou integração externa impedir a homologação, não finalizar o projeto como entregue. Registrar `BLOQUEADO`, o que foi validado com fake ou sandbox e o requisito restante. Bugs da homologação são corrigidos exclusivamente por `corrigir-bug`.
+- Lean: 2;
+- Standard: 3;
+- Full: 5.
 
-## Paradas permitidas
+Em cada rodada: corrigir causa mínima, executar teste cobrindo, gerar novo pacote do delta e revisar achados abertos. Quando `breaker: true`, parar tentativas. Problema estrutural ou load-bearing marca plano `blocked`; nunca exceder o limite.
 
-Parar somente por bloqueio externo indispensável, contradição entre specs, decisão do responsável realmente necessária ou gate irrecuperável. Não pedir autorização entre tarefas ou planos do intervalo solicitado.
+## 6. Gate por plano
 
-A existência de múltiplas opções técnicas não é uma parada permitida: aplicar a regra de decisão autônoma e seguir com a recomendada.
+Depois das unidades:
 
-## Resposta final
+1. executar todos os comandos `verification.plan` no RC atual;
+2. registrar comando, cwd, horário, saída resumida e código de retorno;
+3. usar `corrigir-bug` para falha de produto e repetir gate afetado/dependentes;
+4. gerar checkpoint final;
+5. marcar plano `completed` somente com gates obrigatórios `passed`.
 
-Informar planos concluídos, gates executados, resultado da homologação, caminhos do resumo e manual PDF, commits principais, decisões alteradas e bloqueios abertos. Não repetir relatórios completos dos subagentes.
+`not_run`, flake aberto ou dependência indispensável mantém `blocked`.
+
+## 7. Release, homologação e revisão final
+
+Quando o último plano aprovado concluir:
+
+1. identificar RC com fingerprint completo `id`, `revision`, `build` e `checksum`, então definir `release.status: candidate`;
+2. executar `homologar-sistema`, que começa por `verification.release`;
+3. somente com `homologation: accepted` e status `homologated`, revisar o release inteiro;
+4. comparar spec, planos, contratos cruzados, achados adiados, segurança e diff desde a primeira `base_revision`;
+5. executar verificação ampla proporcional e registrar `final_review: approved`;
+6. criar `artifacts/delivery/DELIVERY.md` e definir `release.status: ready`.
+
+Se o host não invocar skills por nome, ler e cumprir diretamente `corrigir-bug` ou `homologar-sistema`.
+
+Manual/PDF só entra na entrega quando `manual_pdf` e o escopo exigirem.
+
+## Paradas
+
+Parar por Superpowers ausente em v1, estado/snapshot inválido, worktree insegura, aprovação ausente, mudança de contrato, defeito direto bloqueante, ação sensível sem autorização, breaker, gate irrecuperável ou dependência externa indispensável.
+
+## Saída
+
+Informar rota, planos/modos, workspaces, gates, homologação, revisão final, commits, ledgers/checkpoints, manual quando aplicável e bloqueios. Não fazer push, merge, deploy ou publicação por inferência.

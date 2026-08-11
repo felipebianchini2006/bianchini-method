@@ -1,0 +1,4 @@
+interface:
+  display_name: "Status do Projeto"
+  short_description: "Resume estado, gates e próximo passo"
+  default_prompt: "Use $status-projeto para mostrar o estado verificável do projeto."

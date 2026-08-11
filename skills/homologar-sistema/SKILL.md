@@ -1,60 +1,105 @@
 ---
 name: homologar-sistema
-description: Use quando todos os planos de implementação selecionados estiverem concluídos e for necessário validar o release candidate pelas jornadas reais dos usuários antes da entrega ou publicação.
+description: Use somente com invocação explícita de /homologar-sistema ou quando PROJECT_STATE declarar method_version 2 e release.status candidate. Em v1, apenas roteia à homologação legado.
 ---
 
 # Homologar Sistema
 
-**Anuncie ao iniciar:** "Homologando o release candidate <versão/commit> via bianchini-method."
+**Anuncie:** "Homologando RC <id> com automação primeiro."
 
-## Princípio
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py).
 
-Validar o artefato que será entregue, como usuário real, no escopo contratado. Evidência do RC executado vem antes do aceite; plataforma não executada, bug crítico aberto ou dependência externa indispensável não validada impedem alegar entrega concluída.
+## 1. Rota e pré-condições
 
-Este comando tem somente os quatro estágios abaixo. Não criar um plano adicional de homologação nem converter cada linha da matriz, tela ou clique em tarefa ou subagente.
+1. Executar `bm.py route`.
+2. V1: exigir Superpowers e usar homologação legado; sem ele, `BLOQUEADO`.
+3. V2: validar estado e confirmar planos `completed`, `verification.plan: passed`, fingerprint completo do RC (`id`, `revision`, `build`, `checksum`) e ambiente/dados de teste.
+4. Confirmar plataformas, perfis e integrações no escopo aprovado.
 
-## 1. Preparação e matriz de cobertura
+Não homologar árvore fonte quando a entrega é um artefato diferente.
 
-1. Ler `AGENTS.md`, `docs/living/PROJECT_STATE.md`, o spec central ativo, critérios de aceite e planos concluídos selecionados. Confirmar versão, commit, build e ambiente do RC.
-2. Extrair somente o escopo aprovado e implementado: plataformas entregues, perfis, permissões, jornadas críticas, integrações e estados de erro. Função futura ou fora do aceite é limitação/backlog, não bug.
-3. Montar matriz concisa com `plataforma | perfil | jornada/comportamento | estados e risco | resultado | evidência`. Agrupar por plataforma e perfil, preservando a sessão. Fazer no máximo uma revisão da preparação.
-4. Usar homologação ou ambiente descartável, dados sintéticos e conta de teste por perfil. Reutilizar seeds, fixtures e harnesses existentes.
-5. Ler [references/platform-runners.md](references/platform-runners.md) e selecionar o runner por plataforma e risco.
+## 2. Automação primeiro
 
-**Limites de segurança:** sem autorização explícita, nunca cobrar de verdade, enviar mensagem real, executar exclusão destrutiva ou alterar produção. Mascarar tokens, credenciais, dados pessoais, documentos, endereços e pagamentos em logs, screenshots, evidências e manual. Não instalar framework novo quando Browser, Playwright, ADB, Xcode/Simulator, Maestro ou testes existentes atenderem.
+Antes de interação manual:
 
-## 2. Execução das jornadas reais
+1. executar todos os comandos de `verification.release` no RC;
+2. executar E2E codificado já existente para as jornadas críticas;
+3. reunir relatórios, logs sanitizados e artefatos;
+4. registrar em cada evidência o mesmo `rc`, `revision`, `build` e `checksum` do candidato, então executar `bm.py proof-map` para montar `comando/jornada -> prova automatizada -> RC -> lacuna`;
+5. corrigir falha de produto antes de continuar.
 
-Executar pela interface do usuário, no build real:
+Automação aprovada no mesmo RC prova o comportamento que observa. Não repetir manualmente a mesma jornada apenas para gerar outra evidência. Ainda explorar manualmente quando houver lacuna de UI visual, acessibilidade, usabilidade, integração/plataforma real, permissão nativa ou risco que o teste não observa.
 
-- todas as funções relevantes de cada perfil;
-- jornada principal, erros críticos, permissões e recuperação de cada perfil;
-- cada comportamento interativo distinto ao menos uma vez, sem repetir o mesmo controle para todos os itens idênticos de uma lista;
-- carregamento, vazio, erro, validação, confirmação, cancelamento, offline quando aplicável e retorno após reinício ou nova sessão;
-- web em desktop e ao menos um viewport móvel realista.
+Se regressão/E2E obrigatório não existir, isso vira lacuna planejada; não marcar automaticamente como falha quando o escopo aceita procedimento determinístico equivalente.
 
-Para aplicativo com código compartilhado, executar jornadas completas na plataforma primária e smoke crítico na secundária. Executar completo em Android e iOS quando houver comportamento nativo: câmera, arquivos, notificações, permissões, mapas, geolocalização, background, biometria, deep links, pagamentos ou diferença conhecida. Registrar a plataforma primária e o motivo. Nunca alegar suporte a plataforma não executada.
+## 3. Matriz orientada a lacunas
 
-Salvar evidências por plataforma e perfil em `artifacts/qa/final/<data>/`, apontando caminhos na matriz. Não copiar logs brutos para documentos vivos nem para o contexto. Computer Use é fallback; preferir seletores, árvore de acessibilidade e ferramentas estruturadas.
+Ler somente critérios/jornadas da spec, cabeçalhos/gates dos planos e resumos dos ledgers. Abrir detalhes quando uma prova ou falha exigir.
 
-## 3. Triagem, correção e reteste
+Criar `artifacts/qa/final/<data>/SUMMARY.md`:
 
-Para cada falha, registrar: perfil, plataforma, jornada, passo, esperado, real, severidade e evidência. Separar bug do produto, indisponibilidade externa e item fora de escopo.
+```markdown
+| ID | Plataforma | Perfil | Jornada | Prova automática | Lacuna manual | Resultado | Evidência |
+|---|---|---|---|---|---|---|---|
+```
 
-Bug crítico ou importante exige **REQUIRED SUB-SKILL:** usar `corrigir-bug`. Ela continua sendo a única skill de correção: causa raiz, teste RED, fix mínimo, revisão, verificação e commit atômico. Bugs independentes não entram no mesmo fix; bugs com a mesma causa podem compor uma onda.
+Resultado: `passed | failed | blocked | not_run`. Fixar runner, versão, ambiente, horário e RC. Ler [`references/platform-runners.md`](references/platform-runners.md) somente para plataformas presentes.
 
-Usar no máximo duas ondas de correção. Depois de cada fix, reexecutar a jornada afetada e os vizinhos de risco; ao final, executar smoke global curto. Se duas ondas não convergirem, parar, registrar o bloqueio e não mascarar o resultado. Bug crítico aberto bloqueia aceite.
+## 4. Exploração manual das lacunas
 
-Registrar problema externo ainda aberto em `docs/living/KNOWN_ISSUES.md`. Bug resolvido fica comprovado pelo commit, teste e resumo final. Se uma integração indispensável estiver indisponível, validar fake/sandbox e degradação quando possível, mas manter o projeto bloqueado até a validação real.
+Executar apenas lacunas do mapa:
 
-## 4. Pacote de aceite e manual PDF
+- comportamento visual distinto e responsividade;
+- acessibilidade e navegação real;
+- permissões positivas/negativas não cobertas;
+- validação, erro, cancelamento e recuperação não automatizados;
+- persistência/reinício quando contratados;
+- integração sandbox e comportamento nativo;
+- plataforma secundária não comprovada por automação.
 
-Somente depois do último reteste aceito:
+Preservar sessão por perfil. Preferir seletor acessível/estável; coordenada é último fallback. Evidência deve ser sanitizada.
 
-1. Criar `artifacts/qa/final/<data>/SUMMARY.md` com RC/ambiente, matriz resumida, jornadas, resultado, bugs corrigidos, bugs abertos e limitações.
-2. Manter evidências sanitizadas nas subpastas por plataforma e perfil.
-3. Ler e cumprir [references/manual-delivery.md](references/manual-delivery.md); gerar ou atualizar `docs/manuals/manual-do-sistema.md` e entregar `artifacts/delivery/manual-do-sistema.pdf`.
-4. Atualizar factualmente `docs/living/PROJECT_STATE.md`; atualizar `docs/living/KNOWN_ISSUES.md` somente para problemas abertos.
-5. Emitir `ACEITO` apenas sem bloqueador e com evidências completas. Caso contrário, emitir `BLOQUEADO`, listar o que foi validado e o próximo requisito verificável.
+Não alegar plataforma `not_run`. Fake não prova integração externa indispensável.
 
-Esta homologação ocorre na mesma branch antes da revisão ampla final e de `superpowers:finishing-a-development-branch`. Correções entram antes dessa única revisão final. Ao terminar, devolver ao `executar-plano` o resultado, caminhos do resumo/manual e bloqueios.
+## 5. Triagem, fix e reteste
+
+Para falha, registrar perfil, plataforma, jornada, passo, esperado, real, severidade, classificação e evidência.
+
+- produto critical/important: executar `corrigir-bug` no mesmo workspace;
+- ambiente: reparar harness e repetir;
+- externo: validar contrato/degradação e bloquear quando indispensável;
+- fora de escopo: registrar limitação, sem alterar RC.
+
+Depois de código alterado: gerar novo RC, repetir automação afetada, lacuna manual correspondente, vizinhos de risco e smoke global. Após duas ondas de homologação sem convergir, `BLOQUEADO`.
+
+Com telemetria habilitada, registrar somente a contagem de bugs de homologação e falhas de gate; detalhes continuam no resumo sanitizado, não na telemetria.
+
+## 6. Veredito
+
+`ACEITO` exige:
+
+- `verification.release: passed` ou exceção de escopo explícita;
+- E2E codificado aplicável aprovado;
+- todas as lacunas obrigatórias executadas;
+- nenhuma falha critical/important;
+- plataformas/integrações indispensáveis reais executadas;
+- evidências do RC final.
+
+Caso contrário, `BLOQUEADO` com próximo requisito verificável. Não inventar “aceito com ressalvas”.
+
+Ao aceitar, gravar `release.homologation: accepted` e `release.status: homologated`.
+
+## 7. Manual conforme escopo
+
+Resolver política com `bm.py policy`:
+
+- `manual_pdf: none`: não gerar e não bloquear;
+- `manual_pdf: quick_start`: gerar guia curto em Markdown e PDF;
+- `manual_pdf: full`: gerar manual completo em Markdown e PDF;
+- `manual_pdf: scope`: gerar o nível contratado na spec aprovada; sem contratação, não gerar.
+
+Quando necessário, ler [`references/manual-delivery.md`](references/manual-delivery.md), criar `docs/manuals/manual-do-sistema.md`, gerar `artifacts/delivery/manual-do-sistema.pdf` e validar o PDF. Conversor ausente só bloqueia quando o manual é obrigatório no escopo.
+
+## Saída
+
+Informar RC, provas automatizadas, E2E, lacunas exploradas, matriz, bugs/retestes, veredito, manual quando aplicável e bloqueios. Se o host não invocar `corrigir-bug`, ler e cumprir seu contrato diretamente.
