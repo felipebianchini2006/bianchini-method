@@ -149,7 +149,23 @@ O ledger é append-only. Logs completos, diffs e screenshots ficam em arquivos a
 
 ## Aprovação única
 
-O pacote contém escopo local, spec, planos, revisão de planejamento e decisões contratuais. Se o escopo existir somente na conversa/URL mutável, materializar `docs/bianchini/vN/inputs/APPROVED_SCOPE.md`.
+O pacote contém escopo local, pesquisa da stack, spec, planos, revisão de planejamento e decisões contratuais. Se o escopo existir somente na conversa/URL mutável, materializar `docs/bianchini/vN/inputs/APPROVED_SCOPE.md`.
+
+## Pesquisa e simplificação do planejamento
+
+Todo novo planejamento v2 usa `planning.quality_version: 1` e inclui `STACK_RESEARCH.md`. Levantar versões e padrões já presentes no repositório; pesquisar somente decisões aplicáveis ao escopo em documentação oficial, normas, RFCs, repositórios upstream e avisos do fornecedor. Registrar URL, versão/recorte, data de acesso e consequência no design. Conteúdo promocional ou opinião não substitui fonte primária.
+
+O escopo aprovado define resultados e invariantes, não a decomposição operacional. Reescrever planos legados ou externos em slices de entrega autocontidos; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências e exploração manual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
+
+Antes do snapshot, executar:
+
+```bash
+bm.py planning-audit docs/living/PROJECT_STATE.md --root <repo> --strict
+```
+
+O gate exige pesquisa primária estruturada, unidades completas, comandos reproduzíveis e orçamento padrão de até 8 planos, 20 unidades executáveis, 3 plataformas e 12.000 palavras de contexto normativo ativo. Acima disso, dividir o ciclo; usar `indivisible` somente com justificativa concreta. Um `split` deve listar `deferred_scope`. Esses limites controlam o ciclo atual, não restringem o roadmap total.
+
+Estados com `planning.quality_version: 1` também executam esse gate dentro de `snapshot create|verify`; portanto, um pacote novo não consegue contornar a auditoria omitindo o comando explícito.
 
 Criar e verificar o manifesto:
 

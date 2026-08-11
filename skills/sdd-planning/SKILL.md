@@ -34,7 +34,32 @@ Ordem: decisão recente do responsável, escopo aprovado, plano mestre, spec/ADR
 - Registrar no `PLANNING_REVIEW.md` apenas fatos, conflitos, premissas, riscos e ponteiros.
 - Não reabrir decisão aprovada nem copiar documentos inteiros.
 
-## 3. Classificar garantia
+## 3. Pesquisar a stack
+
+Ler [`references/stack-research.md`](references/stack-research.md). Antes de decidir arquitetura:
+
+1. inventariar stack, versões, manifests, CI, deploy e padrões já usados;
+2. pesquisar práticas atuais aplicáveis ao escopo em fontes primárias;
+3. comparar recomendação, compatibilidade com o projeto e custo de adoção;
+4. escolher o menor fluxo robusto e registrar o impacto de cada decisão.
+
+Salvar `docs/bianchini/<planning_version>/STACK_RESEARCH.md` com as seções exigidas pelo gate. Incluir esse arquivo no pacote aprovado. Pesquisa não autoriza upgrade, dependência, refatoração ou ampliação de escopo. Quando uma informação atual puder ter mudado, verificá-la na internet; para questões técnicas, usar documentação oficial, norma/RFC, repositório upstream ou aviso do fornecedor.
+
+## 4. Simplificar o ciclo
+
+Tratar documentos recebidos como fonte de resultados, invariantes e restrições, nunca como decomposição obrigatória. A spec do ciclo deve ser autocontida; planos não podem mandar o executor abrir `inputs/`, `docs/superpowers/`, plano legado ou “PLANO Task N”.
+
+Fazer uma passagem explícita antes de escrever os planos:
+
+- separar roadmap futuro do menor ciclo entregável atual;
+- fundir baseline, setup, lint e docs na primeira entrega que os utiliza;
+- manter regressão final, evidências e exploração em `verification.release` e `homologar-sistema`;
+- remover camadas, abstrações e tarefas sem critério de aceite próprio;
+- preferir contratos públicos e slices verticais a tarefas por arquivo ou tecnologia.
+
+Usar orçamento padrão de até 8 planos, 20 unidades, 3 plataformas e 12.000 palavras normativas ativas. Se exceder, dividir o escopo em ciclos e listar o restante em `complexity_review.deferred_scope`. Somente marcar `indivisible` com justificativa concreta de 40+ caracteres. O orçamento limita o pacote atual, não o roadmap.
+
+## 5. Classificar garantia
 
 Escolher `lean`, `standard` ou `full` pelo risco real:
 
@@ -44,7 +69,7 @@ Escolher `lean`, `standard` ou `full` pelo risco real:
 
 Executar `bm.py policy` para cada plano. A auditoria arquitetural é manual e report-only: não a executar automaticamente por perfil ou risco. Definir `architecture_audit: disabled|optional|required` conforme decisão explícita do responsável. Se ele contratar o relatório no pacote (`required`), incluir o arquivo no manifesto quando existir; candidatos de melhoria não bloqueiam aprovação.
 
-## 4. Criar spec central
+## 6. Criar spec central
 
 Caminho v2:
 
@@ -62,9 +87,11 @@ Incluir somente:
 - manual/PDF somente se contratado;
 - decisões e bloqueios.
 
+Aplicar as decisões do `STACK_RESEARCH.md` na spec; não copiar o relatório nem adicionar prática sem relação com o escopo.
+
 Design visual existente usa [`references/design-import.md`](references/design-import.md). Full usa [`references/full-assurance.md`](references/full-assurance.md). Abrir cada referência apenas quando aplicável.
 
-## 5. Criar planos por entregas reais
+## 7. Criar planos por entregas reais
 
 Caminho:
 
@@ -107,7 +134,7 @@ Cada tarefa/slice/grupo declara:
 - Setup/config/docs pertencem à primeira unidade que os usa.
 - Não usar `TBD`, “tratar erros”, tarefas horizontais ou abstração futura.
 
-## 6. Definir verificação
+## 8. Definir verificação
 
 Descobrir comandos nativos do repositório e preencher:
 
@@ -117,11 +144,12 @@ Descobrir comandos nativos do repositório e preencher:
 
 Gate indispensável indisponível é bloqueio, nunca `passed` presumido.
 
-## 7. Criar estado e pacote
+## 9. Criar estado e pacote
 
 Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
 
 - `planning_version: v1` no primeiro ciclo;
+- `planning.quality_version: 1` e caminho local de `STACK_RESEARCH.md`;
 - `planning_status: pending_approval`;
 - `execution_policy: adaptive`;
 - `assurance_profile: lean|standard|full`;
@@ -130,16 +158,18 @@ Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
 - `telemetry.enabled: false` por padrão; habilitar somente por decisão explícita;
 - política adaptativa em cada plano;
 - três estágios de `verification`.
+- `complexity_review: within_budget|split|indivisible` coerente com as métricas reais.
 
 Em `idle`, escopo/spec/revisão ainda são nulos e `plans: []`; ao receber o novo escopo aprovado, trocar para `in_progress` e preencher as fontes locais. Durante bootstrap explícito de migração, `plans: []` também é permitido em `in_progress` com aprovação pending. Antes de gerar snapshot ou pedir aprovação, criar os planos reais e remover o estado bootstrap.
 
 Depois:
 
 1. validar estado com `bm.py validate-state`;
-2. criar manifesto com `bm.py snapshot create`;
-3. gravar o digest retornado em `approval.package.manifest_digest`;
-4. validar estado novamente e verificar snapshot;
-5. pedir uma única aprovação do digest e de todos os planos.
+2. executar `bm.py planning-audit <state> --root <repo> --strict` e corrigir todos os erros;
+3. criar manifesto com `bm.py snapshot create`;
+4. gravar o digest retornado em `approval.package.manifest_digest`;
+5. validar estado novamente e verificar snapshot;
+6. pedir uma única aprovação do digest e de todos os planos.
 
 Não aprovar em nome do responsável. Se ele reduzir o conjunto, regenerar pacote inteiro; não existe aprovação parcial.
 
@@ -153,11 +183,11 @@ Quando o responsável aprovar:
 
 Não incluir mudanças alheias no commit, não fazer push e não criar worktree antes dele. Se já houver mudanças externas que impeçam árvore limpa, declarar `BLOQUEADO` e pedir ao responsável para commitá-las, guardá-las ou removê-las.
 
-## 8. Revisar planejamento
+## 10. Revisar planejamento
 
-Passagem Spec: cobertura, não objetivos, contratos, seams, dependências e plataformas.
+Passagem Spec: cobertura, decisões de pesquisa, não objetivos, contratos, seams, dependências e plataformas.
 
-Passagem Qualidade: simplicidade, política de execução correta, gates executáveis, ausência de placeholders e custo proporcional.
+Passagem Qualidade: menor ciclo entregável, simplicidade, política correta, gates executáveis, ausência de placeholders/referências legadas e custo proporcional.
 
 Salvar `PLANNING_REVIEW.md`. Corrigir achados antes do manifesto final.
 

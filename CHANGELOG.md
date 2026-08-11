@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.4.0 — Pesquisa de stack e planejamento enxuto verificável
+
+- torna obrigatória em novos ciclos a pesquisa atual da stack com fontes primárias e impacto no design;
+- inclui `STACK_RESEARCH.md` no pacote de aprovação única;
+- adiciona passagem explícita de simplificação que trata planos legados como fontes, não como decomposição normativa;
+- introduz orçamento operacional de planos, unidades, plataformas e contexto ativo, com split ou exceção justificada;
+- adiciona `planning-audit --strict` para bloquear placeholders, comandos vagos, referências legadas e unidades incompletas;
+- preserva leitura e execução de estados v2 anteriores sem o novo contrato de qualidade.
+
 ## 2.3.3 — Encerramento legado com transição automática
 
 - mantém toda fase v1 no Superpowers até gates, verificação, entrega e commit finais;

@@ -156,6 +156,7 @@ class PackageIntegrityTests(unittest.TestCase):
             "PackageIntegrityTests",
             "RoutingAndStateScenarios",
             "SnapshotScenarios",
+            "PlanningQualityScenarios",
             "AdaptivePolicyScenarios",
             "WorkspaceAndArtifactScenarios",
             "BehavioralProjectScenarios",
@@ -496,6 +497,209 @@ class SnapshotScenarios(unittest.TestCase):
             )
             self.assertEqual(symlink_result.returncode, 2)
             self.assertFalse((outside / "manifest.sha256").exists())
+
+
+class PlanningQualityScenarios(unittest.TestCase):
+    def make_project(self, root: Path, plan_count: int = 1) -> Path:
+        scope = root / "docs/bianchini/v1/inputs/APPROVED_SCOPE.md"
+        research = root / "docs/bianchini/v1/STACK_RESEARCH.md"
+        spec = root / "docs/bianchini/v1/specs/system.md"
+        review = root / "docs/bianchini/v1/PLANNING_REVIEW.md"
+        for path in (scope, research, spec, review):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        scope.write_text("# Escopo aprovado\n\nEntregar API de registros.\n", encoding="utf-8")
+        research.write_text(
+            "# Stack Research — v1\n\n"
+            "## Stack detectada\n\n- Python 3.13 e pytest.\n\n"
+            "## Fontes primárias\n\n"
+            "- Fonte primária: Python 3.13 documentation\n"
+            "  URL: https://docs.python.org/3.13/\n"
+            "  Acessado em: 2026-08-11\n"
+            "  Aplicação: manter biblioteca padrão no CLI.\n\n"
+            "## Decisões aplicadas\n\n- Reusar unittest e contratos públicos.\n\n"
+            "## Alternativas rejeitadas\n\n- Framework adicional — custo sem benefício no ciclo.\n\n"
+            "## Riscos e lacunas\n\n- Nenhum conhecido.\n",
+            encoding="utf-8",
+        )
+        spec.write_text(
+            "# System Design\n\n## API pública\n\nCriar e consultar registros.\n",
+            encoding="utf-8",
+        )
+        review.write_text(
+            "# Planning Review\n\nSpec e qualidade aprovadas; menor ciclo entregável.\n",
+            encoding="utf-8",
+        )
+        state = json.loads(read(FIXTURES / "project-state-v2.json"))
+        state["planning_status"] = "pending_approval"
+        state["scope"] = {
+            "status": "approved",
+            "source": "docs/bianchini/v1/inputs/APPROVED_SCOPE.md",
+            "approved_at": "2026-08-11T00:00:00Z",
+        }
+        state["planning"] = {
+            "quality_version": 1,
+            "research": "docs/bianchini/v1/STACK_RESEARCH.md",
+            "spec": "docs/bianchini/v1/specs/system.md",
+            "review": "docs/bianchini/v1/PLANNING_REVIEW.md",
+        }
+        state["complexity_review"] = {
+            "decision": "within_budget",
+            "justification": None,
+            "deferred_scope": [],
+        }
+        state["approval"].update(
+            {
+                "status": "pending",
+                "approved_at": None,
+                "approved_by": None,
+                "approved_plans": [],
+            }
+        )
+        state["approval"]["package"]["manifest_digest"] = None
+        package_files = [
+            state["scope"]["source"],
+            state["planning"]["research"],
+            state["planning"]["spec"],
+            state["planning"]["review"],
+        ]
+        plans = []
+        for number in range(1, plan_count + 1):
+            plan_id = f"P{number:02d}"
+            relative = f"docs/bianchini/v1/plans/{plan_id}-api.md"
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                f"---\nplan_id: {plan_id}\nmethod_version: 2\nrisk: low\n"
+                "execution: grouped\nreview: plan_gate\ndepends_on: []\n---\n\n"
+                f"# {plan_id} API\n\n### Tarefa 1 — Entregar comportamento {number}\n\n"
+                "**Execution:** grouped\n"
+                "**Review:** plan_gate\n"
+                "**Test seams:** HTTP API pública\n"
+                "**Spec refs:** specs/system.md#api-pública\n"
+                "**Files:** src/api.py, tests/test_api.py\n"
+                "**Contract:** entrada JSON; saída 201; ID persistido\n"
+                "**Verification:** `python3 -m unittest tests.test_api` retorna 0\n"
+                "**Done when:** contrato público passa no gate do plano\n",
+                encoding="utf-8",
+            )
+            plan = json.loads(json.dumps(state["plans"][0]))
+            plan.update(
+                {
+                    "id": plan_id,
+                    "path": relative,
+                    "status": "planned",
+                    "depends_on": [],
+                    "ledger": f"artifacts/bianchini/v1/ledgers/{plan_id}.md",
+                }
+            )
+            plans.append(plan)
+            package_files.append(relative)
+        state["plans"] = plans
+        state["approval"]["package"]["files"] = package_files
+        state["verification"] = {
+            "fast": {"commands": ["python3 -m unittest tests.test_api"], "status": "pending"},
+            "plan": {"commands": ["python3 -m unittest discover -s tests"], "status": "pending"},
+            "release": {"commands": ["python3 -m unittest discover -s tests"], "status": "pending"},
+        }
+        state_path = root / "docs/living/PROJECT_STATE.md"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        return state_path
+
+    def test_strict_audit_accepts_researched_compact_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root)
+            result = cli_json("planning-audit", str(state), "--root", str(root), "--strict")
+            self.assertTrue(result["valid"])
+            self.assertEqual(result["quality_contract"], "planning-quality-v1")
+            self.assertEqual(result["metrics"]["plans"], 1)
+            self.assertEqual(result["metrics"]["execution_units"], 1)
+
+    def test_strict_audit_rejects_unverifiable_research(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root)
+            research = root / "docs/bianchini/v1/STACK_RESEARCH.md"
+            research.write_text("# opinião sem fontes\n", encoding="utf-8")
+            result = cli("planning-audit", str(state), "--root", str(root), "--strict")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("Fonte primária", result.stderr)
+            self.assertIn("URL HTTPS", result.stderr)
+
+    def test_strict_audit_rejects_placeholders_prose_and_legacy_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            state["verification"]["fast"]["commands"] = ["Executar testes dos alvos <alvo>"]
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            plan = root / state["plans"][0]["path"]
+            plan.write_text(
+                read(plan).replace(
+                    "**Spec refs:** specs/system.md#api-pública",
+                    "**Spec refs:** inputs/APPROVED_SCOPE.md, PLANO Task 7",
+                ),
+                encoding="utf-8",
+            )
+            result = cli("planning-audit", str(state_path), "--root", str(root), "--strict")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("referência operacional", result.stderr)
+            self.assertIn("comando vazio, vago ou com placeholder", result.stderr)
+
+    def test_snapshot_cannot_bypass_quality_audit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            state["verification"]["plan"]["commands"] = ["Validar tudo depois"]
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            result = cli("snapshot", "create", str(state_path), "--root", str(root))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("não é comando reproduzível", result.stderr)
+            manifest = root / state["approval"]["package"]["manifest_path"]
+            self.assertFalse(manifest.exists())
+
+    def test_budget_requires_split_or_indivisible_justification(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root, plan_count=9)
+            blocked = cli("planning-audit", str(state_path), "--root", str(root), "--strict")
+            self.assertEqual(blocked.returncode, 2)
+            self.assertIn("orçamento excedido em plans", blocked.stderr)
+
+            state = json.loads(read(state_path))
+            state["complexity_review"] = {
+                "decision": "indivisible",
+                "justification": "Os nove contratos públicos formam uma única migração atômica sem estado intermediário seguro.",
+                "deferred_scope": [],
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            accepted = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(accepted["budget_exceeded"], ["plans"])
+
+    def test_old_v2_state_remains_compatible_but_cannot_claim_new_quality(self) -> None:
+        valid = cli("validate-state", str(FIXTURES / "project-state-v2.json"))
+        self.assertEqual(valid.returncode, 0, valid.stderr)
+        with tempfile.TemporaryDirectory() as temp:
+            compatible = cli_json(
+                "planning-audit",
+                str(FIXTURES / "project-state-v2.json"),
+                "--root",
+                temp,
+            )
+            self.assertEqual(compatible["quality_contract"], "legacy-compatible")
+            strict = cli(
+                "planning-audit",
+                str(FIXTURES / "project-state-v2.json"),
+                "--root",
+                temp,
+                "--strict",
+            )
+            self.assertEqual(strict.returncode, 2)
+            self.assertIn("quality_version", strict.stderr)
 
 
 class AdaptivePolicyScenarios(unittest.TestCase):
@@ -1401,6 +1605,23 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("Mudança preexistente bloqueia", executor)
         self.assertIn("bm/v1-p01", contract)
         self.assertIn("bm/v2-p01", contract)
+
+    def test_planning_research_and_simplification_are_enforced(self) -> None:
+        planning = read(SKILLS["sdd-planning"])
+        contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
+        research = read(ROOT / "skills/sdd-planning/references/stack-research.md")
+        for expected in (
+            "STACK_RESEARCH.md",
+            "fontes primárias",
+            "complexity_review.deferred_scope",
+            "planning-audit",
+            "menor ciclo entregável",
+            "PLANO Task N",
+        ):
+            self.assertIn(expected, planning)
+        self.assertIn("8 planos, 20 unidades executáveis, 3 plataformas", contract)
+        self.assertIn("Acessado em: YYYY-MM-DD", research)
+        self.assertIn("documentação oficial", research)
 
     def test_root_superpowers_is_ignored_and_persistent_docs_are_versioned(self) -> None:
         planning = read(SKILLS["sdd-planning"])

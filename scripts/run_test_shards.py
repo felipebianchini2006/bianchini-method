@@ -15,6 +15,7 @@ SHARDS = (
     "PackageIntegrityTests",
     "RoutingAndStateScenarios",
     "SnapshotScenarios",
+    "PlanningQualityScenarios",
     "AdaptivePolicyScenarios",
     "WorkspaceAndArtifactScenarios",
     "BehavioralProjectScenarios",

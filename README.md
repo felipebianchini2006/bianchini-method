@@ -15,7 +15,7 @@ escopo aprovado
   -> entrega
 ```
 
-`status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
+`sdd-planning` pesquisa a stack em fontes primárias, aplica as decisões à spec e reduz o escopo ao menor ciclo entregável antes da aprovação. `status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
 `auditar-arquitetura` é manual, report-only e executada apenas sob pedido explícito.
 
 ## Compatibilidade
@@ -55,7 +55,7 @@ Fix rounds: Lean 2, Standard 3, Full 5. Não há quantidade mínima de tarefas o
 
 ## Skills
 
-- `sdd-planning`: spec, planos, política, gates e aprovação única.
+- `sdd-planning`: pesquisa atual da stack, spec, simplificação, planos, gates e aprovação única.
 - `executar-plano`: execução v1 legado ou v2 isolada/adaptativa.
 - `auditar-arquitetura`: relatório manual de hotspots e mudanças recentes.
 - `status-projeto`: estado, gates, bloqueios e próximo passo, sem mutação.
@@ -71,7 +71,7 @@ Fix rounds: Lean 2, Standard 3, Full 5. Não há quantidade mínima de tarefas o
 O CLI usa somente a biblioteca padrão Python e fornece:
 
 ```text
-validate-state  route  legacy-transition  snapshot  policy  workspace(create|check|locate|resume)
+validate-state  route  legacy-transition  planning-audit  snapshot  policy  workspace(create|check|locate|resume)
 repo-hygiene(check|migrate)  task-brief  report  review-package
 checkpoint  proof-map  telemetry  status
 ```
@@ -79,6 +79,8 @@ checkpoint  proof-map  telemetry  status
 Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é bloqueada.
 
 `workspace create` também exige repositório limpo e pacote aprovado integralmente commitado. A identidade inclui ciclo e plano (`bm/v1-p01`, `bm/v2-p01`), impedindo reuso acidental entre planejamentos.
+
+Novos planejamentos incluem `STACK_RESEARCH.md` com fontes oficiais, data e impacto no design. `planning-audit --strict` bloqueia pesquisa sem evidência primária, placeholders, comandos em prosa, planos dependentes de fontes legadas e ciclos acima do orçamento padrão sem divisão ou justificativa. O snapshot reaplica o gate automaticamente nos estados com o novo contrato.
 
 `/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; documentos ativos v2 ficam em `docs/bianchini/<planning_version>/`.
 

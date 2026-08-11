@@ -147,8 +147,18 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
             "approved_at": None,
         }:
             errors.append("state.scope: idle exige escopo pendente e sem fonte aprovada")
-        if state["planning"] != {"spec": None, "review": None}:
-            errors.append("state.planning: idle não pode apontar spec ou revisão")
+        if any(
+            state["planning"].get(field) is not None
+            for field in ("research", "spec", "review")
+        ):
+            errors.append("state.planning: idle não pode apontar pesquisa, spec ou revisão")
+        complexity = state.get("complexity_review")
+        if complexity is not None and complexity != {
+            "decision": "pending",
+            "justification": None,
+            "deferred_scope": [],
+        }:
+            errors.append("state.complexity_review: idle exige revisão pendente e vazia")
         if approval["status"] != "pending":
             errors.append("state.approval.status: idle exige aprovação pending")
         if approval.get("approved_at") is not None or approval.get("approved_by") is not None:
@@ -193,6 +203,13 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
             errors.append("state.scope: ciclo ativo exige escopo aprovado e fonte local")
         if not state["planning"]["spec"] or not state["planning"]["review"]:
             errors.append("state.planning: ciclo ativo exige spec e revisão")
+        if state["planning"].get("quality_version") == 1:
+            if not state["planning"].get("research"):
+                errors.append("state.planning.research: contrato de qualidade v1 exige pesquisa")
+            if not isinstance(state.get("complexity_review"), dict):
+                errors.append(
+                    "state.complexity_review: contrato de qualidade v1 exige revisão de complexidade"
+                )
     if len(plan_ids) != len(set(plan_ids)):
         errors.append("state.plans: IDs duplicados")
     active = state.get("active_execution")
@@ -258,6 +275,8 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
             state["planning"]["review"],
             *(plan["path"] for plan in plans),
         }
+        if state["planning"].get("research"):
+            contract_files.add(state["planning"]["research"])
         missing_contract_files = sorted(contract_files - package_files)
         if missing_contract_files:
             errors.append(
@@ -546,7 +565,17 @@ def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
         "architecture_audit_status": "not_run",
         "manual_pdf": "scope",
         "scope": {"status": "pending", "source": None, "approved_at": None},
-        "planning": {"spec": None, "review": None},
+        "planning": {
+            "quality_version": 1,
+            "research": None,
+            "spec": None,
+            "review": None,
+        },
+        "complexity_review": {
+            "decision": "pending",
+            "justification": None,
+            "deferred_scope": [],
+        },
         "approval": {
             "status": "pending",
             "approved_at": None,
@@ -808,8 +837,228 @@ def telemetry_summary(state_path: Path, root: Path) -> dict[str, Any]:
     return summarize_telemetry(validate_state(state_path), root)
 
 
+PLANNING_LIMITS = {
+    "plans": 8,
+    "execution_units": 20,
+    "platforms": 3,
+    "active_context_words": 12_000,
+}
+PLANNING_UNIT = re.compile(
+    r"(?m)^###\s+(?:Tarefa|Task|Slice|Grupo|Group)\s+[^\n]+$",
+    re.IGNORECASE,
+)
+PLANNING_PLACEHOLDER = re.compile(
+    r"(?i)\b(?:TBD|TODO|FIXME|a definir|tratar erros|preencher depois)\b|"
+    r"<(?:alvo|arquivo|comando|caminho|se[cç][aã]o|descri[cç][aã]o|id|nome)[^>]*>"
+)
+LEGACY_OPERATIONAL_REFERENCE = re.compile(
+    r"(?i)(?:docs/superpowers|(?:^|/)inputs/|PLANO\s+Task|writing-plans|"
+    r"Superpowers)"
+)
+NON_COMMAND_PREFIXES = {
+    "aplicar",
+    "confirmar",
+    "executar",
+    "revisar",
+    "rodar",
+    "testar",
+    "validar",
+    "verificar",
+}
+RESEARCH_HEADINGS = (
+    "## Stack detectada",
+    "## Fontes primárias",
+    "## Decisões aplicadas",
+    "## Alternativas rejeitadas",
+    "## Riscos e lacunas",
+)
+UNIT_FIELDS = (
+    "Execution",
+    "Review",
+    "Test seams",
+    "Spec refs",
+    "Files",
+    "Contract",
+    "Verification",
+    "Done when",
+)
+
+
+def word_count(content: str) -> int:
+    return len(re.findall(r"\b[\wÀ-ÿ-]+\b", content, flags=re.UNICODE))
+
+
+def planning_file(root: Path, value: Any, label: str) -> tuple[Path | None, str]:
+    if not isinstance(value, str) or not value.strip():
+        return None, ""
+    target = confined_path(root, value, label)
+    if not target.is_file():
+        return target, ""
+    return target, target.read_text(encoding="utf-8")
+
+
+def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]:
+    state = validate_state(state_path)
+    quality_enabled = state.get("planning", {}).get("quality_version") == 1
+    enforced = strict or quality_enabled
+    errors: list[str] = []
+    warnings: list[str] = []
+    if state["planning_status"] == "idle":
+        if enforced:
+            raise BMError("planejamento inválido:\n- ciclo idle ainda não possui pacote auditável")
+        return {
+            "valid": True,
+            "quality_contract": "legacy-compatible",
+            "metrics": {key: 0 for key in PLANNING_LIMITS},
+            "limits": PLANNING_LIMITS,
+            "warnings": [],
+        }
+
+    package_files = set(state["approval"]["package"]["files"])
+    research_value = state["planning"].get("research")
+    spec_value = state["planning"].get("spec")
+    review_value = state["planning"].get("review")
+    plan_values = [plan["path"] for plan in state["plans"]]
+    contract_values = [research_value, spec_value, review_value, *plan_values]
+    if enforced:
+        if not quality_enabled:
+            errors.append("planning.quality_version: esperado 1 para novo planejamento")
+        for value in contract_values:
+            if not isinstance(value, str) or not value:
+                errors.append("pacote: pesquisa, spec, revisão e planos devem ter caminhos locais")
+            elif value not in package_files:
+                errors.append(f"pacote: artefato contratual ausente do manifesto: {value}")
+
+    research_path, research = planning_file(root, research_value, "planning.research")
+    if enforced:
+        if research_path is None or not research:
+            errors.append("pesquisa: STACK_RESEARCH.md local é obrigatório")
+        else:
+            for heading in RESEARCH_HEADINGS:
+                if heading not in research:
+                    errors.append(f"pesquisa: seção obrigatória ausente: {heading}")
+            if "https://" not in research:
+                errors.append("pesquisa: ao menos uma URL HTTPS de fonte primária é obrigatória")
+            if "Fonte primária:" not in research:
+                errors.append("pesquisa: classifique explicitamente cada referência como Fonte primária")
+            if not re.search(r"(?i)Acessado em:\s*\d{4}-\d{2}-\d{2}", research):
+                errors.append("pesquisa: registre Acessado em: YYYY-MM-DD")
+
+    active_contents: list[str] = []
+    for value, label in (
+        (research_value, "planning.research"),
+        (spec_value, "planning.spec"),
+        (review_value, "planning.review"),
+    ):
+        path, content = planning_file(root, value, label)
+        if enforced and (path is None or not content):
+            errors.append(f"{label}: arquivo ausente ou vazio")
+        if content:
+            active_contents.append(content)
+
+    unit_count = 0
+    for plan in state["plans"]:
+        path, content = planning_file(root, plan["path"], f"plan {plan['id']}")
+        if enforced and (path is None or not content):
+            errors.append(f"plano {plan['id']}: arquivo ausente ou vazio")
+            continue
+        if not content:
+            continue
+        active_contents.append(content)
+        matches = list(PLANNING_UNIT.finditer(content))
+        unit_count += len(matches)
+        if enforced and not matches:
+            errors.append(f"plano {plan['id']}: nenhuma unidade executável encontrada")
+        if enforced and PLANNING_PLACEHOLDER.search(content):
+            errors.append(f"plano {plan['id']}: placeholder ou instrução vaga")
+        if enforced and LEGACY_OPERATIONAL_REFERENCE.search(content):
+            errors.append(
+                f"plano {plan['id']}: referência operacional a fonte bruta/legado"
+            )
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+            section = content[match.start():end]
+            for field in UNIT_FIELDS:
+                if not re.search(rf"(?mi)^\*\*{re.escape(field)}:\*\*\s*\S", section):
+                    errors.append(
+                        f"plano {plan['id']} / {match.group(0).strip()}: campo {field} ausente"
+                    )
+        title_lines = "\n".join(match.group(0) for match in matches)
+        if re.search(r"(?i)\b(?:baseline|lint|setup)\b", title_lines):
+            warnings.append(
+                f"plano {plan['id']}: confirme que baseline/lint/setup foi incorporado à primeira entrega real"
+            )
+        if re.search(r"(?i)\b(?:homologa[cç][aã]o|evid[eê]ncias? de release)\b", title_lines):
+            warnings.append(
+                f"plano {plan['id']}: possível duplicação do gate homologar-sistema"
+            )
+
+    if enforced:
+        for stage, stage_value in state["verification"].items():
+            commands = stage_value.get("commands", [])
+            if not commands:
+                errors.append(f"verification.{stage}: informe ao menos um comando real")
+            for command in commands:
+                first = command.strip().split(maxsplit=1)[0].lower() if command.strip() else ""
+                if not first or PLANNING_PLACEHOLDER.search(command):
+                    errors.append(f"verification.{stage}: comando vazio, vago ou com placeholder")
+                elif first in NON_COMMAND_PREFIXES:
+                    errors.append(
+                        f"verification.{stage}: procedimento em prosa não é comando reproduzível: {command}"
+                    )
+
+    package_words = 0
+    for value in package_files:
+        _, content = planning_file(root, value, "approval.package.files")
+        package_words += word_count(content)
+    metrics = {
+        "plans": len(state["plans"]),
+        "execution_units": unit_count,
+        "platforms": len(state.get("release", {}).get("platforms", [])),
+        "active_context_words": sum(word_count(content) for content in active_contents),
+        "package_words": package_words,
+    }
+    exceeded = [
+        key for key, limit in PLANNING_LIMITS.items() if metrics[key] > limit
+    ]
+    complexity = state.get("complexity_review")
+    if enforced:
+        if not isinstance(complexity, dict):
+            errors.append("complexity_review: revisão obrigatória ausente")
+        else:
+            decision = complexity.get("decision")
+            justification = (complexity.get("justification") or "").strip()
+            deferred = complexity.get("deferred_scope") or []
+            if exceeded:
+                if decision != "indivisible" or len(justification) < 40:
+                    errors.append(
+                        "complexity_review: orçamento excedido em "
+                        + ", ".join(exceeded)
+                        + "; divida o ciclo ou justifique indivisibilidade em 40+ caracteres"
+                    )
+            elif decision not in {"within_budget", "split"}:
+                errors.append(
+                    "complexity_review.decision: use within_budget ou split dentro do orçamento"
+                )
+            if decision == "split" and not deferred:
+                errors.append("complexity_review.deferred_scope: split exige escopo adiado explícito")
+
+    if errors:
+        raise BMError("planejamento inválido:\n- " + "\n- ".join(dict.fromkeys(errors)))
+    return {
+        "valid": True,
+        "quality_contract": "planning-quality-v1" if quality_enabled else "legacy-compatible",
+        "metrics": metrics,
+        "limits": PLANNING_LIMITS,
+        "budget_exceeded": exceeded,
+        "warnings": sorted(set(warnings)),
+    }
+
+
 def snapshot(state_path: Path, root: Path, verify: bool) -> dict[str, Any]:
     state = validate_state(state_path)
+    if state.get("planning", {}).get("quality_version") == 1:
+        planning_audit(state_path, root, strict=True)
     package = state["approval"]["package"]
     content = build_manifest(root, package["files"])
     digest = hashlib.sha256(content).hexdigest()
@@ -1452,6 +1701,11 @@ def parser() -> argparse.ArgumentParser:
     snap.add_argument("state", type=Path)
     snap.add_argument("--root", type=Path, required=True)
 
+    planning_check = commands.add_parser("planning-audit")
+    planning_check.add_argument("state", type=Path)
+    planning_check.add_argument("--root", type=Path, required=True)
+    planning_check.add_argument("--strict", action="store_true")
+
     decide = commands.add_parser("policy")
     decide.add_argument("--profile", choices=["lean", "standard", "full"], required=True)
     decide.add_argument("--risk", choices=["low", "medium", "high", "critical"], required=True)
@@ -1558,6 +1812,8 @@ def main() -> int:
             )
         elif args.command == "snapshot":
             emit(snapshot(args.state, args.root, args.action == "verify"))
+        elif args.command == "planning-audit":
+            emit(planning_audit(args.state, args.root, args.strict))
         elif args.command == "policy":
             emit(policy(args.profile, args.risk, args.change, args.manual_pdf, args.manual_in_scope, args.round))
         elif args.command == "workspace":

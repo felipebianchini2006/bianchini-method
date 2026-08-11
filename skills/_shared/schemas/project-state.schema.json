@@ -49,8 +49,21 @@
       "type": "object",
       "required": ["spec", "review"],
       "properties": {
+        "quality_version": { "const": 1 },
+        "research": { "type": ["string", "null"] },
         "spec": { "type": ["string", "null"] },
         "review": { "type": ["string", "null"] }
+      }
+    },
+    "complexity_review": {
+      "type": "object",
+      "required": ["decision", "justification", "deferred_scope"],
+      "properties": {
+        "decision": {
+          "enum": ["pending", "within_budget", "split", "indivisible"]
+        },
+        "justification": { "type": ["string", "null"] },
+        "deferred_scope": { "type": "array", "items": { "type": "string" } }
       }
     },
     "approval": {

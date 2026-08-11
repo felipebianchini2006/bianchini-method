@@ -19,8 +19,15 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
     "approved_at": null
   },
   "planning": {
+    "quality_version": 1,
+    "research": "docs/bianchini/v1/STACK_RESEARCH.md",
     "spec": "docs/bianchini/v1/specs/YYYY-MM-DD-sistema-system-design.md",
     "review": "docs/bianchini/v1/PLANNING_REVIEW.md"
+  },
+  "complexity_review": {
+    "decision": "within_budget",
+    "justification": null,
+    "deferred_scope": []
   },
   "approval": {
     "status": "pending",
@@ -33,6 +40,7 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
       "manifest_digest": null,
       "files": [
         "docs/bianchini/v1/inputs/APPROVED_SCOPE.md",
+        "docs/bianchini/v1/STACK_RESEARCH.md",
         "docs/bianchini/v1/specs/YYYY-MM-DD-sistema-system-design.md",
         "docs/bianchini/v1/plans/P01-entrega.md",
         "docs/bianchini/v1/PLANNING_REVIEW.md"
@@ -54,9 +62,9 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
     }
   ],
   "verification": {
-    "fast": { "commands": [], "status": "pending" },
-    "plan": { "commands": [], "status": "pending" },
-    "release": { "commands": [], "status": "pending" }
+    "fast": { "commands": ["<substituir pelo comando rápido real>"], "status": "pending" },
+    "plan": { "commands": ["<substituir pelo gate real do plano>"], "status": "pending" },
+    "release": { "commands": ["<substituir pelo gate real do release>"], "status": "pending" }
   },
   "release": {
     "status": "pending",
@@ -81,9 +89,12 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
 ## Semântica
 
 - `planning_version` versiona o ciclo documental (`v1`, `v2`...), não o método.
-- `planning_status: idle` é criado somente no encerramento automático de um projeto legado. Nesse estado, `scope` fica pending/sem fonte, `planning.spec` e `planning.review` ficam nulos, aprovação e manifesto ficam vazios, `plans: []` e `active_execution: null`. O próximo `/sdd-planning` mantém `planning_version: v1` e muda para `in_progress` ao receber novo escopo aprovado.
+- `planning_status: idle` é criado somente no encerramento automático de um projeto legado. Nesse estado, `scope` fica pending/sem fonte, `planning.research`, `planning.spec` e `planning.review` ficam nulos, `complexity_review` fica pending, aprovação e manifesto ficam vazios, `plans: []` e `active_execution: null`. O próximo `/sdd-planning` mantém `planning_version: v1` e muda para `in_progress` ao receber novo escopo aprovado.
 - Migração explícita pode iniciar com `planning_status: in_progress`, aprovação pending e `plans: []`. Esse bootstrap serve somente para fixar a rota v2; deve receber planos reais antes de `pending_approval`, snapshot ou aprovação.
 - `planning_status`: `idle | in_progress | pending_approval | approved | blocked`.
+- `planning.quality_version: 1` ativa pesquisa primária, simplificação e orçamento verificáveis. Estados v2 anteriores sem esse campo continuam legíveis; novos planejamentos devem usá-lo.
+- `planning.research` aponta para `STACK_RESEARCH.md`, incluído no pacote aprovado.
+- `complexity_review`: `within_budget`, `split` ou `indivisible`; exceção indivisível exige justificativa concreta.
 - `assurance_profile`: `lean | standard | full`.
 - `architecture_audit`: `disabled | optional | required`; é uma auditoria manual e report-only, nunca ativada automaticamente por risco ou perfil.
 - `architecture_audit_status: passed` significa relatório concluído, não certificação nem gate de aprovação.
@@ -99,6 +110,12 @@ Valide sempre antes de aprovação, execução, homologação e status:
 
 ```bash
 python3 <caminho-absoluto-de-bm.py> validate-state docs/living/PROJECT_STATE.md
+```
+
+Antes do snapshot de um novo planejamento, substitua os comandos ilustrativos por comandos reais e execute:
+
+```bash
+python3 <caminho-absoluto-de-bm.py> planning-audit docs/living/PROJECT_STATE.md --root . --strict
 ```
 
 Após registrar a aprovação, verificar o snapshot e criar um commit local contendo todos os arquivos do manifesto, este estado e o manifesto. `workspace create` recusará árvore suja ou arquivo aprovado ausente do `HEAD`.
