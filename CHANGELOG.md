@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.1 — Preservação obrigatória do escopo aprovado
+
+- corrige o orçamento fixo que podia incentivar adiamento automático de requisitos;
+- escala capacidade de planejamento por perfil Lean, Standard e Full;
+- exige preservar 100% do escopo ao escalar o perfil ou justificar pacote Full amplo;
+- bloqueia `deferred_scope` sem autorização explícita do responsável, autor e horário;
+- esclarece que simplicidade e economia reduzem decomposição/contexto, nunca o produto contratado.
+
 ## 2.4.0 — Pesquisa de stack e planejamento enxuto verificável
 
 - torna obrigatória em novos ciclos a pesquisa atual da stack com fontes primárias e impacto no design;

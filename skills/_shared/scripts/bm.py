@@ -153,11 +153,14 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
         ):
             errors.append("state.planning: idle não pode apontar pesquisa, spec ou revisão")
         complexity = state.get("complexity_review")
-        if complexity is not None and complexity != {
-            "decision": "pending",
-            "justification": None,
-            "deferred_scope": [],
-        }:
+        if complexity is not None and (
+            complexity.get("decision") != "pending"
+            or complexity.get("justification") is not None
+            or complexity.get("deferred_scope") != []
+            or complexity.get("scope_split_approved", False)
+            or complexity.get("scope_split_approved_by") is not None
+            or complexity.get("scope_split_approved_at") is not None
+        ):
             errors.append("state.complexity_review: idle exige revisão pendente e vazia")
         if approval["status"] != "pending":
             errors.append("state.approval.status: idle exige aprovação pending")
@@ -575,6 +578,9 @@ def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
             "decision": "pending",
             "justification": None,
             "deferred_scope": [],
+            "scope_split_approved": False,
+            "scope_split_approved_by": None,
+            "scope_split_approved_at": None,
         },
         "approval": {
             "status": "pending",
@@ -837,12 +843,27 @@ def telemetry_summary(state_path: Path, root: Path) -> dict[str, Any]:
     return summarize_telemetry(validate_state(state_path), root)
 
 
-PLANNING_LIMITS = {
-    "plans": 8,
-    "execution_units": 20,
-    "platforms": 3,
-    "active_context_words": 12_000,
+PLANNING_LIMITS_BY_PROFILE = {
+    "lean": {
+        "plans": 8,
+        "execution_units": 20,
+        "platforms": 3,
+        "active_context_words": 12_000,
+    },
+    "standard": {
+        "plans": 16,
+        "execution_units": 40,
+        "platforms": 6,
+        "active_context_words": 24_000,
+    },
+    "full": {
+        "plans": 32,
+        "execution_units": 80,
+        "platforms": 12,
+        "active_context_words": 48_000,
+    },
 }
+PLANNING_PROFILES = ("lean", "standard", "full")
 PLANNING_UNIT = re.compile(
     r"(?m)^###\s+(?:Tarefa|Task|Slice|Grupo|Group)\s+[^\n]+$",
     re.IGNORECASE,
@@ -897,6 +918,32 @@ def planning_file(root: Path, value: Any, label: str) -> tuple[Path | None, str]
     return target, target.read_text(encoding="utf-8")
 
 
+def exceeded_planning_limits(
+    metrics: dict[str, int], limits: dict[str, int]
+) -> list[str]:
+    return [key for key, limit in limits.items() if metrics[key] > limit]
+
+
+def recommended_planning_profile(
+    metrics: dict[str, int], plans: list[dict[str, Any]]
+) -> str:
+    capacity_profile = "full"
+    for profile in PLANNING_PROFILES:
+        if not exceeded_planning_limits(metrics, PLANNING_LIMITS_BY_PROFILE[profile]):
+            capacity_profile = profile
+            break
+    risks = {plan.get("risk") for plan in plans}
+    if "critical" in risks:
+        risk_profile = "full"
+    elif risks & {"medium", "high"}:
+        risk_profile = "standard"
+    else:
+        risk_profile = "lean"
+    return PLANNING_PROFILES[
+        max(PLANNING_PROFILES.index(capacity_profile), PLANNING_PROFILES.index(risk_profile))
+    ]
+
+
 def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]:
     state = validate_state(state_path)
     quality_enabled = state.get("planning", {}).get("quality_version") == 1
@@ -906,11 +953,14 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
     if state["planning_status"] == "idle":
         if enforced:
             raise BMError("planejamento inválido:\n- ciclo idle ainda não possui pacote auditável")
+        limits = PLANNING_LIMITS_BY_PROFILE[state["assurance_profile"]]
         return {
             "valid": True,
             "quality_contract": "legacy-compatible",
-            "metrics": {key: 0 for key in PLANNING_LIMITS},
-            "limits": PLANNING_LIMITS,
+            "profile": state["assurance_profile"],
+            "recommended_profile": "lean",
+            "metrics": {key: 0 for key in limits},
+            "limits": limits,
             "warnings": [],
         }
 
@@ -1018,9 +1068,10 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         "active_context_words": sum(word_count(content) for content in active_contents),
         "package_words": package_words,
     }
-    exceeded = [
-        key for key, limit in PLANNING_LIMITS.items() if metrics[key] > limit
-    ]
+    profile = state["assurance_profile"]
+    limits = PLANNING_LIMITS_BY_PROFILE[profile]
+    exceeded = exceeded_planning_limits(metrics, limits)
+    recommended_profile = recommended_planning_profile(metrics, state["plans"])
     complexity = state.get("complexity_review")
     if enforced:
         if not isinstance(complexity, dict):
@@ -1029,27 +1080,62 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
             decision = complexity.get("decision")
             justification = (complexity.get("justification") or "").strip()
             deferred = complexity.get("deferred_scope") or []
-            if exceeded:
-                if decision != "indivisible" or len(justification) < 40:
+            split_approved = complexity.get("scope_split_approved") is True
+            split_approved_by = (complexity.get("scope_split_approved_by") or "").strip()
+            split_approved_at = complexity.get("scope_split_approved_at") or ""
+
+            if deferred:
+                if decision != "split":
                     errors.append(
-                        "complexity_review: orçamento excedido em "
-                        + ", ".join(exceeded)
-                        + "; divida o ciclo ou justifique indivisibilidade em 40+ caracteres"
+                        "complexity_review: deferred_scope exige decision split"
+                    )
+                if not (
+                    split_approved
+                    and split_approved_by
+                    and re.match(r"^\d{4}-\d{2}-\d{2}T", split_approved_at)
+                ):
+                    errors.append(
+                        "complexity_review: escopo aprovado não pode ser adiado para caber no orçamento; "
+                        "split exige autorização explícita do responsável com autor e horário"
+                    )
+            elif decision == "split":
+                errors.append(
+                    "complexity_review.deferred_scope: split exige escopo adiado autorizado"
+                )
+            elif split_approved or split_approved_by or split_approved_at:
+                errors.append(
+                    "complexity_review: autorização de split não pode permanecer sem deferred_scope"
+                )
+            if PLANNING_PROFILES.index(profile) < PLANNING_PROFILES.index(
+                recommended_profile
+            ):
+                errors.append(
+                    f"assurance_profile {profile}: insuficiente para risco/capacidade; "
+                    f"preserve todo o escopo e escale para {recommended_profile}"
+                )
+            if exceeded:
+                if profile == "full" and (
+                    decision not in {"indivisible", "split"}
+                    or len(justification) < 40
+                ):
+                    errors.append(
+                        "complexity_review: perfil full acima da faixa exige justificativa "
+                        "de indivisibilidade em 40+ caracteres; nunca reduza escopo automaticamente"
                     )
             elif decision not in {"within_budget", "split"}:
                 errors.append(
                     "complexity_review.decision: use within_budget ou split dentro do orçamento"
                 )
-            if decision == "split" and not deferred:
-                errors.append("complexity_review.deferred_scope: split exige escopo adiado explícito")
 
     if errors:
         raise BMError("planejamento inválido:\n- " + "\n- ".join(dict.fromkeys(errors)))
     return {
         "valid": True,
         "quality_contract": "planning-quality-v1" if quality_enabled else "legacy-compatible",
+        "profile": profile,
+        "recommended_profile": recommended_profile,
         "metrics": metrics,
-        "limits": PLANNING_LIMITS,
+        "limits": limits,
         "budget_exceeded": exceeded,
         "warnings": sorted(set(warnings)),
     }

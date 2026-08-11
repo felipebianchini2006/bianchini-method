@@ -15,7 +15,7 @@ escopo aprovado
   -> entrega
 ```
 
-`sdd-planning` pesquisa a stack em fontes primárias, aplica as decisões à spec e reduz o escopo ao menor ciclo entregável antes da aprovação. `status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
+`sdd-planning` pesquisa a stack em fontes primárias, aplica as decisões à spec e simplifica a execução sem reduzir o escopo aprovado. `status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
 `auditar-arquitetura` é manual, report-only e executada apenas sob pedido explícito.
 
 ## Compatibilidade
@@ -80,7 +80,7 @@ Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é b
 
 `workspace create` também exige repositório limpo e pacote aprovado integralmente commitado. A identidade inclui ciclo e plano (`bm/v1-p01`, `bm/v2-p01`), impedindo reuso acidental entre planejamentos.
 
-Novos planejamentos incluem `STACK_RESEARCH.md` com fontes oficiais, data e impacto no design. `planning-audit --strict` bloqueia pesquisa sem evidência primária, placeholders, comandos em prosa, planos dependentes de fontes legadas e ciclos acima do orçamento padrão sem divisão ou justificativa. O snapshot reaplica o gate automaticamente nos estados com o novo contrato.
+Novos planejamentos incluem `STACK_RESEARCH.md` com fontes oficiais, data e impacto no design. `planning-audit --strict` bloqueia pesquisa sem evidência primária, placeholders, comandos em prosa e planos dependentes de fontes legadas. O orçamento escala por perfil (Lean, Standard e Full) sem retirar requisitos aprovados. Qualquer `deferred_scope` exige autorização explícita registrada do responsável. O snapshot reaplica o gate automaticamente.
 
 `/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; documentos ativos v2 ficam em `docs/bianchini/<planning_version>/`.
 

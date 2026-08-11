@@ -45,27 +45,29 @@ Ler [`references/stack-research.md`](references/stack-research.md). Antes de dec
 
 Salvar `docs/bianchini/<planning_version>/STACK_RESEARCH.md` com as seções exigidas pelo gate. Incluir esse arquivo no pacote aprovado. Pesquisa não autoriza upgrade, dependência, refatoração ou ampliação de escopo. Quando uma informação atual puder ter mudado, verificá-la na internet; para questões técnicas, usar documentação oficial, norma/RFC, repositório upstream ou aviso do fornecedor.
 
-## 4. Simplificar o ciclo
+## 4. Simplificar sem reduzir escopo
 
-Tratar documentos recebidos como fonte de resultados, invariantes e restrições, nunca como decomposição obrigatória. A spec do ciclo deve ser autocontida; planos não podem mandar o executor abrir `inputs/`, `docs/superpowers/`, plano legado ou “PLANO Task N”.
+Preservar 100% dos resultados, invariantes e restrições do escopo aprovado. Tratar somente sua decomposição como não normativa. A spec do ciclo deve ser autocontida; planos não podem mandar o executor abrir `inputs/`, `docs/superpowers/`, plano legado ou “PLANO Task N”.
 
 Fazer uma passagem explícita antes de escrever os planos:
 
-- separar roadmap futuro do menor ciclo entregável atual;
+- criar cobertura explícita de cada requisito aprovado em spec e plano;
 - fundir baseline, setup, lint e docs na primeira entrega que os utiliza;
 - manter regressão final, evidências e exploração em `verification.release` e `homologar-sistema`;
 - remover camadas, abstrações e tarefas sem critério de aceite próprio;
 - preferir contratos públicos e slices verticais a tarefas por arquivo ou tecnologia.
 
-Usar orçamento padrão de até 8 planos, 20 unidades, 3 plataformas e 12.000 palavras normativas ativas. Se exceder, dividir o escopo em ciclos e listar o restante em `complexity_review.deferred_scope`. Somente marcar `indivisible` com justificativa concreta de 40+ caracteres. O orçamento limita o pacote atual, não o roadmap.
+Nunca mover requisito aprovado para `deferred_scope` a fim de satisfazer orçamento. Escalar primeiro `assurance_profile`: Lean até 8 planos/20 unidades/3 plataformas/12.000 palavras; Standard até 16/40/6/24.000; Full até 32/80/12/48.000. Acima de Full, manter o escopo e justificar `indivisible`; otimizar ponteiros e execução, não retirar entregas.
+
+Usar `split` somente quando o responsável tiver autorizado explicitamente a divisão antes do planejamento. Registrar `scope_split_approved: true`, autor e horário. Sem autorização, deixar `deferred_scope: []`; se o escopo não couber, escalar o perfil. Não interpretar “seja simples”, “evite overengineering” ou o próprio orçamento como autorização para adiar requisito.
 
 ## 5. Classificar garantia
 
-Escolher `lean`, `standard` ou `full` pelo risco real:
+Escolher `lean`, `standard` ou `full` pelo maior entre risco e complexidade do escopo completo:
 
 - `lean`: baixo risco, integração isolada;
 - `standard`: risco médio, múltiplos perfis/plataformas ou integração coordenada;
-- `full`: regulação, risco crítico ou garantias ampliadas.
+- `full`: regulação, risco crítico, múltiplos subsistemas ou escopo amplo.
 
 Executar `bm.py policy` para cada plano. A auditoria arquitetural é manual e report-only: não a executar automaticamente por perfil ou risco. Definir `architecture_audit: disabled|optional|required` conforme decisão explícita do responsável. Se ele contratar o relatório no pacote (`required`), incluir o arquivo no manifesto quando existir; candidatos de melhoria não bloqueiam aprovação.
 
@@ -158,7 +160,7 @@ Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
 - `telemetry.enabled: false` por padrão; habilitar somente por decisão explícita;
 - política adaptativa em cada plano;
 - três estágios de `verification`.
-- `complexity_review: within_budget|split|indivisible` coerente com as métricas reais.
+- `complexity_review: within_budget|split|indivisible` coerente com perfil e escopo; `split` exige autorização explícita registrada.
 
 Em `idle`, escopo/spec/revisão ainda são nulos e `plans: []`; ao receber o novo escopo aprovado, trocar para `in_progress` e preencher as fontes locais. Durante bootstrap explícito de migração, `plans: []` também é permitido em `in_progress` com aprovação pending. Antes de gerar snapshot ou pedir aprovação, criar os planos reais e remover o estado bootstrap.
 
@@ -185,9 +187,9 @@ Não incluir mudanças alheias no commit, não fazer push e não criar worktree 
 
 ## 10. Revisar planejamento
 
-Passagem Spec: cobertura, decisões de pesquisa, não objetivos, contratos, seams, dependências e plataformas.
+Passagem Spec: cobertura de 100% do escopo aprovado, decisões de pesquisa, não objetivos autorizados, contratos, seams, dependências e plataformas.
 
-Passagem Qualidade: menor ciclo entregável, simplicidade, política correta, gates executáveis, ausência de placeholders/referências legadas e custo proporcional.
+Passagem Qualidade: simplicidade sem redução de escopo, perfil proporcional, gates executáveis, ausência de placeholders/referências legadas e custo proporcional.
 
 Salvar `PLANNING_REVIEW.md`. Corrigir achados antes do manifesto final.
 

@@ -27,7 +27,10 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
   "complexity_review": {
     "decision": "within_budget",
     "justification": null,
-    "deferred_scope": []
+    "deferred_scope": [],
+    "scope_split_approved": false,
+    "scope_split_approved_by": null,
+    "scope_split_approved_at": null
   },
   "approval": {
     "status": "pending",
@@ -94,7 +97,8 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
 - `planning_status`: `idle | in_progress | pending_approval | approved | blocked`.
 - `planning.quality_version: 1` ativa pesquisa primária, simplificação e orçamento verificáveis. Estados v2 anteriores sem esse campo continuam legíveis; novos planejamentos devem usá-lo.
 - `planning.research` aponta para `STACK_RESEARCH.md`, incluído no pacote aprovado.
-- `complexity_review`: `within_budget`, `split` ou `indivisible`; exceção indivisível exige justificativa concreta.
+- `complexity_review`: `within_budget`, `split` ou `indivisible`. O orçamento escala com `assurance_profile`; ele nunca autoriza remover requisito aprovado.
+- `deferred_scope` só pode receber requisito do escopo aprovado quando o responsável tiver autorizado explicitamente a divisão antes do planejamento. Nesse caso, registrar `scope_split_approved: true`, autor e horário. Sem isso, `planning-audit --strict` bloqueia.
 - `assurance_profile`: `lean | standard | full`.
 - `architecture_audit`: `disabled | optional | required`; é uma auditoria manual e report-only, nunca ativada automaticamente por risco ou perfil.
 - `architecture_audit_status: passed` significa relatório concluído, não certificação nem gate de aprovação.

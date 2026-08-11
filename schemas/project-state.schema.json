@@ -63,7 +63,10 @@
           "enum": ["pending", "within_budget", "split", "indivisible"]
         },
         "justification": { "type": ["string", "null"] },
-        "deferred_scope": { "type": "array", "items": { "type": "string" } }
+        "deferred_scope": { "type": "array", "items": { "type": "string" } },
+        "scope_split_approved": { "type": "boolean" },
+        "scope_split_approved_by": { "type": ["string", "null"] },
+        "scope_split_approved_at": { "type": ["string", "null"] }
       }
     },
     "approval": {

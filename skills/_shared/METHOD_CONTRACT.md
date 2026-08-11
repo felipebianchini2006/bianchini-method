@@ -155,7 +155,7 @@ O pacote contém escopo local, pesquisa da stack, spec, planos, revisão de plan
 
 Todo novo planejamento v2 usa `planning.quality_version: 1` e inclui `STACK_RESEARCH.md`. Levantar versões e padrões já presentes no repositório; pesquisar somente decisões aplicáveis ao escopo em documentação oficial, normas, RFCs, repositórios upstream e avisos do fornecedor. Registrar URL, versão/recorte, data de acesso e consequência no design. Conteúdo promocional ou opinião não substitui fonte primária.
 
-O escopo aprovado define resultados e invariantes, não a decomposição operacional. Reescrever planos legados ou externos em slices de entrega autocontidos; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências e exploração manual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
+O escopo aprovado define resultados e invariantes, não a decomposição operacional. Preservar 100% dele; simplificar implementação nunca significa retirar requisito. Reescrever planos legados ou externos em slices de entrega autocontidos; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências e exploração manual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
 
 Antes do snapshot, executar:
 
@@ -163,7 +163,9 @@ Antes do snapshot, executar:
 bm.py planning-audit docs/living/PROJECT_STATE.md --root <repo> --strict
 ```
 
-O gate exige pesquisa primária estruturada, unidades completas, comandos reproduzíveis e orçamento padrão de até 8 planos, 20 unidades executáveis, 3 plataformas e 12.000 palavras de contexto normativo ativo. Acima disso, dividir o ciclo; usar `indivisible` somente com justificativa concreta. Um `split` deve listar `deferred_scope`. Esses limites controlam o ciclo atual, não restringem o roadmap total.
+O gate exige pesquisa primária estruturada, unidades completas, comandos reproduzíveis e orçamento proporcional ao perfil: Lean 8 planos/20 unidades/3 plataformas/12.000 palavras; Standard 16/40/6/24.000; Full 32/80/12/48.000. Exceder Lean ou Standard exige escalar o perfil mantendo todo o escopo. Acima de Full, usar `indivisible` com justificativa e otimizar contexto; nunca reduzir escopo automaticamente.
+
+`deferred_scope` não é ferramenta de economia. Só pode conter requisito aprovado quando o responsável tiver autorizado explicitamente a divisão antes do planejamento, com `scope_split_approved: true`, autor e horário. Sem essa prova, o audit e o snapshot bloqueiam. “Menor ciclo”, simplicidade, custo ou limite de contexto não constituem autorização.
 
 Estados com `planning.quality_version: 1` também executam esse gate dentro de `snapshot create|verify`; portanto, um pacote novo não consegue contornar a auditoria omitindo o comando explícito.
 

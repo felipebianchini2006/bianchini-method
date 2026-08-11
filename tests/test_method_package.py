@@ -546,6 +546,9 @@ class PlanningQualityScenarios(unittest.TestCase):
             "decision": "within_budget",
             "justification": None,
             "deferred_scope": [],
+            "scope_split_approved": False,
+            "scope_split_approved_by": None,
+            "scope_split_approved_at": None,
         }
         state["approval"].update(
             {
@@ -660,25 +663,109 @@ class PlanningQualityScenarios(unittest.TestCase):
             manifest = root / state["approval"]["package"]["manifest_path"]
             self.assertFalse(manifest.exists())
 
-    def test_budget_requires_split_or_indivisible_justification(self) -> None:
+    def test_budget_escalates_profile_without_reducing_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             state_path = self.make_project(root, plan_count=9)
             blocked = cli("planning-audit", str(state_path), "--root", str(root), "--strict")
             self.assertEqual(blocked.returncode, 2)
-            self.assertIn("orçamento excedido em plans", blocked.stderr)
+            self.assertIn("preserve todo o escopo e escale para standard", blocked.stderr)
 
             state = json.loads(read(state_path))
-            state["complexity_review"] = {
-                "decision": "indivisible",
-                "justification": "Os nove contratos públicos formam uma única migração atômica sem estado intermediário seguro.",
-                "deferred_scope": [],
-            }
+            state["assurance_profile"] = "standard"
             state_path.write_text(json.dumps(state), encoding="utf-8")
             accepted = cli_json(
                 "planning-audit", str(state_path), "--root", str(root), "--strict"
             )
-            self.assertEqual(accepted["budget_exceeded"], ["plans"])
+            self.assertEqual(accepted["budget_exceeded"], [])
+            self.assertEqual(accepted["profile"], "standard")
+            self.assertEqual(accepted["recommended_profile"], "standard")
+            self.assertEqual(state["complexity_review"]["deferred_scope"], [])
+
+    def test_full_profile_accepts_broad_scope_without_deferral(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root, plan_count=20)
+            state = json.loads(read(state_path))
+            for plan in state["plans"]:
+                path = root / plan["path"]
+                extra_units = ""
+                for unit in (2, 3):
+                    extra_units += (
+                        f"\n### Tarefa {unit} — Entregar comportamento adicional {unit}\n\n"
+                        "**Execution:** grouped\n"
+                        "**Review:** plan_gate\n"
+                        "**Test seams:** HTTP API pública\n"
+                        "**Spec refs:** specs/system.md#api-pública\n"
+                        "**Files:** src/api.py, tests/test_api.py\n"
+                        "**Contract:** entrada JSON; saída observável; estado persistido\n"
+                        "**Verification:** `python3 -m unittest tests.test_api` retorna 0\n"
+                        "**Done when:** contrato público passa no gate do plano\n"
+                    )
+                path.write_text(read(path) + extra_units, encoding="utf-8")
+            state["assurance_profile"] = "full"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            accepted = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(accepted["profile"], "full")
+            self.assertEqual(accepted["recommended_profile"], "full")
+            self.assertEqual(accepted["metrics"]["plans"], 20)
+            self.assertEqual(accepted["metrics"]["execution_units"], 60)
+            self.assertEqual(accepted["budget_exceeded"], [])
+
+    def test_critical_risk_escalates_profile_even_for_small_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            state["plans"][0].update(
+                {"risk": "critical", "execution": "strict", "review": "per_task"}
+            )
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            blocked = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(blocked.returncode, 2)
+            self.assertIn("escale para full", blocked.stderr)
+
+            state["assurance_profile"] = "full"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            accepted = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(accepted["recommended_profile"], "full")
+
+    def test_deferred_scope_requires_explicit_owner_authorization(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            state["complexity_review"].update(
+                {
+                    "decision": "split",
+                    "deferred_scope": ["Pix Automático"],
+                }
+            )
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            blocked = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(blocked.returncode, 2)
+            self.assertIn("não pode ser adiado para caber no orçamento", blocked.stderr)
+
+            state["complexity_review"].update(
+                {
+                    "scope_split_approved": True,
+                    "scope_split_approved_by": "owner@example.invalid",
+                    "scope_split_approved_at": "2026-08-11T12:00:00Z",
+                }
+            )
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            accepted = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertTrue(accepted["valid"])
 
     def test_old_v2_state_remains_compatible_but_cannot_claim_new_quality(self) -> None:
         valid = cli("validate-state", str(FIXTURES / "project-state-v2.json"))
@@ -1613,13 +1700,15 @@ class SkillBehaviorContracts(unittest.TestCase):
         for expected in (
             "STACK_RESEARCH.md",
             "fontes primárias",
-            "complexity_review.deferred_scope",
+            "deferred_scope",
             "planning-audit",
-            "menor ciclo entregável",
+            "Preservar 100%",
+            "scope_split_approved: true",
             "PLANO Task N",
         ):
             self.assertIn(expected, planning)
-        self.assertIn("8 planos, 20 unidades executáveis, 3 plataformas", contract)
+        self.assertIn("Standard 16/40/6/24.000", contract)
+        self.assertIn("nunca reduzir escopo automaticamente", contract)
         self.assertIn("Acessado em: YYYY-MM-DD", research)
         self.assertIn("documentação oficial", research)
 
