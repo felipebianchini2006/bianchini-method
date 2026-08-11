@@ -16,9 +16,10 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md). Resolva o
 1. Executar `bm.py route`.
 2. V1: exigir Superpowers e usar integralmente o executor legado. Se ausente, `BLOQUEADO`. Não usar nenhuma etapa v2 abaixo.
 3. V2: executar `bm.py validate-state` e `bm.py snapshot verify`.
-4. Se aprovação ainda estiver pending, registrar apenas aprovação explícita inequívoca do digest atual. Concluir a transação descrita em `sdd-planning`: verificar snapshot, commitar localmente somente pacote/estado/manifesto e exigir árvore limpa. O comando de execução não vale como aprovação.
-5. Confirmar planos em `approved_plans` e dependências concluídas. Auditoria arquitetural manual não é gate de execução; defeitos funcionais registrados continuam sujeitos aos gates normais.
-6. Exigir `git status --porcelain` vazio. Mudança preexistente bloqueia a criação da worktree; nunca omitir, copiar informalmente ou incluir mudança alheia no commit do planejamento.
+4. Executar `bm.py repo-hygiene check --repo <repo>`; bloquear `.superpowers/` rastreado ou ausência do ignore versionado.
+5. Se aprovação ainda estiver pending, registrar apenas aprovação explícita inequívoca do digest atual. Concluir a transação descrita em `sdd-planning`: verificar snapshot, commitar localmente somente pacote/estado/manifesto e exigir árvore limpa. O comando de execução não vale como aprovação.
+6. Confirmar planos em `approved_plans` e dependências concluídas. Auditoria arquitetural manual não é gate de execução; defeitos funcionais registrados continuam sujeitos aos gates normais.
+7. Exigir `git status --porcelain` vazio. Mudança preexistente bloqueia a criação da worktree; nunca omitir, copiar informalmente ou incluir mudança alheia no commit do planejamento.
 
 Snapshot divergente invalida aprovação e bloqueia. Não classificar mudança como “editorial”.
 

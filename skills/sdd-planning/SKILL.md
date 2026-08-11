@@ -17,6 +17,10 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_sha
 4. Se a rota for `v2-new`, iniciar v2 pelo template e validar com `bm.py validate-state`.
 5. Se versão ambígua/inválida, bloquear sem inferir migração.
 
+Exceção: se o responsável pedir explicitamente a migração do projeto atual, executar `route --migrate-to-v2`, nunca inferir essa decisão. Preservar `docs/superpowers/` como histórico, atualizar `AGENTS.md`/`CLAUDE.md` para remover o workflow ativo legado e criar estado bootstrap v2 com `planning_status: in_progress` e `plans: []`. O próximo planejamento deve substituir o bootstrap antes de `pending_approval`.
+
+Executar `bm.py repo-hygiene check --repo <repo>`. Se houver `.superpowers/` rastreado e a migração estiver autorizada, executar `repo-hygiene migrate`; caso contrário, bloquear. A raiz deve conter `/.superpowers/` no `.gitignore`; documentos persistentes pertencem a `docs/bianchini/`, nunca a `.superpowers/`.
+
 Esta skill somente planeja. Não criar código, scaffolding, migração ou dependência de produção.
 
 ## 2. Ler fontes uma vez
@@ -123,6 +127,8 @@ Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
 - `telemetry.enabled: false` por padrão; habilitar somente por decisão explícita;
 - política adaptativa em cada plano;
 - três estágios de `verification`.
+
+Durante bootstrap explícito de migração, `plans: []` é permitido somente com `planning_status: in_progress` e aprovação pending. Antes de gerar snapshot ou pedir aprovação, criar os planos reais e remover o estado bootstrap.
 
 Depois:
 

@@ -65,7 +65,8 @@ def init_repo(path: Path) -> str:
     git(path, "config", "user.name", "Bianchini Test")
     git(path, "config", "user.email", "test@example.invalid")
     (path / "app.txt").write_text("base\n", encoding="utf-8")
-    git(path, "add", "app.txt")
+    (path / ".gitignore").write_text("/.superpowers/\n", encoding="utf-8")
+    git(path, "add", "app.txt", ".gitignore")
     git(path, "commit", "-m", "initial")
     return git(path, "rev-parse", "HEAD")
 
@@ -170,6 +171,43 @@ class RoutingAndStateScenarios(unittest.TestCase):
             result = cli_json("route", "--repo", temp, "--new-project")
             self.assertEqual(result["route"], "v2-new")
             self.assertFalse(result["superpowers_required"])
+
+    def test_explicit_migration_overrides_provisional_v1_route(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "docs/superpowers/plans").mkdir(parents=True)
+            result = cli_json(
+                "route",
+                "--repo",
+                str(root),
+                "--new-project",
+                "--migrate-to-v2",
+            )
+            self.assertEqual(result["route"], "v2-migration")
+            self.assertTrue(result["legacy_detected"])
+            self.assertFalse(result["superpowers_required"])
+
+    def test_in_progress_bootstrap_allows_zero_plans_only_until_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = json.loads(read(FIXTURES / "project-state-v2.json"))
+            state["planning_status"] = "in_progress"
+            state["approval"]["status"] = "pending"
+            state["approval"]["approved_at"] = None
+            state["approval"]["approved_by"] = None
+            state["approval"]["approved_plans"] = []
+            state["approval"]["package"]["manifest_digest"] = None
+            state["plans"] = []
+            state_path = root / "PROJECT_STATE.md"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            valid = cli("validate-state", str(state_path))
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+
+            state["planning_status"] = "pending_approval"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            invalid = cli("validate-state", str(state_path))
+            self.assertEqual(invalid.returncode, 2)
+            self.assertIn("ao menos um plano", invalid.stderr)
 
     def test_v1_with_superpowers_uses_legacy_route(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -550,6 +588,52 @@ class AdaptivePolicyScenarios(unittest.TestCase):
 
 
 class WorkspaceAndArtifactScenarios(unittest.TestCase):
+    def test_repo_hygiene_archives_tracked_root_artifacts_and_adds_ignore(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            (repo / ".gitignore").write_text("", encoding="utf-8")
+            report = repo / ".superpowers/sdd/cycle/task-1-report.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("evidence bytes\n", encoding="utf-8")
+            git(repo, "add", ".gitignore", ".superpowers")
+            git(repo, "commit", "-m", "track legacy root artifact")
+
+            blocked = cli("repo-hygiene", "check", "--repo", str(repo))
+            self.assertEqual(blocked.returncode, 3)
+            self.assertIn("ainda rastreado", blocked.stderr)
+            self.assertIn("ausente do .gitignore", blocked.stderr)
+
+            migrated = cli_json("repo-hygiene", "migrate", "--repo", str(repo))
+            archived = (
+                repo
+                / "docs/bianchini/legacy/root-superpowers/sdd/cycle/task-1-report.md"
+            )
+            self.assertEqual(archived.read_text(encoding="utf-8"), "evidence bytes\n")
+            self.assertFalse(report.exists())
+            self.assertTrue(migrated["staged"])
+            self.assertTrue(migrated["ignore_added"])
+            self.assertIn("/.superpowers/", read(repo / ".gitignore"))
+            self.assertIn("R", git(repo, "diff", "--cached", "--name-status"))
+            checked = cli_json("repo-hygiene", "check", "--repo", str(repo))
+            self.assertTrue(checked["valid"])
+
+    def test_repo_hygiene_migration_blocks_unrelated_dirty_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            report = repo / ".superpowers/sdd/task.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("tracked\n", encoding="utf-8")
+            git(repo, "add", "-f", ".superpowers/sdd/task.md")
+            git(repo, "commit", "-m", "track legacy artifact")
+            (repo / "user-work.txt").write_text("do not touch\n", encoding="utf-8")
+
+            result = cli("repo-hygiene", "migrate", "--repo", str(repo))
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("mudanças alheias", result.stderr)
+            self.assertTrue(report.is_file())
+
     def test_workspace_target_inside_repository_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -698,7 +782,9 @@ class WorkspaceAndArtifactScenarios(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
             init_repo(repo)
-            (repo / ".gitignore").write_text("docs/ignored-plan.md\n", encoding="utf-8")
+            (repo / ".gitignore").write_text(
+                "/.superpowers/\ndocs/ignored-plan.md\n", encoding="utf-8"
+            )
             git(repo, "add", ".gitignore")
             git(repo, "commit", "-m", "chore: ignore generated plan")
             state_path = commit_approved_package(repo)
@@ -1182,6 +1268,16 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("Mudança preexistente bloqueia", executor)
         self.assertIn("bm/v1-p01", contract)
         self.assertIn("bm/v2-p01", contract)
+
+    def test_root_superpowers_is_ignored_and_persistent_docs_are_versioned(self) -> None:
+        planning = read(SKILLS["sdd-planning"])
+        executor = read(SKILLS["executar-plano"])
+        contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
+        self.assertIn("repo-hygiene migrate", planning)
+        self.assertIn("repo-hygiene check", executor)
+        self.assertIn("/.superpowers/", contract)
+        self.assertIn("docs/bianchini/legacy/root-superpowers/", contract)
+        self.assertIn("/.superpowers/", read(ROOT / ".gitignore"))
 
     def test_homologation_and_manual_contracts_are_explicit(self) -> None:
         homologation = read(SKILLS["homologar-sistema"])

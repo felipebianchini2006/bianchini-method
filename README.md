@@ -28,6 +28,8 @@ method_version: 1 # ou estado legado existente sem method_version
 
 Continuam integralmente no fluxo legado Superpowers. A v2 preserva caminhos, ledger, dispatch, revisão e retomada existentes. Se Superpowers não estiver disponível, a execução v1 bloqueia claramente; nunca usa o executor standalone nem migra automaticamente.
 
+Quando o responsável autorizar explicitamente, `route --migrate-to-v2` inicia uma migração controlada: preserva documentação v1 sob `docs/`, atualiza as instruções do repositório e cria um estado bootstrap v2. Sem essa autorização, a compatibilidade legado continua vencendo.
+
 ### Projetos v2
 
 ```json
@@ -68,12 +70,15 @@ O CLI usa somente a biblioteca padrão Python e fornece:
 
 ```text
 validate-state  route  snapshot  policy  workspace(create|check|locate|resume)
-task-brief  report  review-package  checkpoint  proof-map  telemetry  status
+repo-hygiene(check|migrate)  task-brief  report  review-package
+checkpoint  proof-map  telemetry  status
 ```
 
 Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é bloqueada.
 
 `workspace create` também exige repositório limpo e pacote aprovado integralmente commitado. A identidade inclui ciclo e plano (`bm/v1-p01`, `bm/v2-p01`), impedindo reuso acidental entre planejamentos.
+
+`/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; documentos ativos v2 ficam em `docs/bianchini/<planning_version>/`.
 
 ## Homologação e manual
 

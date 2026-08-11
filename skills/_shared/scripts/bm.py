@@ -135,6 +135,10 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
     approval = state["approval"]
     plans = state["plans"]
     plan_ids = [item["id"] for item in plans]
+    if not plans and state["planning_status"] != "in_progress":
+        errors.append(
+            "state.plans: ao menos um plano é obrigatório fora do bootstrap in_progress"
+        )
     if len(plan_ids) != len(set(plan_ids)):
         errors.append("state.plans: IDs duplicados")
     active = state.get("active_execution")
@@ -255,7 +259,26 @@ def route_project(
     superpowers_path: Path | None,
     repo: Path,
     new_project: bool,
+    migrate_to_v2: bool,
 ) -> dict[str, Any]:
+    if migrate_to_v2:
+        legacy_detected = (repo / "docs" / "superpowers").exists()
+        if state_path is not None and state_path.is_file():
+            state = load_state(state_path)
+            if state.get("method_version") == 2:
+                validate_state(state_path)
+                return {"route": "v2-standalone", "superpowers_required": False}
+            if state.get("method_version") != 1:
+                raise BMError(
+                    "BLOQUEADO: somente estado v1 pode receber migração explícita para v2",
+                    EXIT_BLOCKED,
+                )
+            legacy_detected = True
+        return {
+            "route": "v2-migration",
+            "legacy_detected": legacy_detected,
+            "superpowers_required": False,
+        }
     if state_path is None or not state_path.is_file():
         legacy = (repo / "docs" / "superpowers").exists()
         if legacy:
@@ -321,6 +344,134 @@ def confined_path(root: Path, value: str, label: str) -> Path:
     except ValueError as error:
         raise BMError(f"{label} fora da raiz: {value}") from error
     return target
+
+
+ROOT_SUPERPOWERS_IGNORE = "/.superpowers/"
+ROOT_SUPERPOWERS_ARCHIVE = "docs/bianchini/legacy/root-superpowers"
+
+
+def tracked_root_superpowers(root: Path) -> list[str]:
+    output = run_git(["ls-files", "-z", "--", ".superpowers"], root)
+    return sorted(item for item in output.split("\0") if item)
+
+
+def has_versioned_superpowers_ignore(root: Path) -> bool:
+    gitignore = root / ".gitignore"
+    if not gitignore.is_file():
+        return False
+    patterns = {
+        line.strip()
+        for line in gitignore.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    return bool(patterns & {"/.superpowers/", ".superpowers/", "/.superpowers"})
+
+
+def ensure_versioned_superpowers_ignore(root: Path) -> bool:
+    if has_versioned_superpowers_ignore(root):
+        return False
+    gitignore = root / ".gitignore"
+    content = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
+    if content and not content.endswith("\n"):
+        content += "\n"
+    content += "\n# Artefatos locais de execução do Bianchini Method/Superpowers\n"
+    content += ROOT_SUPERPOWERS_IGNORE + "\n"
+    gitignore.write_text(content.lstrip("\n"), encoding="utf-8")
+    return True
+
+
+def repository_hygiene(
+    repo: Path,
+    migrate: bool,
+    destination: str = ROOT_SUPERPOWERS_ARCHIVE,
+) -> dict[str, Any]:
+    root = repo.resolve()
+    top = Path(run_git(["rev-parse", "--show-toplevel"], root)).resolve()
+    if top != root:
+        raise BMError(f"--repo deve apontar para a raiz Git: {top}")
+    tracked = tracked_root_superpowers(root)
+    ignored = has_versioned_superpowers_ignore(root)
+    if not migrate:
+        problems: list[str] = []
+        if tracked:
+            problems.append(
+                f"{len(tracked)} arquivo(s) de .superpowers ainda rastreado(s)"
+            )
+        if not ignored:
+            problems.append(f"{ROOT_SUPERPOWERS_IGNORE} ausente do .gitignore")
+        if problems:
+            raise BMError(
+                "BLOQUEADO: higiene do repositório: " + "; ".join(problems),
+                EXIT_BLOCKED,
+            )
+        return {
+            "valid": True,
+            "tracked_root_artifacts": [],
+            "ignore_rule": ROOT_SUPERPOWERS_IGNORE,
+        }
+
+    status = run_git(["status", "--porcelain=v1", "--untracked-files=all"], root)
+    unrelated: list[str] = []
+    for line in status.splitlines():
+        path = line[3:].split(" -> ")[-1]
+        if path != ".superpowers" and not path.startswith(".superpowers/"):
+            unrelated.append(path)
+    if unrelated:
+        raise BMError(
+            "BLOQUEADO: migração de higiene exige ausência de mudanças alheias: "
+            + ", ".join(sorted(unrelated)),
+            EXIT_BLOCKED,
+        )
+
+    archive_root = confined_path(root, destination, "destino da higiene")
+    if archive_root == root or ".superpowers" in archive_root.relative_to(root).parts:
+        raise BMError("destino da higiene deve ficar fora de .superpowers")
+    moved: list[dict[str, str]] = []
+    for source_name in tracked:
+        source_relative = Path(source_name)
+        if not source_relative.parts or source_relative.parts[0] != ".superpowers":
+            raise BMError(f"caminho Git inesperado: {source_name}")
+        source = confined_path(root, source_name, "artefato raiz")
+        if source.is_symlink() or not source.is_file():
+            raise BMError(f"artefato rastreado ausente ou não regular: {source_name}")
+        relative_tail = Path(*source_relative.parts[1:])
+        target_relative = Path(destination) / relative_tail
+        target = confined_path(root, target_relative.as_posix(), "arquivo histórico")
+        if target.exists():
+            if (
+                target.is_symlink()
+                or not target.is_file()
+                or target.read_bytes() != source.read_bytes()
+            ):
+                raise BMError(
+                    f"destino histórico já existe com conteúdo diferente: {target_relative}"
+                )
+            source.unlink()
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source.replace(target)
+        moved.append({"from": source_name, "to": target_relative.as_posix()})
+
+    ignore_added = ensure_versioned_superpowers_ignore(root)
+    run_git(["add", "--", ".gitignore"], root)
+    if tracked:
+        run_git(["add", "-u", "--", ".superpowers"], root)
+        run_git(["add", "--", destination], root)
+    remaining = tracked_root_superpowers(root)
+    if remaining:
+        raise BMError(
+            "BLOQUEADO: migração não removeu todos os artefatos raiz: "
+            + ", ".join(remaining),
+            EXIT_BLOCKED,
+        )
+    return {
+        "valid": True,
+        "moved": moved,
+        "ignore_added": ignore_added,
+        "ignore_rule": ROOT_SUPERPOWERS_IGNORE,
+        "archive_root": archive_root.relative_to(root).as_posix(),
+        "staged": True,
+    }
 
 
 TELEMETRY_METRICS = (
@@ -563,6 +714,7 @@ def committed_package_preflight(
             + ", ".join(changed[:8]),
             EXIT_BLOCKED,
         )
+    repository_hygiene(root, False)
     resolved_state = (
         state_path.resolve()
         if state_path.is_absolute()
@@ -1065,6 +1217,12 @@ def parser() -> argparse.ArgumentParser:
     route.add_argument("--superpowers-path", type=Path)
     route.add_argument("--repo", type=Path, default=Path.cwd())
     route.add_argument("--new-project", action="store_true")
+    route.add_argument("--migrate-to-v2", action="store_true")
+
+    hygiene = commands.add_parser("repo-hygiene")
+    hygiene.add_argument("action", choices=["check", "migrate"])
+    hygiene.add_argument("--repo", type=Path, default=Path.cwd())
+    hygiene.add_argument("--destination", default=ROOT_SUPERPOWERS_ARCHIVE)
 
     snap = commands.add_parser("snapshot")
     snap.add_argument("action", choices=["create", "verify"])
@@ -1149,7 +1307,23 @@ def main() -> int:
         if args.command == "validate-state":
             emit({"valid": True, "method_version": validate_state(args.state, args.schema)["method_version"]})
         elif args.command == "route":
-            emit(route_project(args.state, args.superpowers_path, args.repo, args.new_project))
+            emit(
+                route_project(
+                    args.state,
+                    args.superpowers_path,
+                    args.repo,
+                    args.new_project,
+                    args.migrate_to_v2,
+                )
+            )
+        elif args.command == "repo-hygiene":
+            emit(
+                repository_hygiene(
+                    args.repo,
+                    args.action == "migrate",
+                    args.destination,
+                )
+            )
         elif args.command == "snapshot":
             emit(snapshot(args.state, args.root, args.action == "verify"))
         elif args.command == "policy":

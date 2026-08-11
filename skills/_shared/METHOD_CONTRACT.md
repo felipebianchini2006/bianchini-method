@@ -14,6 +14,8 @@ Com estado existente, execute `bm.py route docs/living/PROJECT_STATE.md`. Sem es
 - Superpowers ausente: `BLOQUEADO`; informar a dependência e não executar com o motor v2.
 - Nunca migrar, renumerar, normalizar estado em disco ou criar artefatos v2 automaticamente.
 
+Migração para v2 só existe após autorização explícita do responsável. Nesse caso, executar `bm.py route --repo <repo> --new-project --migrate-to-v2`, preservar planos legados sob `docs/` como históricos, atualizar as regras do repositório e criar um estado bootstrap v2 com `planning_status: in_progress`. O bootstrap pode ter `plans: []` somente enquanto o novo planejamento ainda está sendo produzido; antes de `pending_approval`, deve existir ao menos um plano completo.
+
 Valores legados reconhecidos apenas para leitura/status:
 
 | Canônico | Valores v1 |
@@ -82,6 +84,17 @@ python3 <bm.py> workspace check --repo <workspace>
 `workspace create` bloqueia qualquer alteração tracked/untracked, exige estado e snapshot aprovados e confirma que escopo, spec, planos, revisão, estado e manifesto existem no `HEAD` com os mesmos bytes. Arquivo ignorado mas não commitado também bloqueia. A identidade usa `<planning_version>-<plan_id>` (`bm/v1-p01`, `bm/v2-p01`) para não reutilizar ciclos antigos.
 
 `workspace check` bloqueia `main`, `master`, detached HEAD e a worktree primária. Não existe fallback para implementação na branch atual. Planejamento, status e o commit local do pacote aprovado podem ocorrer na principal; edição de código não.
+
+## Higiene da raiz
+
+`.superpowers/` na raiz contém somente artefatos locais/transitórios e deve estar coberto por `/.superpowers/` no `.gitignore` versionado. Nenhum arquivo sob essa raiz pode permanecer rastreado.
+
+```bash
+bm.py repo-hygiene check --repo <repo>
+bm.py repo-hygiene migrate --repo <repo>
+```
+
+`migrate` exige ausência de mudanças alheias, move somente arquivos já rastreados preservando seus bytes para `docs/bianchini/legacy/root-superpowers/`, adiciona o ignore e prepara essas mudanças no índice. `docs/superpowers/` pode permanecer como histórico v1; documentos ativos v2 ficam exclusivamente em `docs/bianchini/<planning_version>/`. `workspace create` executa o check e bloqueia qualquer violação.
 
 ## Artefatos determinísticos
 

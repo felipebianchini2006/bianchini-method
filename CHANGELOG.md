@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.2 — Migração explícita e higiene da raiz
+
+- adiciona rota explícita e auditável de projetos v1 para v2;
+- permite estado bootstrap sem planos somente durante `planning_status: in_progress`;
+- proíbe arquivos rastreados sob `.superpowers/` na raiz;
+- migra artefatos históricos para `docs/bianchini/legacy/root-superpowers/` preservando bytes;
+- exige `/.superpowers/` no `.gitignore` versionado antes da execução v2.
+
 ## 2.3.1 — Worktree baseada no pacote aprovado
 
 - bloqueia `workspace create` quando o repositório possui alteração não commitada;
