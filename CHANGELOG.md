@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.2 — Lean volta a ser realmente pequeno
+
+- define faixa típica Lean de 1–4 planos e teto estrito abaixo de 8;
+- reduz os demais tetos Lean para 16 unidades, 2 plataformas e 8.000 palavras;
+- registra warning entre 5 e 7 planos para evitar usar o teto como meta;
+- mantém escalada para Standard/Full e preservação integral do escopo.
+
 ## 2.4.1 — Preservação obrigatória do escopo aprovado
 
 - corrige o orçamento fixo que podia incentivar adiamento automático de requisitos;

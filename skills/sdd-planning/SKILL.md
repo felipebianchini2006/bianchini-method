@@ -57,7 +57,7 @@ Fazer uma passagem explícita antes de escrever os planos:
 - remover camadas, abstrações e tarefas sem critério de aceite próprio;
 - preferir contratos públicos e slices verticais a tarefas por arquivo ou tecnologia.
 
-Nunca mover requisito aprovado para `deferred_scope` a fim de satisfazer orçamento. Escalar primeiro `assurance_profile`: Lean até 8 planos/20 unidades/3 plataformas/12.000 palavras; Standard até 16/40/6/24.000; Full até 32/80/12/48.000. Acima de Full, manter o escopo e justificar `indivisible`; otimizar ponteiros e execução, não retirar entregas.
+Nunca mover requisito aprovado para `deferred_scope` a fim de satisfazer orçamento. Escalar primeiro `assurance_profile`: Lean é pequeno, normalmente 1–4 planos e no máximo 7 planos/16 unidades/2 plataformas/8.000 palavras; Standard até 16/40/6/24.000; Full até 32/80/12/48.000. Os números são tetos, nunca metas ou mínimos. Acima de Full, manter o escopo e justificar `indivisible`; otimizar ponteiros e execução, não retirar entregas.
 
 Usar `split` somente quando o responsável tiver autorizado explicitamente a divisão antes do planejamento. Registrar `scope_split_approved: true`, autor e horário. Sem autorização, deixar `deferred_scope: []`; se o escopo não couber, escalar o perfil. Não interpretar “seja simples”, “evite overengineering” ou o próprio orçamento como autorização para adiar requisito.
 
@@ -65,7 +65,7 @@ Usar `split` somente quando o responsável tiver autorizado explicitamente a div
 
 Escolher `lean`, `standard` ou `full` pelo maior entre risco e complexidade do escopo completo:
 
-- `lean`: baixo risco, integração isolada;
+- `lean`: baixo risco, integração isolada e pacote pequeno; 5–7 planos exigem justificar por que ainda é Lean;
 - `standard`: risco médio, múltiplos perfis/plataformas ou integração coordenada;
 - `full`: regulação, risco crítico, múltiplos subsistemas ou escopo amplo.
 

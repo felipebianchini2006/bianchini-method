@@ -163,7 +163,7 @@ Antes do snapshot, executar:
 bm.py planning-audit docs/living/PROJECT_STATE.md --root <repo> --strict
 ```
 
-O gate exige pesquisa primária estruturada, unidades completas, comandos reproduzíveis e orçamento proporcional ao perfil: Lean 8 planos/20 unidades/3 plataformas/12.000 palavras; Standard 16/40/6/24.000; Full 32/80/12/48.000. Exceder Lean ou Standard exige escalar o perfil mantendo todo o escopo. Acima de Full, usar `indivisible` com justificativa e otimizar contexto; nunca reduzir escopo automaticamente.
+O gate exige pesquisa primária estruturada, unidades completas, comandos reproduzíveis e orçamento proporcional ao perfil: Lean normalmente 1–4 planos, com teto de 7 planos/16 unidades/2 plataformas/8.000 palavras; Standard 16/40/6/24.000; Full 32/80/12/48.000. Tetos não são metas nem mínimos. Exceder Lean ou Standard exige escalar o perfil mantendo todo o escopo. Acima de Full, usar `indivisible` com justificativa e otimizar contexto; nunca reduzir escopo automaticamente.
 
 `deferred_scope` não é ferramenta de economia. Só pode conter requisito aprovado quando o responsável tiver autorizado explicitamente a divisão antes do planejamento, com `scope_split_approved: true`, autor e horário. Sem essa prova, o audit e o snapshot bloqueiam. “Menor ciclo”, simplicidade, custo ou limite de contexto não constituem autorização.
 

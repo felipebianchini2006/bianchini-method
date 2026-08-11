@@ -682,6 +682,26 @@ class PlanningQualityScenarios(unittest.TestCase):
             self.assertEqual(accepted["recommended_profile"], "standard")
             self.assertEqual(state["complexity_review"]["deferred_scope"], [])
 
+    def test_lean_is_small_and_seven_is_ceiling_not_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            seven = self.make_project(root, plan_count=7)
+            accepted = cli_json(
+                "planning-audit", str(seven), "--root", str(root), "--strict"
+            )
+            self.assertEqual(accepted["profile"], "lean")
+            self.assertEqual(accepted["limits"]["plans"], 7)
+            self.assertIn("1–4 planos", accepted["warnings"][0])
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            eight = self.make_project(root, plan_count=8)
+            blocked = cli(
+                "planning-audit", str(eight), "--root", str(root), "--strict"
+            )
+            self.assertEqual(blocked.returncode, 2)
+            self.assertIn("escale para standard", blocked.stderr)
+
     def test_full_profile_accepts_broad_scope_without_deferral(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1708,6 +1728,7 @@ class SkillBehaviorContracts(unittest.TestCase):
         ):
             self.assertIn(expected, planning)
         self.assertIn("Standard 16/40/6/24.000", contract)
+        self.assertIn("teto de 7 planos/16 unidades", contract)
         self.assertIn("nunca reduzir escopo automaticamente", contract)
         self.assertIn("Acessado em: YYYY-MM-DD", research)
         self.assertIn("documentação oficial", research)

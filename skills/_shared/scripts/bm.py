@@ -845,10 +845,10 @@ def telemetry_summary(state_path: Path, root: Path) -> dict[str, Any]:
 
 PLANNING_LIMITS_BY_PROFILE = {
     "lean": {
-        "plans": 8,
-        "execution_units": 20,
-        "platforms": 3,
-        "active_context_words": 12_000,
+        "plans": 7,
+        "execution_units": 16,
+        "platforms": 2,
+        "active_context_words": 8_000,
     },
     "standard": {
         "plans": 16,
@@ -1069,6 +1069,10 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         "package_words": package_words,
     }
     profile = state["assurance_profile"]
+    if profile == "lean" and metrics["plans"] > 4:
+        warnings.append(
+            "perfil lean acima da faixa típica de 1–4 planos; 7 é teto, não meta"
+        )
     limits = PLANNING_LIMITS_BY_PROFILE[profile]
     exceeded = exceeded_planning_limits(metrics, limits)
     recommended_profile = recommended_planning_profile(metrics, state["plans"])
