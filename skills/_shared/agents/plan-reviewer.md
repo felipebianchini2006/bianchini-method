@@ -27,9 +27,10 @@ Não recebe o histórico da conversa nem o repositório inteiro.
 Revisar dois eixos, sempre com evidência no diff:
 
 - **Spec:** escopo, comportamento, contratos públicos e critérios de aceite cobertos, sem requisito silenciosamente adiado;
-- **Qualidade:** correção, simplicidade, compatibilidade, testes sensíveis ao risco e regressões.
+- **Qualidade:** correção, simplicidade, compatibilidade, testes sensíveis ao risco e regressões;
+- **Espaço negativo**, quando a unidade toca efeito irreversível, estado persistente ou concorrência: qual operação é irreversível; o que acontece se o processo morrer antes e depois dela; existe estado durável de retomada; a evidência pode ser ambígua; o objeto pode mudar entre inspeção e ação.
 
-Classificar cada finding como `critical`, `important`, `minor` ou `note`, citando arquivo e trecho. Confirmar que o diff corresponde ao brief e que nada fora do escopo foi alterado.
+Classificar cada finding como `critical`, `important`, `minor` ou `note`, citando arquivo e trecho. Finding `critical`/`important` registra o `risk_seam` afetado e a classe estrutural quando houver. Confirmar que o diff corresponde ao brief e que nada fora do escopo foi alterado.
 
 ## Proibições
 

@@ -102,7 +102,9 @@ Máximo retornado por `bm.py policy`:
 - Standard: 3;
 - Full: 5.
 
-Em cada rodada: corrigir causa mínima, executar teste cobrindo, gerar novo pacote do delta e revisar achados abertos. Quando `breaker: true`, parar tentativas. Problema estrutural ou load-bearing marca plano `blocked`; nunca exceder o limite.
+Em cada rodada: registrar o `risk_seam` no ledger, corrigir causa mínima, executar teste cobrindo, gerar novo pacote do delta e revisar achados abertos. Recalcular `bm.py policy` com `--risk-seam`, `--seam-round` acumulado do seam, `--consecutive-seam-findings` e `--structural-finding` quando o parecer apontar classe estrutural (crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry após timeout, idempotência concorrente, recuperação após restart).
+
+Fix round é hipótese, não entrega: somente RED/GREEN focal, regressão diretamente relacionada e revisão do delta. Gates completos, documentação e mudança de status permanecem no gate do plano, após zero critical/important. Quando `breaker: true` ou `redesign_required: true`, parar tentativas e redesenhar conforme o contrato antes de novo patch no seam. Problema estrutural ou load-bearing marca plano `blocked`; nunca exceder o limite.
 
 ## 6. Gate por plano
 

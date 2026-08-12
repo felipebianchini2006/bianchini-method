@@ -91,7 +91,15 @@ Regras:
 - escalar o modo quando risco descoberto aumentar; não reduzir sem atualizar plano aprovado;
 - calcular política com `bm.py policy` e registrar o JSON no ledger.
 
-Usar os fix rounds máximos retornados por `bm.py policy`. Ao atingir o máximo, `breaker: true`: parar patches, reavaliar causa/arquitetura e bloquear se o problema for estrutural.
+Usar os fix rounds máximos retornados por `bm.py policy`. O orçamento é contado por `risk_seam`, não por nome de tarefa ou plano: registrar o seam de risco no ledger a cada rodada e recalcular `bm.py policy` com `--risk-seam` e `--seam-round` acumulado do seam. Renomear, dividir ou reabrir a unidade não zera a contagem do mesmo seam.
+
+O breaker dispara na primeira destas condições:
+
+- contagem acumulada do seam atinge o máximo do perfil;
+- dois pareceres consecutivos com finding critical/important no mesmo seam (`--consecutive-seam-findings`);
+- qualquer finding de classe estrutural (`--structural-finding`): crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry após timeout, idempotência concorrente ou recuperação após restart.
+
+Com `breaker: true` ou `redesign_required: true`, a hipótese atual está invalidada: parar patches imediatamente. Antes de qualquer novo patch no seam, produzir e registrar redesenho com máquina de estados, limites transacionais, operações irreversíveis, pontos de crash, atores concorrentes, estado durável de retomada e matriz de falhas; problema estrutural bloqueia o plano. A menor mudança aceitável é a menor que torna o invariante verdadeiro; preservar uma coreografia comprovadamente insegura não é mudança mínima, é hipótese inválida.
 
 ## Workspace obrigatório v2
 

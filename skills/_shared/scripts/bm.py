@@ -1508,24 +1508,59 @@ def snapshot(state_path: Path, root: Path, verify: bool) -> dict[str, Any]:
     return {"algorithm": "sha256-manifest-v1", "digest": digest, "manifest": str(manifest)}
 
 
-def policy(profile: str, risk: str, change: str, manual_pdf: str, manual_in_scope: bool, round_number: int) -> dict[str, Any]:
+STRUCTURAL_FINDING_CLASSES = (
+    "crash_window",
+    "partial_commit",
+    "toctou",
+    "external_effect_before_persistence",
+    "retry_after_timeout",
+    "concurrent_idempotency",
+    "recovery_after_restart",
+)
+
+
+def policy(
+    profile: str,
+    risk: str,
+    change: str,
+    manual_pdf: str,
+    manual_in_scope: bool,
+    round_number: int,
+    risk_seam: str | None = None,
+    seam_round: int | None = None,
+    structural_findings: tuple[str, ...] = (),
+    consecutive_seam_findings: int = 0,
+) -> dict[str, Any]:
     if risk == "low":
         execution, review, cadence = "grouped", "plan_gate", "group_seam"
     elif risk == "medium":
         execution, review, cadence = "slice", "per_slice", "slice_seam"
     else:
         execution, review, cadence = "strict", "per_task", "red_green_per_task"
+    if (seam_round is not None or consecutive_seam_findings) and not risk_seam:
+        raise BMError("--seam-round e --consecutive-seam-findings exigem --risk-seam")
+    for finding in structural_findings:
+        if finding not in STRUCTURAL_FINDING_CLASSES:
+            raise BMError(f"classe estrutural desconhecida: {finding}")
     max_rounds = {"lean": 2, "standard": 3, "full": 5}[profile]
     manual_required = manual_pdf in {"quick_start", "full"} or (
         manual_pdf == "scope" and manual_in_scope
     )
     visual_validation = change == "visual"
+    effective_round = max(round_number, seam_round or 0)
+    hypothesis_invalidated = bool(structural_findings) or consecutive_seam_findings >= 2
     return {
         "execution": execution,
         "review": review,
         "test_cadence": cadence,
         "max_fix_rounds": max_rounds,
-        "breaker": round_number >= max_rounds,
+        "risk_seam": risk_seam,
+        "breaker_scope": "risk_seam" if risk_seam else "unit",
+        "effective_fix_round": effective_round,
+        "structural_findings": list(structural_findings),
+        "hypothesis_invalidated": hypothesis_invalidated,
+        "redesign_required": hypothesis_invalidated,
+        "breaker": effective_round >= max_rounds or hypothesis_invalidated,
         "architecture_audit_required": False,
         "architecture_audit_mode": "manual_report_only",
         "manual_required": manual_required,
@@ -3053,6 +3088,15 @@ def parser() -> argparse.ArgumentParser:
     )
     decide.add_argument("--manual-in-scope", action="store_true")
     decide.add_argument("--round", type=int, default=0)
+    decide.add_argument("--risk-seam")
+    decide.add_argument("--seam-round", type=int, default=None)
+    decide.add_argument(
+        "--structural-finding",
+        action="append",
+        default=[],
+        choices=list(STRUCTURAL_FINDING_CLASSES),
+    )
+    decide.add_argument("--consecutive-seam-findings", type=int, default=0)
 
     workspace = commands.add_parser("workspace")
     workspace.add_argument("action", choices=["create", "check", "locate", "resume"])
@@ -3210,7 +3254,20 @@ def main() -> int:
         elif args.command == "planning-audit":
             emit(planning_audit(args.state, args.root, args.strict))
         elif args.command == "policy":
-            emit(policy(args.profile, args.risk, args.change, args.manual_pdf, args.manual_in_scope, args.round))
+            emit(
+                policy(
+                    args.profile,
+                    args.risk,
+                    args.change,
+                    args.manual_pdf,
+                    args.manual_in_scope,
+                    args.round,
+                    args.risk_seam,
+                    args.seam_round,
+                    tuple(args.structural_finding),
+                    args.consecutive_seam_findings,
+                )
+            )
         elif args.command == "workspace":
             if args.action == "create":
                 if not args.plan or not args.planning_version or not args.state:

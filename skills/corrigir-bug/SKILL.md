@@ -66,7 +66,7 @@ Formular uma hipótese falsificável:
 A causa é <mecanismo> porque <evidências>. Se for verdadeira, <experimento mínimo> produz <resultado>; caso contrário, produz <contraprova>.
 ```
 
-Testar uma hipótese por vez. Após três hipóteses refutadas, reler arquitetura/contratos e atualizar o diagnóstico. Fix rounds seguem `bm.py policy`: Lean 2, Standard 3, Full 5. Quando `breaker: true`, parar patches e bloquear problema estrutural.
+Testar uma hipótese por vez. Após três hipóteses refutadas, reler arquitetura/contratos e atualizar o diagnóstico. Fix rounds seguem `bm.py policy` com contagem por `risk_seam`: Lean 2, Standard 3, Full 5; renomear a tarefa não zera o seam. Evidência de classe estrutural — crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry após timeout, idempotência concorrente, recuperação após restart — invalida a hipótese imediatamente: parar patches e redesenhar com máquina de estados e matriz de falhas antes de novo fix. Quando `breaker: true`, parar patches e bloquear problema estrutural.
 
 ## 4. Regressão RED
 
@@ -84,7 +84,7 @@ Para corrida, tempo ou concorrência, preferir sincronização/relógio controla
 
 ## 5. Fix mínimo GREEN
 
-Corrigir no ponto onde o contrato é violado, não apenas onde o erro aparece. Alterar uma causa por vez e evitar refatoração, atualização de dependência ou limpeza não necessária.
+Corrigir no ponto onde o contrato é violado, não apenas onde o erro aparece. A menor mudança aceitável é a menor que torna o invariante verdadeiro; preservar coreografia comprovadamente insegura não é mudança mínima. Alterar uma causa por vez e evitar refatoração, atualização de dependência ou limpeza não necessária.
 
 Depois:
 

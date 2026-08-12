@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.6.0 — Breaker epistêmico por seam de risco
+
+- `bm.py policy` passa a contar o orçamento de fix rounds por `risk_seam` (`--risk-seam`, `--seam-round`): renomear, dividir ou reabrir a tarefa não zera a contagem do mesmo seam;
+- finding de classe estrutural (`--structural-finding`: crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry após timeout, idempotência concorrente, recuperação após restart) invalida a hipótese imediatamente e retorna `hypothesis_invalidated`/`redesign_required`;
+- dois pareceres consecutivos com critical/important no mesmo seam (`--consecutive-seam-findings`) disparam breaker antecipado; antes de novo patch, o contrato exige máquina de estados, limites transacionais, pontos de crash, estado durável de retomada e matriz de falhas;
+- fix round formalizado como hipótese, não entrega: somente RED/GREEN focal, regressão relacionada e revisão do delta; gates completos, documentação e mudança de status ficam no gate do plano, após zero critical/important;
+- `plan-reviewer` ganha o eixo de espaço negativo (operação irreversível, morte do processo antes/depois, estado durável de retomada, evidência ambígua, objeto alterado entre inspeção e ação) e registra `risk_seam` em findings critical/important;
+- "mudança mínima" subordinada explicitamente ao invariante: preservar coreografia comprovadamente insegura não é mudança mínima.
+
 ## 2.5.3 — Evidência vinculada ao brief e ao estado final do código
 
 - cada evidência registrada em checkpoint é carimbada com o digest do brief atual e um fingerprint da árvore de trabalho (`HEAD` + diff + conteúdo de arquivos não rastreados);

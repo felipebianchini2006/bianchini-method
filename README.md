@@ -57,7 +57,7 @@ Não dependem do Superpowers. Usam estado validado, worktree obrigatória, artef
 | médio | `slice` | por slice vertical | por seam do slice |
 | alto/crítico | `strict` | por tarefa | RED/GREEN por tarefa |
 
-Os fix rounds são retornados por `bm.py policy`. Não há quantidade mínima de tarefas ou agentes.
+Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: renomear ou dividir a tarefa não zera o orçamento do mesmo seam. Finding de classe estrutural (crash window, partial commit, TOCTOU, retry após timeout, idempotência concorrente, recuperação após restart) ou dois pareceres consecutivos critical/important no mesmo seam disparam o breaker antecipado e exigem redesenho antes de novo patch. Não há quantidade mínima de tarefas ou agentes.
 
 ## Skills
 

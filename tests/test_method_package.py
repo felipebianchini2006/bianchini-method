@@ -998,6 +998,70 @@ class AdaptivePolicyScenarios(unittest.TestCase):
         self.assertFalse(standard["breaker"])
         self.assertTrue(full["breaker"])
 
+    def test_seam_budget_survives_task_rename(self) -> None:
+        value = self.policy(
+            "--profile", "full", "--risk", "high", "--round", "1",
+            "--risk-seam", "financial-migration-recovery", "--seam-round", "5",
+        )
+        self.assertTrue(value["breaker"])
+        self.assertEqual(value["breaker_scope"], "risk_seam")
+        self.assertEqual(value["risk_seam"], "financial-migration-recovery")
+        self.assertEqual(value["effective_fix_round"], 5)
+        self.assertFalse(value["hypothesis_invalidated"])
+
+    def test_structural_finding_invalidates_hypothesis_immediately(self) -> None:
+        value = self.policy(
+            "--profile", "full", "--risk", "critical", "--round", "1",
+            "--structural-finding", "crash_window",
+            "--structural-finding", "toctou",
+        )
+        self.assertTrue(value["breaker"])
+        self.assertTrue(value["hypothesis_invalidated"])
+        self.assertTrue(value["redesign_required"])
+        self.assertEqual(value["structural_findings"], ["crash_window", "toctou"])
+
+    def test_two_consecutive_seam_findings_trip_early_breaker(self) -> None:
+        tripped = self.policy(
+            "--profile", "standard", "--risk", "medium", "--round", "1",
+            "--risk-seam", "payments-ledger", "--consecutive-seam-findings", "2",
+        )
+        self.assertTrue(tripped["breaker"])
+        self.assertTrue(tripped["redesign_required"])
+        single = self.policy(
+            "--profile", "standard", "--risk", "medium", "--round", "1",
+            "--risk-seam", "payments-ledger", "--consecutive-seam-findings", "1",
+        )
+        self.assertFalse(single["breaker"])
+        self.assertFalse(single["redesign_required"])
+
+    def test_seam_counters_require_named_seam(self) -> None:
+        result = cli("policy", "--profile", "full", "--risk", "high", "--seam-round", "3")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--risk-seam", result.stderr)
+
+    def test_epistemic_breaker_is_documented_in_contracts(self) -> None:
+        contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
+        for text in (
+            "risk_seam",
+            "não zera a contagem do mesmo seam",
+            "crash window",
+            "TOCTOU",
+            "máquina de estados",
+            "matriz de falhas",
+            "não é mudança mínima",
+        ):
+            self.assertIn(text, contract)
+        executor = read(SKILLS["executar-plano"])
+        self.assertIn("Fix round é hipótese, não entrega", executor)
+        self.assertIn("--consecutive-seam-findings", executor)
+        bugfix = read(SKILLS["corrigir-bug"])
+        self.assertIn("crash window", bugfix)
+        self.assertIn("renomear a tarefa não zera o seam", bugfix)
+        reviewer = read(ROOT / "skills/_shared/agents/plan-reviewer.md")
+        self.assertIn("Espaço negativo", reviewer)
+        self.assertIn("estado durável de retomada", reviewer)
+        self.assertIn("entre inspeção e ação", reviewer)
+
     def test_visual_bug_uses_visual_evidence(self) -> None:
         value = self.policy("--profile", "lean", "--risk", "low", "--change", "visual")
         self.assertEqual(value["visual_validation"], "screenshot_or_visual_regression")
