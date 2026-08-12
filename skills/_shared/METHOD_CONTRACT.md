@@ -1,6 +1,19 @@
 # Contrato do Bianchini Method
 
-Referência normativa das seis skills. Use [`scripts/bm.py`](scripts/bm.py) para decisões frágeis e repetíveis; não reimplemente essas primitivas em prompts.
+Referência normativa das sete skills. Use [`scripts/bm.py`](scripts/bm.py) para decisões frágeis e repetíveis; não reimplemente essas primitivas em prompts.
+
+## Execução direta explícita
+
+`/executar-direto` é um fluxo independente e opt-in para uma entrega única, coesa e de risco baixo ou médio localizado. Ele não altera o roteamento v1/v2, não cria `PROJECT_STATE.md` e não invoca Superpowers. O CLI mantém `BRIEF.md`, `PROGRESS.md`, `RESULT.md` e estado mínimo em `.superpowers/bianchini/direct/<slug>/`, sempre ignorado pelo Git e confinado ao repositório.
+
+```bash
+bm.py direct start --repo <repo> --slug <slug> --objective <objetivo> --scope <escopo> --acceptance <critério> --verification <comando>
+bm.py direct status --repo <repo> [--slug <slug>]
+bm.py direct checkpoint --repo <repo> --slug <slug> --checkpoint <marco> --next-action <ação>
+bm.py direct finish --repo <repo> --slug <slug> --status completed --next-action <ação>
+```
+
+O início bloqueia detached HEAD e alterações não reconhecidas, cria `bm/direct/<slug>` quando necessário e escala hazards estruturais para `/sdd-planning` antes de implementar o risco. Não cria worktree, planos, spec, auditoria, homologação completa ou manual.
 
 ## Roteamento v1/v2
 

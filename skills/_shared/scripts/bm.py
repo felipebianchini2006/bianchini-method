@@ -470,6 +470,7 @@ def confined_path(root: Path, value: str, label: str) -> Path:
 
 ROOT_SUPERPOWERS_IGNORE = "/.superpowers/"
 ROOT_SUPERPOWERS_ARCHIVE = "docs/bianchini/legacy/root-superpowers"
+DIRECT_SCRATCH_ROOT = ".superpowers/bianchini/direct"
 LEGACY_STATE_ARCHIVE = "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md"
 IDLE_NEXT_ACTION = (
     "Aguardar novo escopo; então executar /sdd-planning para iniciar o ciclo v1 standalone."
@@ -1986,6 +1987,437 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
     return {"proof_map": str(output), **proof}
 
 
+DIRECT_HAZARDS = {
+    "new-auth",
+    "new-payment",
+    "webhook",
+    "multi-tenant",
+    "rls",
+    "data-migration",
+    "sensitive-infra",
+    "secrets-iam",
+    "concurrency",
+    "offline-sync",
+    "critical-geolocation",
+    "destructive",
+    "new-architecture",
+    "multi-platform-differences",
+    "ambiguous-business-rule",
+}
+DIRECT_RED_GREEN_KINDS = {
+    "bug",
+    "business-rule",
+    "calculation",
+    "data-transform",
+    "parser",
+    "permission",
+    "state-machine",
+}
+
+
+def direct_repo(repo: Path) -> Path:
+    root = repo.resolve()
+    top = Path(run_git(["rev-parse", "--show-toplevel"], root)).resolve()
+    if top != root:
+        raise BMError(f"--repo deve apontar para a raiz Git: {top}")
+    return root
+
+
+def direct_slug(value: str) -> str:
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value):
+        raise BMError("slug inválido; use letras minúsculas, números e hífens")
+    return value
+
+
+def direct_directory(root: Path, slug: str) -> Path:
+    normalized = direct_slug(slug)
+    lexical = root / DIRECT_SCRATCH_ROOT / normalized
+    target = confined_path(root, f"{DIRECT_SCRATCH_ROOT}/{normalized}", "scratch direto")
+    if path_uses_symlink(root, lexical):
+        raise BMError("scratch direto não pode atravessar symlink")
+    return target
+
+
+def direct_state_path(root: Path, slug: str) -> Path:
+    return direct_directory(root, slug) / ".state.json"
+
+
+def read_direct_state(root: Path, slug: str) -> dict[str, Any]:
+    path = direct_state_path(root, slug)
+    if path.is_symlink() or not path.is_file():
+        raise BMError(f"execução direta não encontrada: {slug}", EXIT_BLOCKED)
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise BMError(f"estado da execução direta inválido: {error.msg}", EXIT_BLOCKED) from error
+    if not isinstance(value, dict) or value.get("mode") not in {"direct", "escalated"}:
+        raise BMError("estado da execução direta inválido", EXIT_BLOCKED)
+    return value
+
+
+def write_direct_state(root: Path, state: dict[str, Any]) -> Path:
+    directory = direct_directory(root, state["slug"])
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / ".state.json"
+    temporary = directory / ".state.json.tmp"
+    temporary.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+    return path
+
+
+def markdown_list(values: list[str], empty: str = "Nenhum.") -> str:
+    return "\n".join(f"- {value}" for value in values) if values else f"- {empty}"
+
+
+def render_direct_brief(state: dict[str, Any]) -> str:
+    return (
+        "# Brief da execução direta\n\n"
+        f"## Objetivo\n\n{state['objective']}\n\n"
+        f"## Estado atual relevante\n\n{state['current_state']}\n\n"
+        f"## Escopo\n\n{state['scope']}\n\n"
+        "## Não objetivos\n\n"
+        f"{markdown_list(state['non_objectives'])}\n\n"
+        "## Critérios de aceite\n\n"
+        f"{markdown_list(state['acceptance'])}\n\n"
+        "## Arquivos e interfaces prováveis\n\n"
+        f"{markdown_list(state['likely_files'], 'A confirmar pela leitura localizada.')}\n\n"
+        f"## Risco inicial\n\n{state['risk']}\n\n"
+        "## Comandos de verificação\n\n"
+        f"{markdown_list(state['verification_commands'])}\n\n"
+        f"## Branch\n\n`{state['branch']}`\n\n"
+        f"## Commit base\n\n`{state['base_commit']}`\n"
+    )
+
+
+def render_direct_progress(state: dict[str, Any]) -> str:
+    return (
+        "# Progresso da execução direta\n\n"
+        f"- Objetivo: {state['objective']}\n"
+        f"- Branch: `{state['branch']}`\n"
+        f"- Commit base: `{state['base_commit']}`\n"
+        f"- Último checkpoint concluído: {state['last_checkpoint'] or 'nenhum'}\n"
+        f"- Verificação atual: {state['verification']}\n"
+        f"- Próxima ação: {state['next_action']}\n\n"
+        "## Arquivos alterados\n\n"
+        f"{markdown_list(state['changed_files'])}\n\n"
+        "## Comandos executados\n\n"
+        f"{markdown_list(state['commands'])}\n\n"
+        "## Resultados\n\n"
+        f"{markdown_list(state['results'])}\n\n"
+        "## Bloqueios\n\n"
+        f"{markdown_list(state['blockers'])}\n"
+    )
+
+
+def render_direct_result(state: dict[str, Any]) -> str:
+    status_label = {
+        "active": "em andamento",
+        "completed": "concluído",
+        "blocked": "bloqueado",
+        "escalated": "escalado",
+    }[state["status"]]
+    return (
+        "# Resultado da execução direta\n\n"
+        f"## Objetivo\n\n{state['objective']}\n\n"
+        f"Status: {status_label}\n\n"
+        f"## Estado atual confirmado\n\n{state['current_state']}\n\n"
+        f"## Escopo e decisão de risco\n\n{state['scope']}\n\n"
+        f"- Risco: {state['risk']}\n"
+        f"- Hazards: {', '.join(state['hazards']) if state['hazards'] else 'nenhum'}\n\n"
+        "## Fatos confirmados\n\n"
+        f"{markdown_list(state['results'])}\n\n"
+        "## Comportamentos implementados\n\n"
+        f"{markdown_list(state['behaviors'])}\n\n"
+        "## Arquivos alterados\n\n"
+        f"{markdown_list(state['changed_files'])}\n\n"
+        "## Comandos executados\n\n"
+        f"{markdown_list(state['commands'])}\n\n"
+        "## Resultados das verificações\n\n"
+        f"{markdown_list(state['verification_results'])}\n\n"
+        "## Limitações\n\n"
+        f"{markdown_list(state['limitations'])}\n\n"
+        "## Itens fora de escopo encontrados\n\n"
+        f"{markdown_list(state['out_of_scope'])}\n\n"
+        "## Bloqueios\n\n"
+        f"{markdown_list(state['blockers'])}\n\n"
+        "## Branch e estado Git\n\n"
+        f"- Branch: `{state['branch']}`\n- Commit base: `{state['base_commit']}`\n"
+        f"- Estado: {state.get('git_status', 'unknown')}\n\n"
+        f"## Próximo passo\n\n{state['next_action']}\n"
+    )
+
+
+def direct_payload(state: dict[str, Any], directory: Path) -> dict[str, Any]:
+    return {
+        "mode": state["mode"],
+        "slug": state["slug"],
+        "objective": state["objective"],
+        "status": state["status"],
+        "risk": state["risk"],
+        "verification_strategy": state["verification_strategy"],
+        "branch": state["branch"],
+        "base_commit": state["base_commit"],
+        "last_checkpoint": state["last_checkpoint"],
+        "verification": state["verification"],
+        "blockers": state["blockers"],
+        "next_action": state["next_action"],
+        "git_status": state.get("git_status", "unknown"),
+        "brief": str(directory / "BRIEF.md"),
+        "progress": str(directory / "PROGRESS.md"),
+        "result": str(directory / "RESULT.md"),
+        "next_step": "/sdd-planning" if state["mode"] == "escalated" else None,
+    }
+
+
+def direct_git_status(root: Path) -> tuple[str, list[str]]:
+    lines = run_git(
+        ["status", "--porcelain=v1", "--untracked-files=all"], root
+    ).splitlines()
+    paths = sorted(
+        {line[3:].split(" -> ")[-1] for line in lines if len(line) > 3}
+    )
+    return ("clean" if not paths else "modified", paths)
+
+
+def direct_base_is_ancestor(root: Path, base_commit: str) -> bool:
+    completed = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_commit, "HEAD"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode not in {0, 1}:
+        raise BMError(completed.stderr.strip() or "não foi possível validar o commit base")
+    return completed.returncode == 0
+
+
+def direct_start(
+    repo: Path,
+    slug: str,
+    objective: str,
+    scope: str,
+    current_state: str,
+    acceptance: list[str],
+    non_objectives: list[str],
+    likely_files: list[str],
+    verification_commands: list[str],
+    risk: str,
+    change_kind: str,
+    hazards: list[str],
+    subsystems: int,
+    related_changes: list[str],
+    initial_commands: list[str],
+    initial_results: list[str],
+) -> dict[str, Any]:
+    root = direct_repo(repo)
+    directory = direct_directory(root, slug)
+    branch = run_git(["branch", "--show-current"], root)
+    if not branch:
+        raise BMError("BLOQUEADO: executar-direto não funciona em detached HEAD", EXIT_UNSAFE_WORKSPACE)
+    base_commit = run_git(["rev-parse", "HEAD"], root)
+    unknown_hazards = sorted(set(hazards) - DIRECT_HAZARDS)
+    if unknown_hazards:
+        raise BMError("hazard inválido: " + ", ".join(unknown_hazards))
+    escalation_reasons = sorted(set(hazards))
+    if risk in {"high", "critical"}:
+        escalation_reasons.append(f"risk:{risk}")
+    if subsystems > 1:
+        escalation_reasons.append(f"independent-subsystems:{subsystems}")
+    mode = "escalated" if escalation_reasons else "direct"
+
+    existing_path = directory / ".state.json"
+    if existing_path.is_file():
+        existing = read_direct_state(root, slug)
+        if existing.get("objective") != objective:
+            raise BMError("BLOQUEADO: slug já pertence a outro objetivo", EXIT_BLOCKED)
+        ensure_direct_branch(root, existing)
+        git_state, observed_paths = direct_git_status(root)
+        existing["git_status"] = git_state
+        existing["observed_changes"] = observed_paths
+        return {**direct_payload(existing, directory), "resumed": True}
+
+    _, observed_dirty_paths = direct_git_status(root)
+    dirty_paths = set(observed_dirty_paths)
+    recognized = set(related_changes)
+    if dirty_paths - recognized:
+        raise BMError(
+            "BLOQUEADO: alterações não relacionadas não foram reconhecidas no brief: "
+            + ", ".join(sorted(dirty_paths - recognized)),
+            EXIT_BLOCKED,
+        )
+
+    target_branch = branch
+    if mode == "direct" and branch in {"main", "master"}:
+        target_branch = f"bm/direct/{slug}"
+        if run_git(["branch", "--list", target_branch], root):
+            raise BMError(f"BLOQUEADO: branch direta já existe: {target_branch}", EXIT_BLOCKED)
+        run_git(["switch", "-c", target_branch], root)
+
+    if change_kind in DIRECT_RED_GREEN_KINDS:
+        strategy = "red_green"
+    elif change_kind == "visual":
+        strategy = "visual_evidence"
+    else:
+        strategy = "affected_checks"
+    timestamp = datetime.now(timezone.utc).isoformat()
+    state: dict[str, Any] = {
+        "version": 1,
+        "mode": mode,
+        "slug": slug,
+        "objective": objective,
+        "scope": scope,
+        "current_state": current_state,
+        "acceptance": acceptance,
+        "non_objectives": non_objectives,
+        "likely_files": likely_files,
+        "verification_commands": verification_commands,
+        "risk": risk,
+        "change_kind": change_kind,
+        "verification_strategy": strategy,
+        "hazards": escalation_reasons,
+        "subsystems": subsystems,
+        "branch": target_branch,
+        "base_commit": base_commit,
+        "status": "escalated" if mode == "escalated" else "active",
+        "last_checkpoint": None,
+        "changed_files": sorted(recognized),
+        "commands": initial_commands,
+        "results": initial_results,
+        "verification": "pending",
+        "verification_results": [],
+        "behaviors": [],
+        "limitations": [],
+        "out_of_scope": [],
+        "blockers": escalation_reasons,
+        "git_status": "clean" if not dirty_paths else "modified",
+        "next_action": (
+            "Executar /sdd-planning com este handoff compacto."
+            if mode == "escalated"
+            else "Implementar a menor sequência coerente e registrar checkpoint relevante."
+        ),
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+    write_direct_state(root, state)
+    (directory / "BRIEF.md").write_text(render_direct_brief(state), encoding="utf-8")
+    (directory / "PROGRESS.md").write_text(render_direct_progress(state), encoding="utf-8")
+    (directory / "RESULT.md").write_text(render_direct_result(state), encoding="utf-8")
+    return {**direct_payload(state, directory), "resumed": False}
+
+
+def direct_status(repo: Path, slug: str | None) -> dict[str, Any]:
+    root = direct_repo(repo)
+    if slug:
+        state = read_direct_state(root, slug)
+        if state["status"] == "active":
+            ensure_direct_branch(root, state)
+        git_state, observed_paths = direct_git_status(root)
+        state["git_status"] = git_state
+        result = direct_payload(state, direct_directory(root, slug))
+        result["observed_changes"] = observed_paths
+        result["unrecorded_changes"] = sorted(
+            set(observed_paths) - set(state["changed_files"])
+        )
+        return result
+    base = confined_path(root, DIRECT_SCRATCH_ROOT, "scratch direto")
+    if path_uses_symlink(root, root / DIRECT_SCRATCH_ROOT):
+        raise BMError("scratch direto não pode atravessar symlink")
+    if not base.is_dir():
+        return {"mode": "none", "active": False, "executions": []}
+    executions: list[dict[str, Any]] = []
+    for child in sorted(base.iterdir(), key=lambda item: item.name):
+        if child.is_dir() and not child.is_symlink() and (child / ".state.json").is_file():
+            state = read_direct_state(root, child.name)
+            executions.append(direct_payload(state, child))
+    active = [item for item in executions if item["status"] == "active"]
+    if len(active) == 1:
+        return {**active[0], "active": True, "executions": executions}
+    return {"mode": "direct" if active else "none", "active": bool(active), "executions": executions}
+
+
+def ensure_direct_branch(root: Path, state: dict[str, Any]) -> None:
+    current = run_git(["branch", "--show-current"], root)
+    if not current:
+        raise BMError("BLOQUEADO: execução direta em detached HEAD", EXIT_UNSAFE_WORKSPACE)
+    if state["mode"] == "direct" and current != state["branch"]:
+        raise BMError(
+            f"BLOQUEADO: execução direta pertence à branch {state['branch']}, atual {current}",
+            EXIT_UNSAFE_WORKSPACE,
+        )
+    if state["mode"] == "direct" and not direct_base_is_ancestor(
+        root, state["base_commit"]
+    ):
+        raise BMError(
+            "BLOQUEADO: commit base da execução direta não pertence mais ao HEAD atual",
+            EXIT_UNSAFE_WORKSPACE,
+        )
+
+
+def direct_checkpoint(
+    repo: Path,
+    slug: str,
+    checkpoint: str,
+    changed_files: list[str],
+    commands: list[str],
+    results: list[str],
+    verification: str,
+    next_action: str,
+    blockers: list[str],
+) -> dict[str, Any]:
+    root = direct_repo(repo)
+    state = read_direct_state(root, slug)
+    ensure_direct_branch(root, state)
+    if state["status"] != "active":
+        raise BMError("BLOQUEADO: somente execução direta ativa aceita checkpoint", EXIT_BLOCKED)
+    state["last_checkpoint"] = checkpoint
+    state["changed_files"] = sorted(set(state["changed_files"] + changed_files))
+    state["commands"] = state["commands"] + commands
+    state["results"] = state["results"] + results
+    state["verification"] = verification
+    state["next_action"] = next_action
+    state["blockers"] = blockers
+    state["git_status"], _ = direct_git_status(root)
+    state["updated_at"] = datetime.now(timezone.utc).isoformat()
+    directory = direct_directory(root, slug)
+    write_direct_state(root, state)
+    (directory / "PROGRESS.md").write_text(render_direct_progress(state), encoding="utf-8")
+    return direct_payload(state, directory)
+
+
+def direct_finish(
+    repo: Path,
+    slug: str,
+    status: str,
+    behaviors: list[str],
+    verification_results: list[str],
+    limitations: list[str],
+    out_of_scope: list[str],
+    next_action: str,
+) -> dict[str, Any]:
+    root = direct_repo(repo)
+    state = read_direct_state(root, slug)
+    ensure_direct_branch(root, state)
+    state["status"] = status
+    if status == "escalated":
+        state["mode"] = "escalated"
+    state["behaviors"] = behaviors
+    state["verification_results"] = verification_results
+    state["limitations"] = limitations
+    state["out_of_scope"] = out_of_scope
+    state["next_action"] = next_action
+    state["git_status"], _ = direct_git_status(root)
+    state["updated_at"] = datetime.now(timezone.utc).isoformat()
+    directory = direct_directory(root, slug)
+    write_direct_state(root, state)
+    (directory / "PROGRESS.md").write_text(render_direct_progress(state), encoding="utf-8")
+    (directory / "RESULT.md").write_text(render_direct_result(state), encoding="utf-8")
+    return direct_payload(state, directory)
+
+
 def state_summary(path: Path, root: Path | None = None) -> dict[str, Any]:
     state = load_state(path, root)
     if state.get("method_version") == 1:
@@ -2205,6 +2637,58 @@ def parser() -> argparse.ArgumentParser:
     for metric in TELEMETRY_METRICS:
         telemetry.add_argument(f"--{metric.replace('_', '-')}", type=int, default=0)
 
+    direct = commands.add_parser("direct")
+    direct.add_argument("action", choices=["start", "status", "checkpoint", "finish"])
+    direct.add_argument("--repo", type=Path, default=Path.cwd())
+    direct.add_argument("--slug")
+    direct.add_argument("--objective")
+    direct.add_argument("--scope")
+    direct.add_argument("--current-state", default="Arquitetura existente a confirmar por leitura localizada.")
+    direct.add_argument("--acceptance", action="append", default=[])
+    direct.add_argument("--non-objective", action="append", default=[])
+    direct.add_argument("--likely-file", action="append", default=[])
+    direct.add_argument("--verification", action="append", default=[])
+    direct.add_argument(
+        "--risk", choices=["low", "medium", "high", "critical"], default="low"
+    )
+    direct.add_argument(
+        "--change-kind",
+        choices=[
+            "behavioral",
+            "mechanical",
+            "visual",
+            "bug",
+            "business-rule",
+            "calculation",
+            "data-transform",
+            "parser",
+            "permission",
+            "state-machine",
+        ],
+        default="behavioral",
+    )
+    direct.add_argument("--hazard", action="append", default=[])
+    direct.add_argument("--subsystems", type=int, default=1)
+    direct.add_argument("--related-change", action="append", default=[])
+    direct.add_argument("--checkpoint")
+    direct.add_argument("--changed-file", action="append", default=[])
+    direct.add_argument(
+        "--command",
+        dest="executed_commands",
+        metavar="COMMAND",
+        action="append",
+        default=[],
+    )
+    direct.add_argument("--result-entry", action="append", default=[])
+    direct.add_argument("--blocker", action="append", default=[])
+    direct.add_argument("--next-action")
+    direct.add_argument(
+        "--status", choices=["completed", "blocked", "escalated"]
+    )
+    direct.add_argument("--behavior", action="append", default=[])
+    direct.add_argument("--limitation", action="append", default=[])
+    direct.add_argument("--out-of-scope", action="append", default=[])
+
     summary = commands.add_parser("status")
     summary.add_argument("state", type=Path)
     summary.add_argument("--root", type=Path)
@@ -2306,6 +2790,71 @@ def main() -> int:
                 )
             else:
                 emit(telemetry_summary(args.state, args.root))
+        elif args.command == "direct":
+            if args.action == "start":
+                if not all((args.slug, args.objective, args.scope)):
+                    raise BMError("direct start exige --slug, --objective e --scope")
+                if not args.acceptance or not args.verification:
+                    raise BMError(
+                        "direct start exige ao menos um --acceptance e um --verification"
+                    )
+                if args.subsystems < 1:
+                    raise BMError("--subsystems deve ser positivo")
+                emit(
+                    direct_start(
+                        args.repo,
+                        args.slug,
+                        args.objective,
+                        args.scope,
+                        args.current_state,
+                        args.acceptance,
+                        args.non_objective,
+                        args.likely_file,
+                        args.verification,
+                        args.risk,
+                        args.change_kind,
+                        args.hazard,
+                        args.subsystems,
+                        args.related_change,
+                        args.executed_commands,
+                        args.result_entry,
+                    )
+                )
+            elif args.action == "status":
+                emit(direct_status(args.repo, args.slug))
+            elif args.action == "checkpoint":
+                if not all((args.slug, args.checkpoint, args.next_action)):
+                    raise BMError(
+                        "direct checkpoint exige --slug, --checkpoint e --next-action"
+                    )
+                emit(
+                    direct_checkpoint(
+                        args.repo,
+                        args.slug,
+                        args.checkpoint,
+                        args.changed_file,
+                        args.executed_commands,
+                        args.result_entry,
+                        args.verification[0] if args.verification else "pending",
+                        args.next_action,
+                        args.blocker,
+                    )
+                )
+            else:
+                if not all((args.slug, args.status, args.next_action)):
+                    raise BMError("direct finish exige --slug, --status e --next-action")
+                emit(
+                    direct_finish(
+                        args.repo,
+                        args.slug,
+                        args.status,
+                        args.behavior,
+                        args.verification,
+                        args.limitation,
+                        args.out_of_scope,
+                        args.next_action,
+                    )
+                )
         elif args.command == "status":
             summary_value = state_summary(args.state, args.root)
             if args.format == "text":

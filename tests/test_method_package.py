@@ -20,6 +20,7 @@ PROJECT_FIXTURES = FIXTURES / "projects"
 SKILL_NAMES = (
     "sdd-planning",
     "executar-plano",
+    "executar-direto",
     "auditar-arquitetura",
     "status-projeto",
     "corrigir-bug",
@@ -126,13 +127,15 @@ def frontmatter(markdown: str) -> dict[str, str]:
 class PackageIntegrityTests(unittest.TestCase):
     LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 
-    def test_six_public_skills_have_valid_frontmatter(self) -> None:
+    def test_public_skills_have_valid_frontmatter(self) -> None:
         for name, path in SKILLS.items():
             with self.subTest(skill=name):
                 metadata = frontmatter(read(path))
                 self.assertEqual(metadata.get("name"), name)
                 self.assertIn("Use ", metadata.get("description", ""))
                 self.assertLessEqual(len(read(path).splitlines()), 250)
+                if name == "executar-direto":
+                    self.assertEqual(metadata.get("disable-model-invocation"), "true")
 
     def test_relative_links_resolve(self) -> None:
         failures: list[str] = []
@@ -187,6 +190,7 @@ class PackageIntegrityTests(unittest.TestCase):
             "AdaptivePolicyScenarios",
             "WorkspaceAndArtifactScenarios",
             "BehavioralProjectScenarios",
+            "DirectExecutionScenarios",
             "SkillBehaviorContracts",
         ):
             self.assertIn(f'"{class_name}"', runner)
@@ -1952,6 +1956,287 @@ class BehavioralProjectScenarios(unittest.TestCase):
             self.assertFalse((base / "escaped.jsonl").exists())
 
 
+class DirectExecutionScenarios(unittest.TestCase):
+    def start(
+        self,
+        repo: Path,
+        slug: str = "small-dashboard",
+        risk: str = "low",
+        change_kind: str = "behavioral",
+        *extra: str,
+    ) -> subprocess.CompletedProcess[str]:
+        return cli(
+            "direct",
+            "start",
+            "--repo",
+            str(repo),
+            "--slug",
+            slug,
+            "--objective",
+            "Entregar painel pequeno e coeso",
+            "--scope",
+            "Um painel com um fluxo principal",
+            "--acceptance",
+            "O fluxo principal funciona",
+            "--verification",
+            "python3 -m unittest",
+            "--risk",
+            risk,
+            "--change-kind",
+            change_kind,
+            *extra,
+        )
+
+    def test_low_risk_small_project_starts_direct_on_local_branch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            base = init_repo(repo)
+            result = self.start(repo)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["mode"], "direct")
+            self.assertEqual(payload["status"], "active")
+            self.assertEqual(git(repo, "branch", "--show-current"), "bm/direct/small-dashboard")
+            self.assertEqual(payload["base_commit"], base)
+            scratch = repo / ".superpowers/bianchini/direct/small-dashboard"
+            for name in ("BRIEF.md", "PROGRESS.md", "RESULT.md"):
+                self.assertTrue((scratch / name).is_file())
+            self.assertFalse((repo / "docs/living/PROJECT_STATE.md").exists())
+            self.assertFalse((repo / "docs/bianchini").exists())
+            self.assertEqual(git(repo, "status", "--porcelain"), "")
+
+    def test_medium_cohesive_feature_stays_direct(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            payload = json.loads(self.start(repo, risk="medium").stdout)
+            self.assertEqual(payload["mode"], "direct")
+            self.assertEqual(payload["risk"], "medium")
+
+    def test_bug_requires_red_green_and_visual_accepts_visual_evidence(self) -> None:
+        for kind, expected in (("bug", "red_green"), ("visual", "visual_evidence")):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                init_repo(repo)
+                payload = json.loads(self.start(repo, change_kind=kind).stdout)
+                self.assertEqual(payload["verification_strategy"], expected)
+
+    def test_high_risk_triggers_escalate_to_sdd(self) -> None:
+        scenarios = (
+            (
+                "payment",
+                (
+                    "--hazard",
+                    "new-payment",
+                    "--command",
+                    "npm test -- billing",
+                    "--result-entry",
+                    "Padrão atual não cobre cobrança nova",
+                ),
+            ),
+            ("authentication", ("--hazard", "new-auth")),
+            ("two-subsystems", ("--subsystems", "2")),
+        )
+        for slug, extra in scenarios:
+            with self.subTest(slug=slug), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                init_repo(repo)
+                result = self.start(repo, slug, "medium", "behavioral", *extra)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["mode"], "escalated")
+                self.assertEqual(payload["next_step"], "/sdd-planning")
+                self.assertEqual(git(repo, "branch", "--show-current"), "main")
+                result_file = Path(payload["result"])
+                self.assertIn("Status: escalado", read(result_file))
+                self.assertIn(payload["blockers"][0], read(result_file))
+                if slug == "payment":
+                    self.assertIn("npm test -- billing", read(result_file))
+                    self.assertIn("Padrão atual não cobre cobrança nova", read(result_file))
+
+    def test_dirty_main_and_detached_head_are_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "dirty"
+            init_repo(repo)
+            (repo / "unrelated.txt").write_text("user work\n", encoding="utf-8")
+            dirty = self.start(repo)
+            self.assertEqual(dirty.returncode, 3)
+            self.assertIn("alterações não relacionadas", dirty.stderr)
+            self.assertEqual(git(repo, "branch", "--show-current"), "main")
+
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "related"
+            init_repo(repo)
+            (repo / "feature.txt").write_text("valid partial work\n", encoding="utf-8")
+            related = self.start(
+                repo,
+                "related-change",
+                "low",
+                "behavioral",
+                "--related-change",
+                "feature.txt",
+            )
+            self.assertEqual(related.returncode, 0, related.stderr)
+            self.assertEqual(git(repo, "branch", "--show-current"), "bm/direct/related-change")
+            progress = repo / ".superpowers/bianchini/direct/related-change/PROGRESS.md"
+            self.assertIn("feature.txt", read(progress))
+
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "detached"
+            init_repo(repo)
+            git(repo, "checkout", "--detach")
+            detached = self.start(repo)
+            self.assertEqual(detached.returncode, 4)
+            self.assertIn("detached HEAD", detached.stderr)
+
+    def test_checkpoint_is_resumable_and_status_reports_direct_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            started = json.loads(self.start(repo).stdout)
+            checkpoint = cli_json(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Implementação principal concluída",
+                "--changed-file",
+                "src/dashboard.ts",
+                "--command",
+                "npm test -- dashboard",
+                "--verification",
+                "passed",
+                "--next-action",
+                "Executar build",
+            )
+            status = cli_json(
+                "direct", "status", "--repo", str(repo), "--slug", "small-dashboard"
+            )
+            self.assertEqual(status["mode"], "direct")
+            self.assertEqual(status["last_checkpoint"], checkpoint["last_checkpoint"])
+            self.assertEqual(status["verification"], "passed")
+            self.assertEqual(status["branch"], started["branch"])
+            second_status = cli_json(
+                "direct", "status", "--repo", str(repo), "--slug", "small-dashboard"
+            )
+            self.assertEqual(status, second_status)
+
+            git(repo, "switch", "main")
+            wrong_branch = cli(
+                "direct", "status", "--repo", str(repo), "--slug", "small-dashboard"
+            )
+            self.assertEqual(wrong_branch.returncode, 4)
+            self.assertIn("pertence à branch", wrong_branch.stderr)
+
+    def test_finish_writes_result_without_project_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            finished = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--verification",
+                "testes e build passaram",
+                "--next-action",
+                "Revisar e commitar",
+            )
+            self.assertEqual(finished["status"], "completed")
+            self.assertIn("Status: concluído", read(Path(finished["result"])))
+            self.assertFalse((repo / "docs/living/PROJECT_STATE.md").exists())
+
+    def test_discovered_structural_risk_finishes_with_sdd_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            finished = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "escalated",
+                "--limitation",
+                "Autorização nova descoberta",
+                "--next-action",
+                "Executar /sdd-planning",
+            )
+            self.assertEqual(finished["mode"], "escalated")
+            self.assertEqual(finished["next_step"], "/sdd-planning")
+            self.assertIn("Status: escalado", read(Path(finished["result"])))
+
+    def test_scratch_path_traversal_and_symlink_escape_are_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo = root / "repo"
+            init_repo(repo)
+            escaped = self.start(repo, "../escape")
+            self.assertEqual(escaped.returncode, 2)
+            self.assertFalse((root / "escape").exists())
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo = root / "repo"
+            outside = root / "outside"
+            init_repo(repo)
+            outside.mkdir()
+            (repo / ".superpowers").symlink_to(outside, target_is_directory=True)
+            escaped = self.start(repo)
+            self.assertEqual(escaped.returncode, 2)
+            self.assertFalse((outside / "bianchini").exists())
+
+    def test_skill_contract_is_explicit_lightweight_and_has_no_external_agents(self) -> None:
+        direct = read(SKILLS["executar-direto"])
+        metadata = frontmatter(direct)
+        self.assertEqual(metadata["disable-model-invocation"], "true")
+        for expected in (
+            "zero subagentes",
+            "menor diff correto",
+            "RED/GREEN",
+            "browser",
+            "screenshot",
+            "/sdd-planning",
+            "BRIEF.md",
+            "PROGRESS.md",
+            "RESULT.md",
+        ):
+            self.assertIn(expected, direct)
+        for forbidden in (
+            "invocar Superpowers",
+            "Agency Agents",
+            "spec central",
+            "PLANNING_REVIEW",
+            "manual PDF",
+        ):
+            self.assertIn(forbidden, direct)
+        self.assertFalse((ROOT / "skills/agency-agents").exists())
+        agent_config = read(ROOT / "skills/executar-direto/agents/openai.yaml")
+        self.assertNotIn("subagent", agent_config.lower())
+        self.assertIn("allow_implicit_invocation: false", agent_config)
+        self.assertIn("Não faça push", direct)
+        self.assertIn("instalação global", direct)
+
+    def test_status_skill_checks_direct_execution_before_project_state(self) -> None:
+        status_skill = read(SKILLS["status-projeto"])
+        self.assertIn("bm.py direct status", status_skill)
+        self.assertIn("Modo: direto", status_skill)
+        self.assertIn("antes de exigir `PROJECT_STATE.md`", status_skill)
+
+
 class SkillBehaviorContracts(unittest.TestCase):
     def test_executor_has_no_branch_fallback_or_task_minimum(self) -> None:
         executor = read(SKILLS["executar-plano"])
@@ -2032,10 +2317,18 @@ class SkillBehaviorContracts(unittest.TestCase):
     def test_skill_activation_is_explicit_or_scoped_to_method_v2(self) -> None:
         for name, path in SKILLS.items():
             with self.subTest(skill=name):
-                description = frontmatter(read(path))["description"]
-                self.assertTrue(
-                    f"/{name}" in description or "method_version 2" in description
-                )
+                metadata = frontmatter(read(path))
+                description = metadata["description"]
+                if name == "executar-direto":
+                    self.assertEqual(
+                        description,
+                        "Use quando o usuário solicitar a implementação estruturada de um projeto pequeno ou de uma entrega coesa sem planejamento SDD completo.",
+                    )
+                    self.assertEqual(metadata["disable-model-invocation"], "true")
+                else:
+                    self.assertTrue(
+                        f"/{name}" in description or "method_version 2" in description
+                    )
         audit_description = frontmatter(read(SKILLS["auditar-arquitetura"]))["description"]
         self.assertIn("somente", audit_description)
         self.assertIn("não ativa por risco", audit_description)

@@ -19,6 +19,7 @@ SHARDS = (
     "AdaptivePolicyScenarios",
     "WorkspaceAndArtifactScenarios",
     "BehavioralProjectScenarios",
+    "DirectExecutionScenarios",
     "SkillBehaviorContracts",
 )
 

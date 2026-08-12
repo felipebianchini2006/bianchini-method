@@ -1,6 +1,12 @@
 # Bianchini Method v2 — Standalone Adaptive
 
-Sistema de seis skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
+Sistema de sete skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
+
+| Situação | Fluxo |
+|---|---|
+| Tarefa pontual ou experimento | Superpowers diretamente |
+| Projeto pequeno ou entrega coesa | `/executar-direto` |
+| Projeto complexo, multifase ou de alto risco | `/sdd-planning` + `/executar-plano` |
 
 ## Fluxo v2
 

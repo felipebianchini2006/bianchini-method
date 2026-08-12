@@ -11,12 +11,14 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva 
 
 ## Fluxo
 
-1. Localizar `docs/living/PROJECT_STATE.md`.
-2. Executar `bm.py route` com caminho do Superpowers quando detectado.
-3. V1 com Superpowers: ler estado/status legado e informar que o executor continua legado.
-4. V1 sem Superpowers: informar `BLOQUEADO` e a dependência ausente; não sugerir execução v2 automática.
-5. V2: executar `bm.py validate-state` e `bm.py status <state> --root <repo> --format text`. Usar o JSON padrão somente para automação.
-6. Se estado v2 for inválido, reportar erros do schema e parar; não inferir valores.
+1. Executar `bm.py direct status --repo <repo>` antes de exigir `PROJECT_STATE.md`.
+2. Se houver execução ativa, mostrar `Modo: direto`, objetivo, branch, checkpoint, verificação, bloqueios e próxima ação. Para detalhe, abrir apenas `PROGRESS.md`.
+3. Sem execução direta ativa, localizar `docs/living/PROJECT_STATE.md`.
+4. Executar `bm.py route` com caminho do Superpowers quando detectado.
+5. V1 com Superpowers: ler estado/status legado e informar que o executor continua legado.
+6. V1 sem Superpowers: informar `BLOQUEADO` e a dependência ausente; não sugerir execução v2 automática.
+7. V2: executar `bm.py validate-state` e `bm.py status <state> --root <repo> --format text`. Usar o JSON padrão somente para automação.
+8. Se estado v2 for inválido, reportar erros do schema e parar; não inferir valores.
 
 ## Resposta compacta
 
