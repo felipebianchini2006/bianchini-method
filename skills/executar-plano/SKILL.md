@@ -56,6 +56,8 @@ Retomada começa com `workspace resume`, lendo o caminho absoluto do checkpoint,
 
 Antes da unidade, executar `bm.py policy` com perfil/risco e confirmar que o resultado coincide com `execution` e `review` aprovados. Divergência aumenta garantia automaticamente; redução exige novo pacote aprovado.
 
+Quando o host suportar subagentes, o implementador padrão dos três modos segue o contrato [`../_shared/agents/implementation-worker.md`](../_shared/agents/implementation-worker.md). Passar ao subagente somente o caminho do contrato, o caminho do brief, o caminho do relatório e o contexto adicional estritamente necessário; não copiar o conteúdo do contrato para o brief ou prompt. Sem subagentes, cumprir o contrato inline.
+
 ### Grouped — baixo risco
 
 - Agrupar tarefas do mesmo seam e sem conflitos de ownership.
@@ -82,6 +84,10 @@ Antes da unidade, executar `bm.py policy` com perfil/risco e confirmar que o res
 Nenhum modo implementa necessidade de tarefa futura. Testes observam seams públicos, não detalhes internos.
 
 ## 5. Revisão e fix loop
+
+A revisão segue o contrato [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) na cadência do modo: `grouped` recebe uma revisão no gate do plano (nunca por microtarefa), `slice` uma revisão por slice e `strict` revisão independente por tarefa. Entregar ao revisor somente o caminho do contrato, do brief, do relatório, do review package e o caminho do arquivo de saída da revisão; o revisor grava o relatório completo nesse arquivo e devolve ao contexto apenas veredito, contagem por severidade, caminho e bloqueios.
+
+Quando a unidade tiver risco alto ou crítico envolvendo autenticação, autorização, pagamentos, webhooks, multi-tenant, RLS, segredos, dados pessoais, upload, LLM com entrada não confiável, migração ou infraestrutura sensível, adicionar uma passagem somente leitura pelo contrato [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md), entregando também o caminho do arquivo de saída do parecer; o retorno ao contexto é apenas veredito, contagem por severidade e caminho. Não executá-la em tarefa comum. As correções continuam no fix loop abaixo.
 
 Eixos obrigatórios na cadência do modo:
 

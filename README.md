@@ -63,10 +63,15 @@ Os fix rounds são retornados por `bm.py policy`. Não há quantidade mínima de
 
 - `sdd-planning`: pesquisa atual da stack, spec, simplificação, planos, gates e aprovação única.
 - `executar-plano`: execução v1 legado ou v2 isolada/adaptativa.
-- `auditar-arquitetura`: relatório manual de hotspots e mudanças recentes.
+- `executar-direto`: entrega pequena e coesa com brief compacto, scratch ignorado, verificação obrigatória para conclusão e estados terminais; invocação exclusivamente manual por `/executar-direto`.
+- `auditar-arquitetura`: relatório manual de hotspots e mudanças recentes; invocação exclusivamente manual.
 - `status-projeto`: estado, gates, bloqueios e próximo passo, sem mutação.
 - `corrigir-bug`: causa raiz, regressão adequada ao seam, fix mínimo e reteste.
 - `homologar-sistema`: regressão/E2E primeiro, exploração manual das lacunas e aceite.
+
+### Contratos internos de subagentes
+
+`skills/_shared/agents/` contém cinco contratos enxutos e agnósticos de stack, referenciados por caminho pelas skills do método completo: `repo-cartographer` (mapeamento opcional em `sdd-planning`), `implementation-worker` e `plan-reviewer` (`executar-plano`), `security-reviewer` (risco alto/crítico sensível) e `ui-finish-reviewer` (`homologar-sistema` com escopo visual). `/executar-direto` não os utiliza. Origem adaptada do projeto Agency Agents (MIT); ver [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Estado e ferramentas
 
@@ -119,6 +124,7 @@ Nenhuma instalação ou sincronização é executada automaticamente.
 
 ```text
 /sdd-planning
+/executar-direto
 /auditar-arquitetura
 /executar-plano all
 /status-projeto

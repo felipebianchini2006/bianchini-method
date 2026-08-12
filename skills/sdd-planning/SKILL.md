@@ -34,6 +34,10 @@ Ordem: decisão recente do responsável, escopo aprovado, plano mestre, spec/ADR
 - Registrar no `PLANNING_REVIEW.md` apenas fatos, conflitos, premissas, riscos e ponteiros.
 - Não reabrir decisão aprovada nem copiar documentos inteiros.
 
+### Cartografia opcional do repositório
+
+Somente quando o repositório for existente e desconhecido, tiver múltiplas aplicações ou linguagens, legado relevante ou fluxos afetados pouco claros, delegar o mapeamento ao contrato [`../_shared/agents/repo-cartographer.md`](../_shared/agents/repo-cartographer.md). Não usar em projeto novo ou pequeno. Passar ao subagente apenas o caminho do contrato, a raiz do repositório, o escopo e o caminho de saída `.superpowers/bianchini/cartography/<hash-do-HEAD>-<digest-do-escopo>.md`, onde o digest é o SHA-256 do escopo aprovado; não copiar o conteúdo do contrato para o prompt. Reutilizar o mapa somente quando `HEAD` e digest coincidirem com o nome do arquivo; `HEAD` diferente invalida o cache e escopo diferente gera outro arquivo. Retorno do subagente: apenas o caminho do mapa e as áreas não analisadas.
+
 ## 3. Pesquisar a stack
 
 Ler [`references/stack-research.md`](references/stack-research.md). Antes de decidir arquitetura:

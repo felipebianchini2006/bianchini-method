@@ -2013,6 +2013,106 @@ DIRECT_RED_GREEN_KINDS = {
     "permission",
     "state-machine",
 }
+DIRECT_TERMINAL_STATUSES = {"completed", "blocked", "escalated"}
+DIRECT_GENERIC_CURRENT_STATE = re.compile(
+    r"(?i)\b(?:a\s+confirmar|n[aã]o\s+analisad\w*|a\s+verificar|a\s+definir|TBD|TODO)\b"
+)
+DIRECT_EVIDENCE_KINDS = {"command", "browser", "manual", "screenshot"}
+DIRECT_EVIDENCE_STATUSES = {"passed", "failed", "blocked", "not_run"}
+
+
+def parse_direct_evidence(entries: list[str]) -> list[dict[str, Any]]:
+    parsed: list[dict[str, Any]] = []
+    for raw in entries:
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as error:
+            raise BMError(f"--evidence exige JSON válido: {error.msg}") from error
+        if not isinstance(value, dict):
+            raise BMError("--evidence exige um objeto JSON")
+        kind = value.get("kind")
+        status = value.get("status")
+        summary = value.get("summary")
+        if kind not in DIRECT_EVIDENCE_KINDS:
+            raise BMError(
+                "--evidence.kind deve ser command, browser, manual ou screenshot"
+            )
+        if status not in DIRECT_EVIDENCE_STATUSES:
+            raise BMError(
+                "--evidence.status deve ser passed, failed, blocked ou not_run"
+            )
+        if not isinstance(summary, str) or not summary.strip():
+            raise BMError("--evidence.summary é obrigatório")
+        check_id = value.get("check_id")
+        if check_id is not None and (
+            not isinstance(check_id, str) or not check_id.strip()
+        ):
+            raise BMError("--evidence.check_id, quando presente, deve ser texto não vazio")
+        if kind == "command":
+            command = value.get("command")
+            exit_code = value.get("exit_code")
+            if not isinstance(command, str) or not command.strip():
+                raise BMError("evidência de comando exige o campo command")
+            if not isinstance(exit_code, int) or isinstance(exit_code, bool):
+                raise BMError("evidência de comando exige exit_code inteiro")
+            if status == "passed" and exit_code != 0:
+                raise BMError(
+                    "evidência de comando com status passed exige exit_code 0"
+                )
+        else:
+            evidence_ref = value.get("evidence")
+            if not isinstance(evidence_ref, str) or not evidence_ref.strip():
+                raise BMError(
+                    f"evidência {kind} exige o campo evidence com caminho ou descrição"
+                )
+        parsed.append(value)
+    return parsed
+
+
+def direct_tree_digest(root: Path) -> str:
+    head = run_git(["rev-parse", "HEAD"], root)
+    diff = run_git(["diff", "HEAD"], root)
+    _, paths = direct_git_status(root)
+    hasher = hashlib.sha256()
+    hasher.update(head.encode("utf-8"))
+    hasher.update(diff.encode("utf-8"))
+    for path in paths:
+        target = root / path
+        hasher.update(path.encode("utf-8"))
+        if target.is_file() and not target.is_symlink():
+            hasher.update(target.read_bytes())
+    return hasher.hexdigest()
+
+
+def current_direct_evidence(entries: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
+    current: dict[tuple[str, str], dict[str, Any]] = {}
+    for entry in entries:
+        if entry["kind"] == "command":
+            key = ("command", entry["command"])
+        else:
+            key = (entry["kind"], entry.get("check_id") or entry["evidence"])
+        current[key] = entry
+    return current
+
+
+def parse_direct_waivers(entries: list[str], planned: list[str]) -> dict[str, str]:
+    waived: dict[str, str] = {}
+    for entry in entries:
+        matched: tuple[str, str] | None = None
+        for command in sorted(planned, key=len, reverse=True):
+            prefix = command + ":"
+            if entry.startswith(prefix) and entry[len(prefix):].strip():
+                matched = (command, entry[len(prefix):].strip())
+                break
+        if matched is None:
+            command_part, separator, justification = entry.partition(":")
+            if not separator or not command_part.strip() or not justification.strip():
+                raise BMError(
+                    "--waive-verification exige o formato 'comando: justificativa'"
+                )
+            matched = (command_part.strip(), justification.strip())
+        waived[matched[0]] = matched[1]
+    return waived
 
 
 def direct_repo(repo: Path) -> Path:
@@ -2040,6 +2140,102 @@ def direct_directory(root: Path, slug: str) -> Path:
 
 def direct_state_path(root: Path, slug: str) -> Path:
     return direct_directory(root, slug) / ".state.json"
+
+
+def validate_direct_current_state(value: str | None) -> str:
+    text = (value or "").strip()
+    if not text:
+        raise BMError("direct start exige --current-state com síntese factual do repositório")
+    if len(text) < 20 or DIRECT_GENERIC_CURRENT_STATE.search(text):
+        raise BMError(
+            "--current-state deve conter síntese factual obtida por leitura localizada; "
+            "texto genérico como 'a confirmar' ou 'não analisado' não é aceito"
+        )
+    return text
+
+
+def direct_brief_digest(fields: dict[str, Any]) -> str:
+    payload = {
+        "objective": fields["objective"],
+        "current_state": fields["current_state"],
+        "scope": fields["scope"],
+        "non_objectives": sorted(fields["non_objectives"]),
+        "acceptance": sorted(fields["acceptance"]),
+        "risk": fields["risk"],
+        "change_kind": fields["change_kind"],
+        "hazards": sorted(set(fields["hazards"])),
+        "subsystems": fields["subsystems"],
+        "verification_commands": sorted(fields["verification_commands"]),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def stored_brief_digest(state: dict[str, Any]) -> str:
+    declared = state.get("brief_digest")
+    if isinstance(declared, str) and re.fullmatch(r"[0-9a-f]{64}", declared):
+        return declared
+    hazards = state.get(
+        "hazards_declared",
+        [
+            item
+            for item in state.get("hazards", [])
+            if not item.startswith(("risk:", "independent-subsystems:"))
+        ],
+    )
+    return direct_brief_digest(
+        {
+            "objective": state["objective"],
+            "current_state": state["current_state"],
+            "scope": state["scope"],
+            "non_objectives": state["non_objectives"],
+            "acceptance": state["acceptance"],
+            "risk": state["risk"],
+            "change_kind": state["change_kind"],
+            "hazards": hazards,
+            "subsystems": state.get("subsystems", 1),
+            "verification_commands": state["verification_commands"],
+        }
+    )
+
+
+def direct_exclude_file(root: Path) -> Path:
+    return Path(
+        run_git(["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"], root)
+    )
+
+
+def ensure_direct_scratch_excluded(root: Path) -> bool:
+    exclude = direct_exclude_file(root)
+    content = exclude.read_text(encoding="utf-8") if exclude.is_file() else ""
+    patterns = {
+        line.strip()
+        for line in content.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    if patterns & {"/.superpowers/", ".superpowers/", "/.superpowers"}:
+        return False
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    if content and not content.endswith("\n"):
+        content += "\n"
+    content += ROOT_SUPERPOWERS_IGNORE + "\n"
+    exclude.write_text(content, encoding="utf-8")
+    return True
+
+
+def assert_direct_scratch_untracked(root: Path) -> None:
+    _, paths = direct_git_status(root)
+    leaked = sorted(
+        path
+        for path in paths
+        if path == ".superpowers" or path.startswith(".superpowers/")
+    )
+    if leaked:
+        raise BMError(
+            "BLOQUEADO: o scratch direto aparece no git status: " + ", ".join(leaked[:8]),
+            EXIT_BLOCKED,
+        )
 
 
 def read_direct_state(root: Path, slug: str) -> dict[str, Any]:
@@ -2173,9 +2369,16 @@ def direct_payload(state: dict[str, Any], directory: Path) -> dict[str, Any]:
 
 
 def direct_git_status(root: Path) -> tuple[str, list[str]]:
-    lines = run_git(
-        ["status", "--porcelain=v1", "--untracked-files=all"], root
-    ).splitlines()
+    completed = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise BMError(completed.stderr.strip() or "comando Git falhou")
+    lines = completed.stdout.splitlines()
     paths = sorted(
         {line[3:].split(" -> ")[-1] for line in lines if len(line) > 3}
     )
@@ -2212,12 +2415,15 @@ def direct_start(
     related_changes: list[str],
     initial_commands: list[str],
     initial_results: list[str],
+    update_brief: bool = False,
 ) -> dict[str, Any]:
     root = direct_repo(repo)
     directory = direct_directory(root, slug)
     branch = run_git(["branch", "--show-current"], root)
     if not branch:
         raise BMError("BLOQUEADO: executar-direto não funciona em detached HEAD", EXIT_UNSAFE_WORKSPACE)
+    current_state = validate_direct_current_state(current_state)
+    ensure_direct_scratch_excluded(root)
     base_commit = run_git(["rev-parse", "HEAD"], root)
     unknown_hazards = sorted(set(hazards) - DIRECT_HAZARDS)
     if unknown_hazards:
@@ -2228,16 +2434,81 @@ def direct_start(
     if subsystems > 1:
         escalation_reasons.append(f"independent-subsystems:{subsystems}")
     mode = "escalated" if escalation_reasons else "direct"
+    incoming_digest = direct_brief_digest(
+        {
+            "objective": objective,
+            "current_state": current_state,
+            "scope": scope,
+            "non_objectives": non_objectives,
+            "acceptance": acceptance,
+            "risk": risk,
+            "change_kind": change_kind,
+            "hazards": hazards,
+            "subsystems": subsystems,
+            "verification_commands": verification_commands,
+        }
+    )
 
     existing_path = directory / ".state.json"
     if existing_path.is_file():
         existing = read_direct_state(root, slug)
-        if existing.get("objective") != objective:
-            raise BMError("BLOQUEADO: slug já pertence a outro objetivo", EXIT_BLOCKED)
+        if existing.get("status") in DIRECT_TERMINAL_STATUSES:
+            raise BMError(
+                f"BLOQUEADO: execução direta {slug} está em estado terminal "
+                f"{existing['status']}; use um novo slug (ou 'direct reopen' para "
+                "execução bloqueada). Execução escalada continua em /sdd-planning.",
+                EXIT_BLOCKED,
+            )
+        if stored_brief_digest(existing) != incoming_digest:
+            if not update_brief:
+                raise BMError(
+                    "BLOQUEADO: digest do brief divergente do registrado; use um novo "
+                    "slug ou atualize explicitamente o brief com --update-brief",
+                    EXIT_BLOCKED,
+                )
+            if mode == "escalated":
+                raise BMError(
+                    "BLOQUEADO: a atualização do brief introduz risco/hazard que exige "
+                    "escalonamento; use um novo slug e /sdd-planning",
+                    EXIT_BLOCKED,
+                )
+            if change_kind in DIRECT_RED_GREEN_KINDS:
+                updated_strategy = "red_green"
+            elif change_kind == "visual":
+                updated_strategy = "visual_evidence"
+            else:
+                updated_strategy = "affected_checks"
+            existing.update(
+                {
+                    "objective": objective,
+                    "current_state": current_state,
+                    "scope": scope,
+                    "non_objectives": non_objectives,
+                    "acceptance": acceptance,
+                    "risk": risk,
+                    "change_kind": change_kind,
+                    "verification_strategy": updated_strategy,
+                    "hazards_declared": sorted(set(hazards)),
+                    "subsystems": subsystems,
+                    "verification_commands": verification_commands,
+                    "brief_digest": incoming_digest,
+                    "verification": "pending",
+                    "evidence": [],
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            existing["results"] = existing.get("results", []) + [
+                "Brief atualizado explicitamente; verificação e evidências anteriores invalidadas."
+            ]
+            write_direct_state(root, existing)
+            (directory / "BRIEF.md").write_text(
+                render_direct_brief(existing), encoding="utf-8"
+            )
         ensure_direct_branch(root, existing)
         git_state, observed_paths = direct_git_status(root)
         existing["git_status"] = git_state
         existing["observed_changes"] = observed_paths
+        assert_direct_scratch_untracked(root)
         return {**direct_payload(existing, directory), "resumed": True}
 
     _, observed_dirty_paths = direct_git_status(root)
@@ -2279,6 +2550,8 @@ def direct_start(
         "change_kind": change_kind,
         "verification_strategy": strategy,
         "hazards": escalation_reasons,
+        "hazards_declared": sorted(set(hazards)),
+        "brief_digest": incoming_digest,
         "subsystems": subsystems,
         "branch": target_branch,
         "base_commit": base_commit,
@@ -2289,6 +2562,7 @@ def direct_start(
         "results": initial_results,
         "verification": "pending",
         "verification_results": [],
+        "evidence": [],
         "behaviors": [],
         "limitations": [],
         "out_of_scope": [],
@@ -2306,6 +2580,7 @@ def direct_start(
     (directory / "BRIEF.md").write_text(render_direct_brief(state), encoding="utf-8")
     (directory / "PROGRESS.md").write_text(render_direct_progress(state), encoding="utf-8")
     (directory / "RESULT.md").write_text(render_direct_result(state), encoding="utf-8")
+    assert_direct_scratch_untracked(root)
     return {**direct_payload(state, directory), "resumed": False}
 
 
@@ -2367,12 +2642,29 @@ def direct_checkpoint(
     verification: str,
     next_action: str,
     blockers: list[str],
+    evidence: list[str],
 ) -> dict[str, Any]:
     root = direct_repo(repo)
     state = read_direct_state(root, slug)
     ensure_direct_branch(root, state)
     if state["status"] != "active":
         raise BMError("BLOQUEADO: somente execução direta ativa aceita checkpoint", EXIT_BLOCKED)
+    new_evidence = parse_direct_evidence(evidence)
+    if new_evidence:
+        brief_now = stored_brief_digest(state)
+        tree_now = direct_tree_digest(root)
+        for entry in new_evidence:
+            entry["brief_digest"] = brief_now
+            entry["tree_digest"] = tree_now
+    state["evidence"] = state.get("evidence", []) + new_evidence
+    if verification == "passed" and not any(
+        entry["status"] == "passed" for entry in state["evidence"]
+    ):
+        raise BMError(
+            "BLOQUEADO: checkpoint com --verification passed exige ao menos uma "
+            "evidência estruturada aprovada registrada via --evidence",
+            EXIT_BLOCKED,
+        )
     state["last_checkpoint"] = checkpoint
     state["changed_files"] = sorted(set(state["changed_files"] + changed_files))
     state["commands"] = state["commands"] + commands
@@ -2397,10 +2689,154 @@ def direct_finish(
     limitations: list[str],
     out_of_scope: list[str],
     next_action: str,
+    blockers: list[str],
+    accepted_unrecorded: list[str],
+    waive_verification: list[str],
 ) -> dict[str, Any]:
     root = direct_repo(repo)
     state = read_direct_state(root, slug)
+    if state["status"] in DIRECT_TERMINAL_STATUSES:
+        raise BMError(
+            f"BLOQUEADO: execução direta {slug} já está em estado terminal "
+            f"{state['status']}; finish não pode ser repetido. Use um novo slug ou "
+            "'direct reopen' para execução bloqueada.",
+            EXIT_BLOCKED,
+        )
     ensure_direct_branch(root, state)
+    accepted: dict[str, str] = {}
+    for entry in accepted_unrecorded:
+        path_part, separator, justification = entry.partition(":")
+        if not separator or not path_part.strip() or not justification.strip():
+            raise BMError(
+                "--accept-unrecorded exige o formato 'caminho: justificativa'"
+            )
+        accepted[path_part.strip()] = justification.strip()
+    evidence_entries = state.get("evidence", [])
+    current_evidence = current_direct_evidence(evidence_entries)
+    if status == "completed":
+        waived = parse_direct_waivers(waive_verification, state["verification_commands"])
+        problems: list[str] = []
+        if blockers:
+            problems.append("--blocker é incompatível com --status completed")
+        if state["verification"] != "passed":
+            problems.append(
+                f"verificação atual é {state['verification']!r}; conclusão exige "
+                "checkpoint com --verification passed"
+            )
+        if not evidence_entries:
+            problems.append(
+                "nenhuma evidência estruturada registrada; registre com "
+                "checkpoint --evidence '{\"kind\": ..., \"status\": ...}'"
+            )
+        brief_now = stored_brief_digest(state)
+        tree_now = direct_tree_digest(root)
+        stale = [
+            entry
+            for entry in current_evidence.values()
+            if entry.get("brief_digest") != brief_now
+            or entry.get("tree_digest") != tree_now
+        ]
+        if stale:
+            problems.append(
+                "evidência obsoleta (brief ou código mudou depois do registro): "
+                + "; ".join(
+                    str(entry.get("command") or entry.get("evidence"))
+                    for entry in stale[:5]
+                )
+                + "; reexecute as verificações no estado final e registre novo checkpoint"
+            )
+        not_passed = [
+            entry
+            for entry in current_evidence.values()
+            if entry["status"] != "passed"
+        ]
+        if not_passed:
+            problems.append(
+                "evidência atual não aprovada: "
+                + "; ".join(
+                    f"{entry.get('command') or entry.get('evidence')} ({entry['status']})"
+                    for entry in not_passed[:5]
+                )
+            )
+        passed_commands = {
+            key[1]
+            for key, entry in current_evidence.items()
+            if key[0] == "command" and entry["status"] == "passed"
+        }
+        unknown_waivers = sorted(set(waived) - set(state["verification_commands"]))
+        if unknown_waivers:
+            problems.append(
+                "dispensa não corresponde a comando planejado: "
+                + ", ".join(unknown_waivers)
+            )
+        missing_commands = [
+            command
+            for command in state["verification_commands"]
+            if command not in passed_commands and command not in waived
+        ]
+        if missing_commands:
+            problems.append(
+                "comando de verificação planejado sem evidência aprovada: "
+                + ", ".join(missing_commands)
+                + "; registre evidência estruturada ou dispense explicitamente com "
+                "--waive-verification 'comando: justificativa'"
+            )
+        if not behaviors:
+            problems.append("informe ao menos um comportamento entregue com --behavior")
+        if state["blockers"]:
+            problems.append(
+                "bloqueios abertos impedem conclusão: " + ", ".join(state["blockers"][:5])
+            )
+        _, observed_paths = direct_git_status(root)
+        recorded = set(state["changed_files"])
+        unknown_accepted = sorted(set(accepted) - set(observed_paths))
+        if unknown_accepted:
+            problems.append(
+                "aceite não corresponde a alteração observada: "
+                + ", ".join(unknown_accepted)
+            )
+        unrecorded = sorted(set(observed_paths) - recorded - set(accepted))
+        if unrecorded:
+            problems.append(
+                "alterações não registradas no resultado: "
+                + ", ".join(unrecorded[:8])
+                + "; registre com checkpoint --changed-file ou aceite explicitamente "
+                "com --accept-unrecorded 'caminho: justificativa'"
+            )
+        if problems:
+            raise BMError(
+                "BLOQUEADO: conclusão sem verificação suficiente:\n- " + "\n- ".join(problems),
+                EXIT_BLOCKED,
+            )
+        if accepted:
+            state["changed_files"] = sorted(recorded | set(accepted))
+            limitations = limitations + [
+                f"Alteração não registrada aceita: {path} — {justification}"
+                for path, justification in sorted(accepted.items())
+            ]
+        if waived:
+            limitations = limitations + [
+                f"Comando de verificação dispensado: {command} — {justification}"
+                for command, justification in sorted(waived.items())
+            ]
+    else:
+        merged_blockers = state["blockers"] + [
+            item for item in blockers if item not in state["blockers"]
+        ]
+        if not merged_blockers and not limitations:
+            raise BMError(
+                f"BLOQUEADO: status {status} exige motivo registrado via --blocker "
+                "ou --limitation",
+                EXIT_BLOCKED,
+            )
+        state["blockers"] = merged_blockers
+    verification_results = verification_results + [
+        (
+            f"{entry['kind']}: {entry.get('command') or entry.get('evidence')} — "
+            f"{entry['status']} — {entry['summary']}"
+        )
+        for entry in current_evidence.values()
+    ]
     state["status"] = status
     if status == "escalated":
         state["mode"] = "escalated"
@@ -2416,6 +2852,40 @@ def direct_finish(
     (directory / "PROGRESS.md").write_text(render_direct_progress(state), encoding="utf-8")
     (directory / "RESULT.md").write_text(render_direct_result(state), encoding="utf-8")
     return direct_payload(state, directory)
+
+
+def direct_reopen(repo: Path, slug: str, next_action: str) -> dict[str, Any]:
+    root = direct_repo(repo)
+    state = read_direct_state(root, slug)
+    if state["status"] == "active":
+        raise BMError("execução direta já está ativa; reabertura desnecessária")
+    if state["status"] == "escalated":
+        raise BMError(
+            "BLOQUEADO: execução escalada não pode ser reaberta nem concluída; "
+            "use um novo slug ou continue em /sdd-planning",
+            EXIT_BLOCKED,
+        )
+    if state["status"] == "completed":
+        raise BMError(
+            "BLOQUEADO: execução concluída é imutável; use um novo slug",
+            EXIT_BLOCKED,
+        )
+    ensure_direct_branch(root, state)
+    directory = direct_directory(root, slug)
+    reopen_count = int(state.get("reopen_count", 0)) + 1
+    previous_result = directory / "RESULT.md"
+    if previous_result.is_file():
+        archive = directory / f"RESULT-{reopen_count:02d}-{state['status']}.md"
+        archive.write_bytes(previous_result.read_bytes())
+    state["reopen_count"] = reopen_count
+    state["status"] = "active"
+    state["next_action"] = next_action
+    state["git_status"], _ = direct_git_status(root)
+    state["updated_at"] = datetime.now(timezone.utc).isoformat()
+    write_direct_state(root, state)
+    (directory / "PROGRESS.md").write_text(render_direct_progress(state), encoding="utf-8")
+    (directory / "RESULT.md").write_text(render_direct_result(state), encoding="utf-8")
+    return {**direct_payload(state, directory), "reopened": True, "reopen_count": reopen_count}
 
 
 def state_summary(path: Path, root: Path | None = None) -> dict[str, Any]:
@@ -2638,12 +3108,15 @@ def parser() -> argparse.ArgumentParser:
         telemetry.add_argument(f"--{metric.replace('_', '-')}", type=int, default=0)
 
     direct = commands.add_parser("direct")
-    direct.add_argument("action", choices=["start", "status", "checkpoint", "finish"])
+    direct.add_argument(
+        "action", choices=["start", "status", "checkpoint", "finish", "reopen"]
+    )
     direct.add_argument("--repo", type=Path, default=Path.cwd())
     direct.add_argument("--slug")
     direct.add_argument("--objective")
     direct.add_argument("--scope")
-    direct.add_argument("--current-state", default="Arquitetura existente a confirmar por leitura localizada.")
+    direct.add_argument("--current-state")
+    direct.add_argument("--update-brief", action="store_true")
     direct.add_argument("--acceptance", action="append", default=[])
     direct.add_argument("--non-objective", action="append", default=[])
     direct.add_argument("--likely-file", action="append", default=[])
@@ -2688,6 +3161,9 @@ def parser() -> argparse.ArgumentParser:
     direct.add_argument("--behavior", action="append", default=[])
     direct.add_argument("--limitation", action="append", default=[])
     direct.add_argument("--out-of-scope", action="append", default=[])
+    direct.add_argument("--accept-unrecorded", action="append", default=[])
+    direct.add_argument("--evidence", action="append", default=[])
+    direct.add_argument("--waive-verification", action="append", default=[])
 
     summary = commands.add_parser("status")
     summary.add_argument("state", type=Path)
@@ -2792,8 +3268,10 @@ def main() -> int:
                 emit(telemetry_summary(args.state, args.root))
         elif args.command == "direct":
             if args.action == "start":
-                if not all((args.slug, args.objective, args.scope)):
-                    raise BMError("direct start exige --slug, --objective e --scope")
+                if not all((args.slug, args.objective, args.scope, args.current_state)):
+                    raise BMError(
+                        "direct start exige --slug, --objective, --scope e --current-state"
+                    )
                 if not args.acceptance or not args.verification:
                     raise BMError(
                         "direct start exige ao menos um --acceptance e um --verification"
@@ -2818,10 +3296,15 @@ def main() -> int:
                         args.related_change,
                         args.executed_commands,
                         args.result_entry,
+                        args.update_brief,
                     )
                 )
             elif args.action == "status":
                 emit(direct_status(args.repo, args.slug))
+            elif args.action == "reopen":
+                if not all((args.slug, args.next_action)):
+                    raise BMError("direct reopen exige --slug e --next-action")
+                emit(direct_reopen(args.repo, args.slug, args.next_action))
             elif args.action == "checkpoint":
                 if not all((args.slug, args.checkpoint, args.next_action)):
                     raise BMError(
@@ -2838,6 +3321,7 @@ def main() -> int:
                         args.verification[0] if args.verification else "pending",
                         args.next_action,
                         args.blocker,
+                        args.evidence,
                     )
                 )
             else:
@@ -2853,6 +3337,9 @@ def main() -> int:
                         args.limitation,
                         args.out_of_scope,
                         args.next_action,
+                        args.blocker,
+                        args.accept_unrecorded,
+                        args.waive_verification,
                     )
                 )
         elif args.command == "status":

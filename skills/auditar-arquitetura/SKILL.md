@@ -1,6 +1,7 @@
 ---
 name: auditar-arquitetura
 description: Use somente quando o usuário invocar /auditar-arquitetura ou pedir explicitamente uma auditoria arquitetural do Bianchini Method. É manual e não ativa por risco, perfil Full ou simples presença de method_version 2.
+disable-model-invocation: true
 ---
 
 # Auditar Arquitetura
@@ -48,6 +49,8 @@ Procurar oportunidades locais e verificáveis em:
 - duplicação ou abstração que aumente custo real de mudança.
 
 Evitar reescrita ampla, arquitetura futura e preferência estética. Uma proposta deve reduzir um custo ou risco observado.
+
+Quando o delta tocar autenticação, autorização, pagamentos, segredos ou outra área sensível, a análise de trust boundaries pode seguir o contrato somente leitura [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md), passando ao subagente apenas o caminho do contrato, os arquivos do delta e o caminho do parecer; não copiar o conteúdo do contrato para o prompt.
 
 ## Classificação dos candidatos
 

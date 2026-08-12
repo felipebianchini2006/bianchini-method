@@ -59,6 +59,8 @@ Executar apenas lacunas do mapa:
 
 Preservar sessão por perfil. Preferir seletor acessível/estável; coordenada é último fallback. Evidência deve ser sanitizada.
 
+Somente quando o escopo aprovado possuir UI, design importado, brand kit ou critérios visuais, aplicar o gate de acabamento do contrato [`../_shared/agents/ui-finish-reviewer.md`](../_shared/agents/ui-finish-reviewer.md), que retorna `PASS` ou `HOLD` com evidência, mudança objetiva e condição de reteste. Não executá-lo em API, CLI ou serviço sem interface. Passar ao subagente apenas o caminho do contrato, as telas/fluxos do RC e o caminho do arquivo de evidências; não copiar o conteúdo do contrato.
+
 Não alegar plataforma `not_run`. Fake não prova integração externa indispensável.
 
 ## 5. Triagem, fix e reteste

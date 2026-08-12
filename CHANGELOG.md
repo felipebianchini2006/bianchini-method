@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.5.3 — Evidência vinculada ao brief e ao estado final do código
+
+- cada evidência registrada em checkpoint é carimbada com o digest do brief atual e um fingerprint da árvore de trabalho (`HEAD` + diff + conteúdo de arquivos não rastreados);
+- `finish --status completed` bloqueia evidência obsoleta: brief atualizado ou código alterado depois do registro exige reexecutar as verificações e registrar novo checkpoint;
+- `--update-brief` invalida explicitamente `verification` e `evidence`, registrando o fato nos resultados;
+- evidências visuais/manuais aceitam `check_id`: nova tentativa do mesmo check substitui a anterior em vez de manter uma falha antiga bloqueando.
+
+## 2.5.2 — Evidência estruturada na execução direta
+
+- substitui o parsing textual de evidência por registros estruturados em `checkpoint --evidence` (JSON com `kind`, `status`, `summary`, `command`/`exit_code` ou `evidence`), eliminando falsos positivos como "Found 0 errors" e falsos negativos como "exit code 1";
+- `status: passed` em evidência de comando exige `exit_code: 0`; inconsistência é rejeitada na entrada;
+- `checkpoint --verification passed` sem evidência aprovada registrada é bloqueado;
+- `finish --status completed` usa somente a evidência estruturada salva: cada comando planejado no brief precisa da evidência mais recente aprovada ou de dispensa explícita `--waive-verification "comando: justificativa"` registrada nas limitações; evidência atual `failed`/`blocked`/`not_run` bloqueia;
+- resumos das evidências atuais entram automaticamente no `RESULT.md`;
+- `executar-plano` passa a entregar explicitamente o caminho do arquivo de saída ao `plan-reviewer` e ao `security-reviewer`, mantendo o relatório completo fora do contexto.
+
+## 2.5.1 — Correções adversariais da execução direta
+
+- evidência que relata falha (`falhou`, `failed`, `erro`, `não passou`, `timeout`, `cancelado`) não sustenta mais `--status completed`, mesmo contendo palavra de ferramenta;
+- conclusão compara o `git status` com `changed_files` e bloqueia alterações não registradas; aceite explícito exige `--accept-unrecorded "caminho: justificativa"` e fica registrado nas limitações e no `RESULT.md`;
+- `--blocker` passa a ser aplicado no `direct finish`; `blocked` e `escalated` exigem motivo registrado via `--blocker` ou `--limitation`;
+- contratos internos passam a exigir relatório completo em arquivo e retorno curto ao orquestrador (veredito, contagem por severidade e caminho);
+- cache do `repo-cartographer` ganha chave composta `<hash-do-HEAD>-<digest-do-escopo>`, evitando reutilizar cartografia de outro escopo no mesmo commit.
+
+## 2.5.0 — Execução direta endurecida e contratos internos de subagentes
+
+- `direct start` registra `/.superpowers/` em `.git/info/exclude` sem alterar o `.gitignore` do projeto e confirma que o scratch não aparece no `git status`;
+- `direct finish --status completed` exige estado `active`, verificação `passed`, evidência reconhecida, comportamento entregue e ausência de bloqueio aberto;
+- `completed`, `blocked` e `escalated` tornam-se estados terminais; escalado nunca vira concluído; `direct reopen` reabre somente `blocked` preservando o resultado anterior;
+- o brief ganha digest de identidade completo; retomada com digest divergente bloqueia e pede novo slug ou `--update-brief` explícito;
+- `--current-state` passa a ser obrigatório e rejeita texto genérico;
+- `executar-direto` e `auditar-arquitetura` ficam restritos a invocação manual (`disable-model-invocation` e `allow_implicit_invocation: false`);
+- adiciona cinco contratos internos em `skills/_shared/agents/` (repo-cartographer, implementation-worker, plan-reviewer, security-reviewer, ui-finish-reviewer), referenciados por caminho pelas skills do método completo e adaptados do Agency Agents (MIT, `THIRD_PARTY_NOTICES.md`);
+- `/executar-direto` permanece com zero subagentes e sem o catálogo de contratos.
+
 ## 2.4.3 — Hardening cirúrgico de estado e planejamento
 
 - bloqueia estado corrompido ou ambíguo sem evidência legado;

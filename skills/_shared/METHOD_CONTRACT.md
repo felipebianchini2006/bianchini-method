@@ -7,13 +7,16 @@ Referência normativa das sete skills. Use [`scripts/bm.py`](scripts/bm.py) para
 `/executar-direto` é um fluxo independente e opt-in para uma entrega única, coesa e de risco baixo ou médio localizado. Ele não altera o roteamento v1/v2, não cria `PROJECT_STATE.md` e não invoca Superpowers. O CLI mantém `BRIEF.md`, `PROGRESS.md`, `RESULT.md` e estado mínimo em `.superpowers/bianchini/direct/<slug>/`, sempre ignorado pelo Git e confinado ao repositório.
 
 ```bash
-bm.py direct start --repo <repo> --slug <slug> --objective <objetivo> --scope <escopo> --acceptance <critério> --verification <comando>
+bm.py direct start --repo <repo> --slug <slug> --objective <objetivo> --scope <escopo> --current-state <síntese factual> --acceptance <critério> --verification <comando>
 bm.py direct status --repo <repo> [--slug <slug>]
 bm.py direct checkpoint --repo <repo> --slug <slug> --checkpoint <marco> --next-action <ação>
 bm.py direct finish --repo <repo> --slug <slug> --status completed --next-action <ação>
+bm.py direct reopen --repo <repo> --slug <slug> --next-action <ação>   # somente execução blocked
 ```
 
-O início bloqueia detached HEAD e alterações não reconhecidas, cria `bm/direct/<slug>` quando necessário e escala hazards estruturais para `/sdd-planning` antes de implementar o risco. Não cria worktree, planos, spec, auditoria, homologação completa ou manual.
+O início bloqueia detached HEAD e alterações não reconhecidas, registra `/.superpowers/` em `.git/info/exclude` sem tocar o `.gitignore` do projeto, confirma que o scratch não aparece no `git status`, cria `bm/direct/<slug>` quando necessário e escala hazards estruturais para `/sdd-planning` antes de implementar o risco. Não cria worktree, planos, spec, auditoria, homologação completa ou manual.
+
+O brief tem identidade por digest (objetivo, estado atual, escopo, não objetivos, aceite, risco, tipo de mudança, hazards, subsistemas e comandos de verificação): retomada exige digest igual; digest diferente bloqueia e pede novo slug ou `--update-brief` explícito. `finish --status completed` usa evidência estruturada registrada por `checkpoint --evidence` (JSON com `kind`, `status`, `summary`, e `command`/`exit_code` ou `evidence`): exige estado `active`, verificação `passed`, todos os comandos planejados cobertos por evidência aprovada com `exit_code: 0` ou dispensados via `--waive-verification "comando: justificativa"`, nenhuma evidência atual `failed`/`blocked`/`not_run` nem obsoleta (cada evidência é carimbada com digest do brief e fingerprint da árvore; brief ou código alterado depois do registro invalida a prova, e `--update-brief` zera verificação e evidências), ao menos um comportamento entregue, nenhum bloqueio aberto e nenhuma alteração fora de `changed_files` (aceite explícito só com `--accept-unrecorded "caminho: justificativa"`). `blocked` e `escalated` exigem motivo via `--blocker` ou `--limitation`. `completed`, `blocked` e `escalated` são terminais; escalado nunca vira concluído; apenas `blocked` pode ser reaberto preservando o resultado anterior.
 
 ## Roteamento v1/v2
 

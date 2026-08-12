@@ -191,6 +191,7 @@ class PackageIntegrityTests(unittest.TestCase):
             "WorkspaceAndArtifactScenarios",
             "BehavioralProjectScenarios",
             "DirectExecutionScenarios",
+            "AgentContractScenarios",
             "SkillBehaviorContracts",
         ):
             self.assertIn(f'"{class_name}"', runner)
@@ -1976,6 +1977,8 @@ class DirectExecutionScenarios(unittest.TestCase):
             "Entregar painel pequeno e coeso",
             "--scope",
             "Um painel com um fluxo principal",
+            "--current-state",
+            "App base com app.txt versionado e sem painel implementado",
             "--acceptance",
             "O fluxo principal funciona",
             "--verification",
@@ -2107,6 +2110,8 @@ class DirectExecutionScenarios(unittest.TestCase):
                 "src/dashboard.ts",
                 "--command",
                 "npm test -- dashboard",
+                "--evidence",
+                self.EVIDENCE_PASSED,
                 "--verification",
                 "passed",
                 "--next-action",
@@ -2131,11 +2136,44 @@ class DirectExecutionScenarios(unittest.TestCase):
             self.assertEqual(wrong_branch.returncode, 4)
             self.assertIn("pertence à branch", wrong_branch.stderr)
 
+    EVIDENCE_PASSED = json.dumps(
+        {
+            "kind": "command",
+            "command": "python3 -m unittest",
+            "exit_code": 0,
+            "status": "passed",
+            "summary": "mypy: Found 0 errors in 10 source files; suite verde",
+        }
+    )
+
+    def checkpoint_passed(self, repo: Path, slug: str = "small-dashboard") -> None:
+        cli_json(
+            "direct",
+            "checkpoint",
+            "--repo",
+            str(repo),
+            "--slug",
+            slug,
+            "--checkpoint",
+            "Implementação e verificação concluídas",
+            "--command",
+            "python3 -m unittest",
+            "--result-entry",
+            "Suite passou",
+            "--evidence",
+            self.EVIDENCE_PASSED,
+            "--verification",
+            "passed",
+            "--next-action",
+            "Concluir",
+        )
+
     def test_finish_writes_result_without_project_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
             init_repo(repo)
             self.start(repo)
+            self.checkpoint_passed(repo)
             finished = cli_json(
                 "direct",
                 "finish",
@@ -2199,6 +2237,737 @@ class DirectExecutionScenarios(unittest.TestCase):
             self.assertEqual(escaped.returncode, 2)
             self.assertFalse((outside / "bianchini").exists())
 
+    def test_scratch_is_excluded_via_git_info_without_touching_gitignore(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            repo.mkdir(parents=True)
+            git(repo, "init", "-b", "main")
+            git(repo, "config", "user.name", "Bianchini Test")
+            git(repo, "config", "user.email", "test@example.invalid")
+            (repo / "app.txt").write_text("base\n", encoding="utf-8")
+            git(repo, "add", "app.txt")
+            git(repo, "commit", "-m", "initial")
+            result = self.start(repo)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(git(repo, "status", "--porcelain"), "")
+            exclude = repo / ".git/info/exclude"
+            self.assertIn("/.superpowers/", read(exclude))
+            self.assertFalse((repo / ".gitignore").exists())
+            scratch = repo / ".superpowers/bianchini/direct/small-dashboard"
+            for name in ("BRIEF.md", "PROGRESS.md", "RESULT.md", ".state.json"):
+                self.assertTrue((scratch / name).is_file())
+
+    def test_completed_requires_structured_passed_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            finish_args = (
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            pending = cli(*finish_args, "--verification", "testes passaram")
+            self.assertEqual(pending.returncode, 3)
+            self.assertIn("conclusão sem verificação suficiente", pending.stderr)
+            self.assertIn("evidência estruturada", pending.stderr)
+
+            no_proof = cli(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Tentativa sem prova",
+                "--verification",
+                "passed",
+                "--next-action",
+                "Concluir",
+            )
+            self.assertEqual(no_proof.returncode, 3)
+            self.assertIn("exige ao menos uma evidência estruturada aprovada", no_proof.stderr)
+
+            self.checkpoint_passed(repo)
+            free_text_only = cli_json(
+                *finish_args, "--verification", "narrativa livre não decide o gate"
+            )
+            self.assertEqual(free_text_only["status"], "completed")
+            result_text = read(Path(free_text_only["result"]))
+            self.assertIn("command: python3 -m unittest — passed", result_text)
+            self.assertIn("0 errors", result_text)
+
+    def test_structured_evidence_rejects_inconsistent_or_failed_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            checkpoint_args = (
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Verificação executada",
+                "--next-action",
+                "Continuar",
+            )
+            inconsistent = cli(
+                *checkpoint_args,
+                "--evidence",
+                json.dumps(
+                    {
+                        "kind": "command",
+                        "command": "pytest",
+                        "exit_code": 1,
+                        "status": "passed",
+                        "summary": "pytest exit code 1",
+                    }
+                ),
+            )
+            self.assertEqual(inconsistent.returncode, 2)
+            self.assertIn("exit_code 0", inconsistent.stderr)
+
+            malformed = cli(*checkpoint_args, "--evidence", "não é json")
+            self.assertEqual(malformed.returncode, 2)
+            self.assertIn("JSON válido", malformed.stderr)
+
+            missing_ref = cli(
+                *checkpoint_args,
+                "--evidence",
+                json.dumps(
+                    {"kind": "browser", "status": "passed", "summary": "smoke ok"}
+                ),
+            )
+            self.assertEqual(missing_ref.returncode, 2)
+            self.assertIn("campo evidence", missing_ref.stderr)
+
+            failed_run = cli_json(
+                *checkpoint_args,
+                "--evidence",
+                json.dumps(
+                    {
+                        "kind": "command",
+                        "command": "python3 -m unittest",
+                        "exit_code": 1,
+                        "status": "failed",
+                        "summary": "2 falhas na suite",
+                    }
+                ),
+            )
+            self.assertEqual(failed_run["verification"], "pending")
+            blocked = cli(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(blocked.returncode, 3)
+            self.assertIn("evidência atual não aprovada", blocked.stderr)
+            self.checkpoint_passed(repo)
+            recovered = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(recovered["status"], "completed")
+
+    def test_planned_commands_must_be_proven_or_waived(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            cli_json(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Smoke visual executado",
+                "--evidence",
+                json.dumps(
+                    {
+                        "kind": "browser",
+                        "status": "passed",
+                        "evidence": "artifacts/smoke/dashboard.png",
+                        "summary": "Jornada principal concluída",
+                    }
+                ),
+                "--verification",
+                "passed",
+                "--next-action",
+                "Concluir",
+            )
+            finish_args = (
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            unproven = cli(*finish_args)
+            self.assertEqual(unproven.returncode, 3)
+            self.assertIn("comando de verificação planejado sem evidência", unproven.stderr)
+            self.assertIn("python3 -m unittest", unproven.stderr)
+
+            wrong_waiver = cli(
+                *finish_args, "--waive-verification", "npm test: não existe no plano"
+            )
+            self.assertEqual(wrong_waiver.returncode, 3)
+            self.assertIn("dispensa não corresponde", wrong_waiver.stderr)
+
+            waived = cli_json(
+                *finish_args,
+                "--waive-verification",
+                "python3 -m unittest: coberto pelo smoke de browser registrado",
+            )
+            self.assertEqual(waived["status"], "completed")
+            result_text = read(Path(waived["result"]))
+            self.assertIn("Comando de verificação dispensado", result_text)
+            self.assertIn("artifacts/smoke/dashboard.png", result_text)
+
+    def test_completed_blocks_unrecorded_changes_until_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            (repo / "app.txt").write_text("base\npainel\n", encoding="utf-8")
+            (repo / "extra.txt").write_text("sobrou\n", encoding="utf-8")
+            cli_json(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Painel implementado",
+                "--changed-file",
+                "app.txt",
+                "--command",
+                "python3 -m unittest",
+                "--result-entry",
+                "Suite passou",
+                "--evidence",
+                self.EVIDENCE_PASSED,
+                "--verification",
+                "passed",
+                "--next-action",
+                "Concluir",
+            )
+            finish_args = (
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--verification",
+                "testes e build passaram",
+                "--next-action",
+                "Revisar",
+            )
+            blocked = cli(*finish_args)
+            self.assertEqual(blocked.returncode, 3)
+            self.assertIn("alterações não registradas", blocked.stderr)
+            self.assertIn("extra.txt", blocked.stderr)
+
+            malformed = cli(*finish_args, "--accept-unrecorded", "extra.txt")
+            self.assertEqual(malformed.returncode, 2)
+            self.assertIn("caminho: justificativa", malformed.stderr)
+
+            wrong_path = cli(
+                *finish_args, "--accept-unrecorded", "outro.txt: não existe"
+            )
+            self.assertEqual(wrong_path.returncode, 3)
+            self.assertIn("aceite não corresponde", wrong_path.stderr)
+
+            accepted = cli_json(
+                *finish_args,
+                "--accept-unrecorded",
+                "extra.txt: artefato local de build, fora do escopo",
+            )
+            self.assertEqual(accepted["status"], "completed")
+            result_text = read(Path(accepted["result"]))
+            self.assertIn("extra.txt", result_text)
+            self.assertIn("artefato local de build", result_text)
+
+    def test_finish_records_blocker_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            missing_reason = cli(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "blocked",
+                "--next-action",
+                "Aguardar",
+            )
+            self.assertEqual(missing_reason.returncode, 3)
+            self.assertIn("exige motivo", missing_reason.stderr)
+
+            finished = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "blocked",
+                "--blocker",
+                "credencial externa ausente",
+                "--next-action",
+                "Aguardar credencial",
+            )
+            self.assertEqual(finished["status"], "blocked")
+            self.assertIn("credencial externa ausente", finished["blockers"])
+            self.assertIn("credencial externa ausente", read(Path(finished["result"])))
+
+    def test_terminal_states_are_immutable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            self.checkpoint_passed(repo)
+            cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--verification",
+                "testes e build passaram",
+                "--next-action",
+                "Revisar",
+            )
+            again = cli(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "blocked",
+                "--next-action",
+                "Nada",
+            )
+            self.assertEqual(again.returncode, 3)
+            self.assertIn("estado terminal", again.stderr)
+            resumed = self.start(repo)
+            self.assertEqual(resumed.returncode, 3)
+            self.assertIn("estado terminal", resumed.stderr)
+            reopened = cli(
+                "direct",
+                "reopen",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--next-action",
+                "Retomar",
+            )
+            self.assertEqual(reopened.returncode, 3)
+            self.assertIn("imutável", reopened.stderr)
+
+    def test_escalated_execution_cannot_become_completed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "escalated",
+                "--blocker",
+                "complexidade estrutural descoberta",
+                "--next-action",
+                "Executar /sdd-planning",
+            )
+            completed = cli(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--verification",
+                "testes passaram",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(completed.returncode, 3)
+            self.assertIn("estado terminal", completed.stderr)
+            reopened = cli(
+                "direct",
+                "reopen",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--next-action",
+                "Retomar",
+            )
+            self.assertEqual(reopened.returncode, 3)
+            self.assertIn("escalada", reopened.stderr)
+
+    def test_blocked_execution_reopens_preserving_previous_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "blocked",
+                "--limitation",
+                "Aguardando credencial",
+                "--next-action",
+                "Aguardar credencial",
+            )
+            reopened = cli_json(
+                "direct",
+                "reopen",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--next-action",
+                "Retomar com credencial",
+            )
+            self.assertEqual(reopened["status"], "active")
+            scratch = repo / ".superpowers/bianchini/direct/small-dashboard"
+            self.assertTrue((scratch / "RESULT-01-blocked.md").is_file())
+            self.checkpoint_passed(repo)
+            finished = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--verification",
+                "testes e build passaram",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(finished["status"], "completed")
+
+    def test_brief_identity_change_invalidates_resume(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            same = self.start(repo)
+            self.assertEqual(same.returncode, 0, same.stderr)
+            self.assertTrue(json.loads(same.stdout)["resumed"])
+            changed = self.start(repo, "small-dashboard", "medium")
+            self.assertEqual(changed.returncode, 3)
+            self.assertIn("digest do brief divergente", changed.stderr)
+            self.assertIn("novo slug", changed.stderr)
+            updated = self.start(
+                repo, "small-dashboard", "medium", "behavioral", "--update-brief"
+            )
+            self.assertEqual(updated.returncode, 0, updated.stderr)
+            payload = json.loads(updated.stdout)
+            self.assertTrue(payload["resumed"])
+            self.assertEqual(payload["risk"], "medium")
+            self.assertEqual(payload["verification"], "pending")
+
+    def test_update_brief_invalidates_previous_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            self.checkpoint_passed(repo)
+            updated = self.start(
+                repo, "small-dashboard", "medium", "behavioral", "--update-brief"
+            )
+            self.assertEqual(updated.returncode, 0, updated.stderr)
+            blocked = cli(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(blocked.returncode, 3)
+            self.assertIn("evidência estruturada", blocked.stderr)
+            self.checkpoint_passed(repo)
+            recovered = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(recovered["status"], "completed")
+
+    def test_code_changed_after_evidence_blocks_completion(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            self.checkpoint_passed(repo)
+            (repo / "app.txt").write_text("base\nalterado depois do teste\n", encoding="utf-8")
+            cli_json(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Ajuste tardio registrado",
+                "--changed-file",
+                "app.txt",
+                "--verification",
+                "passed",
+                "--next-action",
+                "Concluir",
+            )
+            stale = cli(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(stale.returncode, 3)
+            self.assertIn("evidência obsoleta", stale.stderr)
+            self.checkpoint_passed(repo)
+            recovered = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(recovered["status"], "completed")
+
+    def test_visual_retry_with_check_id_replaces_previous_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            self.start(repo)
+            cli_json(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Primeira tentativa visual",
+                "--evidence",
+                json.dumps(
+                    {
+                        "kind": "screenshot",
+                        "check_id": "dashboard-smoke",
+                        "status": "failed",
+                        "evidence": "artifacts/smoke/tentativa-a.png",
+                        "summary": "Layout quebrado na tentativa A",
+                    }
+                ),
+                "--next-action",
+                "Corrigir layout",
+            )
+            cli_json(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--checkpoint",
+                "Segunda tentativa visual",
+                "--evidence",
+                json.dumps(
+                    {
+                        "kind": "screenshot",
+                        "check_id": "dashboard-smoke",
+                        "status": "passed",
+                        "evidence": "artifacts/smoke/tentativa-b.png",
+                        "summary": "Jornada principal concluída",
+                    }
+                ),
+                "--verification",
+                "passed",
+                "--next-action",
+                "Concluir",
+            )
+            finished = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                "small-dashboard",
+                "--status",
+                "completed",
+                "--behavior",
+                "Painel entregue",
+                "--waive-verification",
+                "python3 -m unittest: coberto pelo smoke visual dashboard-smoke",
+                "--next-action",
+                "Revisar",
+            )
+            self.assertEqual(finished["status"], "completed")
+            result_text = read(Path(finished["result"]))
+            self.assertIn("tentativa-b.png", result_text)
+            self.assertNotIn("tentativa-a.png", result_text)
+
+    def test_current_state_is_mandatory_and_rejects_generic_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            missing = cli(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--slug",
+                "sem-estado",
+                "--objective",
+                "Entregar algo",
+                "--scope",
+                "Escopo coeso",
+                "--acceptance",
+                "Funciona",
+                "--verification",
+                "python3 -m unittest",
+            )
+            self.assertEqual(missing.returncode, 2)
+            self.assertIn("--current-state", missing.stderr)
+        for generic in (
+            "Arquitetura existente a confirmar por leitura localizada.",
+            "Estado não analisado ainda",
+            "Arquitetura a verificar depois",
+        ):
+            with self.subTest(generic=generic), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                init_repo(repo)
+                rejected = cli(
+                    "direct",
+                    "start",
+                    "--repo",
+                    str(repo),
+                    "--slug",
+                    "generico",
+                    "--objective",
+                    "Entregar algo",
+                    "--scope",
+                    "Escopo coeso",
+                    "--current-state",
+                    generic,
+                    "--acceptance",
+                    "Funciona",
+                    "--verification",
+                    "python3 -m unittest",
+                )
+                self.assertEqual(rejected.returncode, 2)
+                self.assertIn("síntese factual", rejected.stderr)
+
     def test_skill_contract_is_explicit_lightweight_and_has_no_external_agents(self) -> None:
         direct = read(SKILLS["executar-direto"])
         metadata = frontmatter(direct)
@@ -2235,6 +3004,127 @@ class DirectExecutionScenarios(unittest.TestCase):
         self.assertIn("bm.py direct status", status_skill)
         self.assertIn("Modo: direto", status_skill)
         self.assertIn("antes de exigir `PROJECT_STATE.md`", status_skill)
+
+
+class AgentContractScenarios(unittest.TestCase):
+    NAMES = (
+        "repo-cartographer",
+        "implementation-worker",
+        "plan-reviewer",
+        "security-reviewer",
+        "ui-finish-reviewer",
+    )
+    CONTRACTS = {
+        name: ROOT / "skills/_shared/agents" / f"{name}.md" for name in NAMES
+    }
+
+    def test_contracts_exist_are_lean_and_generic(self) -> None:
+        for name, path in self.CONTRACTS.items():
+            with self.subTest(contract=name):
+                self.assertTrue(path.is_file())
+                content = read(path)
+                for section in (
+                    "## Gatilho",
+                    "## Entradas",
+                    "## Responsabilidade",
+                    "## Proibições",
+                    "## Saída",
+                    "## Critério de conclusão",
+                ):
+                    self.assertIn(section, content)
+                words = len(re.findall(r"\b[\wÀ-ÿ-]+\b", content))
+                self.assertLessEqual(words, 350, f"{name}: {words} palavras")
+                for forbidden in ("vibe", "personalidade", "emoji", "🧠", "🎯"):
+                    self.assertNotIn(forbidden, content.lower())
+
+    def test_direct_mode_keeps_zero_subagents_and_no_catalog(self) -> None:
+        direct = read(SKILLS["executar-direto"])
+        self.assertIn("zero subagentes", direct)
+        self.assertIn("o modo direto não os carrega", direct)
+        self.assertIn("não usa o catálogo Agency Agents", direct)
+
+    def test_architecture_audit_requires_explicit_invocation(self) -> None:
+        metadata = frontmatter(read(SKILLS["auditar-arquitetura"]))
+        self.assertEqual(metadata.get("disable-model-invocation"), "true")
+        agent_config = read(ROOT / "skills/auditar-arquitetura/agents/openai.yaml")
+        self.assertIn("allow_implicit_invocation: false", agent_config)
+
+    def test_cartographer_scoped_to_planning_with_head_cache(self) -> None:
+        planning = read(SKILLS["sdd-planning"])
+        self.assertIn("../_shared/agents/repo-cartographer.md", planning)
+        self.assertIn("Não usar em projeto novo ou pequeno", planning)
+        self.assertIn("legado relevante", planning)
+        self.assertIn("hash-do-HEAD", planning)
+        self.assertIn("digest-do-escopo", planning)
+        self.assertIn("`HEAD` diferente invalida o cache", planning)
+        contract = read(self.CONTRACTS["repo-cartographer"])
+        self.assertIn("Somente leitura", contract)
+        self.assertIn("Não usar em projeto novo ou pequeno", contract)
+        self.assertIn("hash do `HEAD`", contract)
+        self.assertIn("digest-do-escopo", contract)
+        self.assertIn("propor refatoração", contract)
+
+    def test_reviewer_cadence_matches_execution_modes(self) -> None:
+        executor = read(SKILLS["executar-plano"])
+        self.assertIn("../_shared/agents/implementation-worker.md", executor)
+        self.assertIn("../_shared/agents/plan-reviewer.md", executor)
+        self.assertIn("nunca por microtarefa", executor)
+        contract = read(self.CONTRACTS["plan-reviewer"])
+        self.assertIn("`grouped`: uma revisão no gate do plano", contract)
+        self.assertIn("`slice`: uma revisão por slice", contract)
+        self.assertIn("`strict`: revisão independente por tarefa", contract)
+        self.assertIn("caminho do arquivo de saída da revisão", contract)
+        self.assertIn("contagem por severidade", contract)
+        self.assertIn("o caminho do arquivo de saída da revisão", executor)
+        self.assertIn("caminho do arquivo de saída do parecer", executor)
+        self.assertIn("menor diff correto", read(self.CONTRACTS["implementation-worker"]))
+        for name in self.NAMES:
+            self.assertIn("Retorno ao orquestrador", read(self.CONTRACTS[name]))
+        for risk, review in (("low", "plan_gate"), ("medium", "per_slice"), ("high", "per_task")):
+            with self.subTest(risk=risk):
+                policy = cli_json("policy", "--profile", "standard", "--risk", risk)
+                self.assertEqual(policy["review"], review)
+
+    def test_security_reviewer_only_for_high_risk_sensitive_domains(self) -> None:
+        executor = read(SKILLS["executar-plano"])
+        self.assertIn("../_shared/agents/security-reviewer.md", executor)
+        self.assertIn("risco alto ou crítico", executor)
+        self.assertIn("Não executá-la em tarefa comum", executor)
+        contract = read(self.CONTRACTS["security-reviewer"])
+        self.assertIn("risco alto ou crítico", contract)
+        self.assertIn("Não roda em tarefa comum", contract)
+        for domain in ("autenticação", "pagamentos", "webhooks", "RLS", "segredos"):
+            self.assertIn(domain, contract)
+        self.assertIn("somente leitura", contract)
+        self.assertIn("fix loop existente", contract)
+
+    def test_ui_reviewer_only_with_visual_scope(self) -> None:
+        homologation = read(SKILLS["homologar-sistema"])
+        self.assertIn("../_shared/agents/ui-finish-reviewer.md", homologation)
+        self.assertIn("Não executá-lo em API, CLI ou serviço sem interface", homologation)
+        contract = read(self.CONTRACTS["ui-finish-reviewer"])
+        self.assertIn("Não roda em API, CLI ou serviço sem interface", contract)
+        self.assertIn("`PASS`", contract)
+        self.assertIn("`HOLD`", contract)
+        self.assertIn("condição de reteste", contract)
+        self.assertIn("pesquisar concorrentes", contract)
+
+    def test_no_global_install_and_no_extra_public_skill(self) -> None:
+        expected = {*SKILL_NAMES, "_shared"}
+        actual = {
+            child.name
+            for child in (ROOT / "skills").iterdir()
+            if child.is_dir()
+        }
+        self.assertEqual(actual, expected)
+        self.assertFalse((ROOT / "skills/agency-agents").exists())
+        for path in self.CONTRACTS.values():
+            content = read(path)
+            self.assertNotIn("~/.claude", content)
+            self.assertNotIn("~/.codex", content)
+        notices = read(ROOT / "THIRD_PARTY_NOTICES.md")
+        self.assertIn("Agency Agents", notices)
+        self.assertIn("MIT License", notices)
 
 
 class SkillBehaviorContracts(unittest.TestCase):
