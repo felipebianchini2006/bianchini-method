@@ -45,7 +45,7 @@ Tabela fechada:
 
 `completed` e `stopped` são terminais. Qualquer comando mutável nessas fases falha. Qualquer transição ausente da tabela falha. `parked` não significa concluída; trabalho independente continua.
 
-A parada é isolada por unidade. Enquanto existir qualquer unidade independente executável em qualquer plano aprovado, o scheduler mantém o pool `/root/luna_max` trabalhando e continua o fluxo global. `/root/sol_medium` entra somente para uma revisão crítica ou decisão arquitetural material por vez. `parked`, bloqueio local ou `stopped` de uma unidade não interrompem outras unidades sem dependência. A execução global só termina após entrega concluída ou quando todo trabalho restante estiver terminal ou estacionado sem ação segura disponível.
+A parada é isolada por unidade. Enquanto existir qualquer unidade independente executável em qualquer plano aprovado, o scheduler mantém até cinco atribuições `/root/luna_max` simultâneas e continua o fluxo global. O pool `/root/sol_medium` mantém duas atribuições elegíveis e pode subir para três revisões críticas ou decisões arquiteturais independentes. O scheduler preenche todos os slots seguros disponíveis. `parked`, bloqueio local ou `stopped` de uma unidade não interrompem outras unidades sem dependência. A execução global só termina após entrega concluída ou quando todo trabalho restante estiver terminal ou estacionado sem ação segura disponível.
 
 `gate` e `decision` registram dados sem mudar fase e são aceitos somente enquanto unidade não for terminal. `status` e `migrate` preservam fase; podem validar estado terminal.
 

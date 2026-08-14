@@ -31,7 +31,7 @@ Resolver `scripts/review_guard.py` dentro desta skill. Operar o sidecar somente 
 ## Fluxo
 
 1. Cumprir preflight, rota e aprovação definidos no núcleo.
-2. Ativar `/root/luna_max` como pool principal, criar workers filhos Luna `max` para todas as unidades independentes prontas e usar `/root/sol_medium` no máximo uma tarefa por vez, somente para revisão crítica ou decisão arquitetural material.
+2. Ativar `/root/luna_max` como pool principal com até cinco atribuições simultâneas; usar duas atribuições `/root/sol_medium` quando elegíveis e até três para revisões críticas ou decisões arquiteturais independentes; preencher todos os slots seguros disponíveis.
 3. Implementar cada unidade e criar commit atômico.
 4. Na primeira revisão, congelar blockers e declarar gates pelo comando `freeze`, usando como `unit_identity` o SHA-256 da unidade emitido por `task-brief`.
 5. Após qualquer implementação subsequente, fix ou redesign, usar `submit-delta`. Revisão seguinte só ocorre em `awaiting_review` e cobre blockers congelados abertos e regressões comprovadas do delta.
