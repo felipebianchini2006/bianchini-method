@@ -1,0 +1,6 @@
+interface:
+  display_name: "Executar Plano"
+  short_description: "Desabilitado implicitamente no Codex"
+  default_prompt: "Use $executar-plano-codex all para executar planos aprovados pelo overlay Codex."
+policy:
+  allow_implicit_invocation: false
