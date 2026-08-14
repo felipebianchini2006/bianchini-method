@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -351,6 +352,39 @@ class CodexOverlayPackageTests(unittest.TestCase):
             self.assertIn(included.casefold(), folded)
         for excluded in ("Fix loop", "Breaker", "Redesign", "Paradas"):
             self.assertNotIn(excluded.casefold(), folded)
+
+    def test_core_requires_canonical_subagents_and_maximum_safe_parallelism(self) -> None:
+        core = (OVERLAY / "references/EXECUTION_CORE_CODEX.md").read_text(
+            encoding="utf-8"
+        )
+        skill = (OVERLAY / "SKILL.md").read_text(encoding="utf-8")
+        convergence = (OVERLAY / "references/CODEX_CONVERGENCE.md").read_text(
+            encoding="utf-8"
+        )
+        for agent, model, effort in (
+            ("/root/luna_max", "gpt-5.6-luna", "max"),
+            ("/root/sol_medium", "gpt-5.6-sol", "medium"),
+        ):
+            self.assertIn(agent, core)
+            self.assertIn(agent, skill)
+            self.assertRegex(
+                core,
+                rf"{agent}.*task_name={agent.rsplit('/', 1)[-1]}.*modelo `{re.escape(model)}`.*reasoning effort `{effort}`",
+            )
+        for contract in (
+            "fila global de unidades prontas",
+            "ownership explícito e não sobreposto",
+            "nunca fica ocioso enquanto existir",
+            "não interrompem a fila pronta",
+        ):
+            self.assertIn(contract, core)
+        self.assertIn(
+            "todo trabalho restante estiver terminal ou estacionado", convergence
+        )
+        self.assertNotIn("Quando host suportar subagentes", core)
+        policy = (OVERLAY / "agents/openai.yaml").read_text(encoding="utf-8")
+        for unsupported in ("model:", "reasoning_effort:", "subagents:", "agents:"):
+            self.assertNotIn(unsupported, policy)
 
     def test_codex_activation_policy_is_explicit_and_base_implicit_is_disabled(self) -> None:
         overlay_policy = (OVERLAY / "agents/openai.yaml").read_text(encoding="utf-8")

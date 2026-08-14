@@ -45,6 +45,8 @@ Tabela fechada:
 
 `completed` e `stopped` são terminais. Qualquer comando mutável nessas fases falha. Qualquer transição ausente da tabela falha. `parked` não significa concluída; trabalho independente continua.
 
+A parada é isolada por unidade. Enquanto existir qualquer unidade independente executável em qualquer plano aprovado, o scheduler mantém `/root/luna_max` e `/root/sol_medium` trabalhando e continua o fluxo global. `parked`, bloqueio local ou `stopped` de uma unidade não interrompem outras unidades sem dependência. A execução global só termina após entrega concluída ou quando todo trabalho restante estiver terminal ou estacionado sem ação segura disponível.
+
 `gate` e `decision` registram dados sem mudar fase e são aceitos somente enquanto unidade não for terminal. `status` e `migrate` preservam fase; podem validar estado terminal.
 
 `freeze` cria sidecar e primeira revisão atomicamente. `review` só executa em `awaiting_review`. Fix ou redesign só executam em `review_frozen`. Dois fixes consecutivos sem `submit-delta --kind fix` e `review` intermediários são inválidos. Renomear unidade ou seam não cria nova identidade nem reseta contador.

@@ -29,6 +29,27 @@ Usar `planning_version` do estado. Branch: `bm/<planning_version>-<plan_id>`. En
 
 Aquecer dependências uma vez no workspace com gerenciador e comandos do projeto. Antes de runtime, respeitar `.mise.toml`, `mise.toml` ou configuração equivalente.
 
+## Orquestração obrigatória de subagentes
+
+Em toda execução de plano, inclusive `$executar-plano-codex all`, manter estes dois subagentes canônicos ativos:
+
+- `/root/luna_max`: `task_name=luna_max`, modelo `gpt-5.6-luna`, reasoning effort `max`; lidera implementação, decisões técnicas e unidades de maior risco;
+- `/root/sol_medium`: `task_name=sol_medium`, modelo `gpt-5.6-sol`, reasoning effort `medium`; lidera verificação independente, testes, gates e revisão do resultado.
+
+Se ainda não existirem, criá-los antes da implementação. Se estiverem ociosos, reutilizá-los. Não substituir nomes, modelos ou níveis de esforço e não encerrar um deles enquanto houver trabalho executável. Quando um slot estiver temporariamente indisponível, continuar no coordenador e enfileirar o próximo dispatch para o subagente canônico assim que o slot liberar.
+
+Maximizar paralelismo seguro em todos os planos aprovados:
+
+1. construir uma fila global de unidades prontas a partir das dependências dos planos;
+2. distribuir imediatamente unidades independentes entre `/root/luna_max`, `/root/sol_medium` e o coordenador;
+3. atribuir ownership explícito e não sobreposto de arquivos, seams ou worktrees;
+4. usar worktree distinta por plano e nunca editar o mesmo arquivo concorrentemente;
+5. iniciar revisão, gates, documentação ou próxima unidade independente assim que suas entradas estiverem prontas, sem esperar trabalho não relacionado;
+6. quando um subagente concluir, entregar imediatamente a próxima unidade pronta;
+7. manter implementação e revisão do mesmo delta em agentes diferentes quando houver capacidade.
+
+O coordenador nunca fica ocioso enquanto existir unidade, gate, checkpoint ou entrega executável. Falha local, limite de contexto, duração, orçamento interno ou agente indisponível não interrompem a fila pronta: registrar checkpoint, reatribuir ou seguir trabalho independente. Não fazer polling inútil nem repetir operação sem nova evidência.
+
 ## Execução recuperável
 
 No ledger do plano, registrar digest aprovado, base revision, workspace, branch, modo e perfil.
@@ -47,7 +68,7 @@ Retomada começa com `workspace resume`. Ler checkpoint, estado, unidade atual e
 
 Antes da unidade, executar `bm.py policy` com perfil e risco. Confirmar coincidência com `execution` aprovado. Divergência pode aumentar garantia automaticamente; redução exige novo pacote aprovado.
 
-Quando host suportar subagentes, passar ao implementador somente brief, relatório e contexto estritamente necessário. Sem subagentes, cumprir mesma responsabilidade inline.
+Em cada dispatch, passar ao subagente somente brief, relatório, ownership e contexto estritamente necessário. O coordenador mantém a fila global, integra resultados e executa em paralelo outra unidade independente.
 
 ### Grouped — baixo risco
 

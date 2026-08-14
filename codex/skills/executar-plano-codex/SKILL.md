@@ -30,14 +30,15 @@ Resolver `scripts/review_guard.py` dentro desta skill. Operar o sidecar somente 
 
 ## Fluxo
 
-1. Cumprir preflight, rota, aprovação e criação do workspace definidos no núcleo.
-2. Implementar a unidade e criar commit atômico.
-3. Na primeira revisão, congelar blockers e declarar gates pelo comando `freeze`, usando como `unit_identity` o SHA-256 da unidade emitido por `task-brief`.
-4. Após qualquer implementação subsequente, fix ou redesign, usar `submit-delta`. Revisão seguinte só ocorre em `awaiting_review` e cobre blockers congelados abertos e regressões comprovadas do delta.
-5. Seguir `next_action` determinístico do guard. Nunca inventar uma transição.
-6. Registrar gates obrigatórios no sidecar. Concluir somente sem blocker aberto e com todos os gates obrigatórios aprovados.
-7. Continuar unidades independentes quando uma unidade ficar `parked` ou tiver bloqueio local.
-8. Cumprir release, homologação e entrega definidos no núcleo.
+1. Cumprir preflight, rota e aprovação definidos no núcleo.
+2. Ativar e manter `/root/luna_max` e `/root/sol_medium`; criar os worktrees e despachar em paralelo todas as unidades independentes prontas.
+3. Implementar cada unidade e criar commit atômico.
+4. Na primeira revisão, congelar blockers e declarar gates pelo comando `freeze`, usando como `unit_identity` o SHA-256 da unidade emitido por `task-brief`.
+5. Após qualquer implementação subsequente, fix ou redesign, usar `submit-delta`. Revisão seguinte só ocorre em `awaiting_review` e cobre blockers congelados abertos e regressões comprovadas do delta.
+6. Seguir `next_action` determinístico do guard. Nunca inventar uma transição.
+7. Registrar gates obrigatórios no sidecar. Concluir somente sem blocker aberto e com todos os gates obrigatórios aprovados.
+8. Continuar unidades independentes quando uma unidade ficar `parked` ou tiver bloqueio local; nunca encerrar enquanto houver trabalho executável.
+9. Cumprir release, homologação e entrega definidos no núcleo.
 
 Decisões técnicas internas são automáticas. Nenhuma ação, saída ou estado pode produzir `ask_user`. Somente as quatro categorias de parada e suas provas estruturadas, definidas no contrato de convergência, podem produzir `stopped`.
 
