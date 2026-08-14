@@ -381,6 +381,24 @@ class CodexOverlayPackageTests(unittest.TestCase):
         self.assertIn(
             "todo trabalho restante estiver terminal ou estacionado", convergence
         )
+        for luna_pool_rule in (
+            "/root/luna_max/<unit_id>",
+            "vários workers filhos Luna `max` ativos ao mesmo tempo",
+            "Priorizar slots disponíveis para o pool Luna",
+        ):
+            self.assertIn(luna_pool_rule, core)
+        for sol_limit in (
+            "Usar `/root/sol_medium` com parcimônia",
+            "no máximo uma atribuição Sol ativa por vez",
+            "nunca para implementação",
+            "Sol não cria workers filhos",
+            "Não reservar slot para Sol",
+        ):
+            self.assertIn(sol_limit, core)
+        self.assertIn(
+            "somente para uma revisão crítica ou decisão arquitetural material por vez",
+            convergence,
+        )
         self.assertNotIn("Quando host suportar subagentes", core)
         policy = (OVERLAY / "agents/openai.yaml").read_text(encoding="utf-8")
         for unsupported in ("model:", "reasoning_effort:", "subagents:", "agents:"):

@@ -31,22 +31,25 @@ Aquecer dependências uma vez no workspace com gerenciador e comandos do projeto
 
 ## Orquestração obrigatória de subagentes
 
-Em toda execução de plano, inclusive `$executar-plano-codex all`, manter estes dois subagentes canônicos ativos:
+Em toda execução de plano, inclusive `$executar-plano-codex all`, usar esta hierarquia:
 
-- `/root/luna_max`: `task_name=luna_max`, modelo `gpt-5.6-luna`, reasoning effort `max`; lidera implementação, decisões técnicas e unidades de maior risco;
-- `/root/sol_medium`: `task_name=sol_medium`, modelo `gpt-5.6-sol`, reasoning effort `medium`; lidera verificação independente, testes, gates e revisão do resultado.
+- `/root/luna_max`: `task_name=luna_max`, modelo `gpt-5.6-luna`, reasoning effort `max`; é o executor principal e lidera implementação, decisões técnicas, testes, gates e unidades de maior risco;
+- workers filhos `/root/luna_max/<unit_id>`: herdam `gpt-5.6-luna` com reasoning effort `max` e permitem várias unidades independentes simultâneas;
+- `/root/sol_medium`: `task_name=sol_medium`, modelo `gpt-5.6-sol`, reasoning effort `medium`; é apoio seletivo para segunda opinião em revisão crítica ou decisão arquitetural material.
 
-Se ainda não existirem, criá-los antes da implementação. Se estiverem ociosos, reutilizá-los. Não substituir nomes, modelos ou níveis de esforço e não encerrar um deles enquanto houver trabalho executável. Quando um slot estiver temporariamente indisponível, continuar no coordenador e enfileirar o próximo dispatch para o subagente canônico assim que o slot liberar.
+Criar ou reutilizar `/root/luna_max` antes da implementação. Ele pode manter vários workers filhos Luna `max` ativos ao mesmo tempo, limitados somente por slots, dependências e ownership. Priorizar slots disponíveis para o pool Luna e para o coordenador.
+
+Usar `/root/sol_medium` com parcimônia: no máximo uma atribuição Sol ativa por vez; nunca para implementação, documentação comum, teste previsível, gate mecânico ou unidade independente rotineira; acionar somente quando risco alto/crítico exigir revisão independente ou quando houver decisão arquitetural material sem resposta determinística no contrato. Sol não cria workers filhos. Encerrar ou deixar o Sol ocioso assim que essa atribuição terminar. Não reservar slot para Sol quando existir unidade executável adequada ao Luna.
 
 Maximizar paralelismo seguro em todos os planos aprovados:
 
 1. construir uma fila global de unidades prontas a partir das dependências dos planos;
-2. distribuir imediatamente unidades independentes entre `/root/luna_max`, `/root/sol_medium` e o coordenador;
+2. distribuir imediatamente unidades independentes entre o pool `/root/luna_max` e o coordenador;
 3. atribuir ownership explícito e não sobreposto de arquivos, seams ou worktrees;
 4. usar worktree distinta por plano e nunca editar o mesmo arquivo concorrentemente;
 5. iniciar revisão, gates, documentação ou próxima unidade independente assim que suas entradas estiverem prontas, sem esperar trabalho não relacionado;
 6. quando um subagente concluir, entregar imediatamente a próxima unidade pronta;
-7. manter implementação e revisão do mesmo delta em agentes diferentes quando houver capacidade.
+7. manter implementação e revisão crítica do mesmo delta em agentes diferentes quando houver capacidade, usando Sol somente pelos critérios seletivos acima.
 
 O coordenador nunca fica ocioso enquanto existir unidade, gate, checkpoint ou entrega executável. Falha local, limite de contexto, duração, orçamento interno ou agente indisponível não interrompem a fila pronta: registrar checkpoint, reatribuir ou seguir trabalho independente. Não fazer polling inútil nem repetir operação sem nova evidência.
 
