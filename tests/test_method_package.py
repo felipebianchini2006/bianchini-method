@@ -193,6 +193,9 @@ class PackageIntegrityTests(unittest.TestCase):
             "DirectExecutionScenarios",
             "AgentContractScenarios",
             "SkillBehaviorContracts",
+            "CodexOverlayPackageTests",
+            "ReviewGuardScenarios",
+            "CodexInstallerScenarios",
         ):
             self.assertIn(f'"{class_name}"', runner)
         self.assertIn("scripts/run_test_shards.py", read(ROOT / "README.md"))

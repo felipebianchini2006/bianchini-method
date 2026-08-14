@@ -24,6 +24,12 @@ SHARDS = (
     "SkillBehaviorContracts",
 )
 
+CODEX_SHARDS = (
+    "CodexOverlayPackageTests",
+    "ReviewGuardScenarios",
+    "CodexInstallerScenarios",
+)
+
 
 def main() -> int:
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
@@ -37,7 +43,17 @@ def main() -> int:
         )
         if completed.returncode != 0:
             return completed.returncode
-    print(f"\n{len(SHARDS)} shards aprovados.", file=sys.stderr)
+    for shard in CODEX_SHARDS:
+        print(f"\n=== {shard} ===", file=sys.stderr, flush=True)
+        completed = subprocess.run(
+            [sys.executable, "-m", "unittest", f"test_codex_overlay.{shard}", "-v"],
+            cwd=TESTS,
+            env=environment,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return completed.returncode
+    print(f"\n{len(SHARDS) + len(CODEX_SHARDS)} shards aprovados.", file=sys.stderr)
     return 0
 
 

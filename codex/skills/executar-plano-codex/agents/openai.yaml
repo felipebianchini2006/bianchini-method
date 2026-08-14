@@ -1,0 +1,6 @@
+interface:
+  display_name: "Executar Plano Codex"
+  short_description: "Executa planos com convergência limitada"
+  default_prompt: "Use $executar-plano-codex all para executar todos os planos aprovados com o overlay Codex."
+policy:
+  allow_implicit_invocation: false

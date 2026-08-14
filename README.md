@@ -132,6 +132,16 @@ Nenhuma instalação ou sincronização é executada automaticamente.
 /homologar-sistema
 ```
 
+## Overlay Codex
+
+```bash
+./codex/install.sh
+```
+
+```text
+$executar-plano-codex all
+```
+
 ## Validação do pacote
 
 ```bash
