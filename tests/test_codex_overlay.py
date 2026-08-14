@@ -79,19 +79,52 @@ def write_task_brief(repo: Path, unit: str, identity: str) -> Path:
     path = repo / f"synthetic/task-brief-{unit}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        f"# Task Brief {unit}\n\n- Unit `{unit}` SHA-256: `{identity}`\n",
+        f"# Task Brief {unit}\n\n- Unit `{unit}` SHA-256: `{identity}`\n\n"
+        "REQ-1: comportamento aprovado da unidade sintética.\n",
         encoding="utf-8",
     )
     return path
 
 
-def execution_evidence(exit_code: int = 1) -> dict[str, object]:
-    return {
-        "command": ["python3", "-c", "raise SystemExit(1)"],
-        "cwd": ".",
-        "exit_code": exit_code,
-        "observation": "resultado sintético reproduzível",
-    }
+def run_proof(
+    repo: Path,
+    unit: str,
+    command: list[str],
+    *,
+    commit: str | None = None,
+    cwd: str = ".",
+    timeout: float = 5,
+) -> dict[str, object]:
+    value = result_json(
+        run_guard(
+            "proof",
+            "--root",
+            str(repo),
+            "--planning-version",
+            "v1",
+            "--plan",
+            "P01",
+            "--unit",
+            unit,
+            "--commit",
+            commit or git(repo, "rev-parse", "HEAD"),
+            "--cwd",
+            cwd,
+            "--timeout",
+            str(timeout),
+            "--",
+            *command,
+        )
+    )
+    return value
+
+
+def default_blocker_command() -> list[str]:
+    return [
+        "python3",
+        "-c",
+        "from pathlib import Path; raise SystemExit(0 if 'resolved-marker' in Path('app.txt').read_text() else 1)",
+    ]
 
 
 def initial_blocker(
@@ -102,14 +135,15 @@ def initial_blocker(
         "severity": "important",
         "disposition": "blocker",
         "title": f"Blocker {finding_id}",
-        "approved_requirement": "Spec §2",
-        "reproduction": execution_evidence(),
+        "approved_requirement": "REQ-1",
+        "root_cause": f"root-{finding_id}",
         "material_impact": "requisito aprovado falha",
         "reachable_scenario": "entrada pública válida",
         "risk_seam": seam,
         "structural": structural,
         "structural_class": "state_machine" if structural else None,
-        "structural_evidence": execution_evidence() if structural else None,
+        "structural_evidence": "AUTO" if structural else None,
+        "_test_command": default_blocker_command(),
     }
 
 
@@ -142,7 +176,7 @@ def delta_finding(
         "severity": "important",
         "disposition": "blocker",
         "title": f"Regression {finding_id}",
-        "approved_requirement": "Spec §2",
+        "approved_requirement": "REQ-1",
         "material_impact": "regressão material",
         "reachable_scenario": "entrada pública válida",
         "delta_base": base,
@@ -150,17 +184,19 @@ def delta_finding(
         "file": file,
         "line": line,
         "change_kind": change_kind,
-        "reproduction": {
-            "command": command or ["python3", "-c", "raise SystemExit(1)"],
-            "cwd": ".",
-            "base_exit_code": base_exit_code,
-            "head_exit_code": head_exit_code,
-        },
+        "_test_command": command
+        or (
+            ["python3", "-c", "raise SystemExit(1)"]
+            if base_exit_code != 0 and head_exit_code != 0
+            else ["python3", "-c", "raise SystemExit(0)"]
+            if base_exit_code == 0 and head_exit_code == 0
+            else ["AUTO_DELTA"]
+        ),
         "causal_explanation": "a linha alterada muda diretamente o resultado",
         "risk_seam": seam,
         "structural": structural,
         "structural_class": "state_machine" if structural else None,
-        "structural_evidence": execution_evidence() if structural else None,
+        "structural_evidence": "AUTO" if structural else None,
     }
 
 
@@ -173,7 +209,7 @@ def frozen_resolved(finding_id: str = "B1") -> dict[str, object]:
         "id": finding_id,
         "source": "frozen",
         "resolution": "resolved",
-        "resolution_evidence": execution_evidence(exit_code=0),
+        "_auto_resolution_proof": True,
     }
 
 
@@ -187,11 +223,26 @@ def freeze(
     identity: str | None = None,
 ) -> tuple[Path, dict[str, object]]:
     review_head = head or git(repo, "rev-parse", "HEAD")
-    unit_identity_value = identity or hashlib.sha256(f"unit:{unit}".encode()).hexdigest()
+    unit_identity_value = (
+        identity or hashlib.sha256(f"unit:{unit}".encode()).hexdigest()
+    )
     task_brief = write_task_brief(repo, unit, unit_identity_value)
+    prepared = json.loads(
+        json.dumps(findings if findings is not None else [initial_blocker(seam=seam)])
+    )
+    for finding in prepared:
+        if finding.get("disposition") != "blocker" or finding.get("proof_id"):
+            continue
+        command = finding.pop("_test_command", default_blocker_command())
+        if "reproduction" in finding:
+            continue
+        proof = run_proof(repo, unit, command, commit=review_head)
+        finding["proof_id"] = proof["proof_id"]
+        if finding.get("structural_evidence") == "AUTO":
+            finding["structural_evidence"] = proof["proof_id"]
     findings_path = write_json(
         repo / "synthetic/findings.json",
-        {"findings": findings if findings is not None else [initial_blocker(seam=seam)]},
+        {"findings": prepared},
     )
     result = run_guard(
         "freeze",
@@ -235,9 +286,7 @@ def start_fix(sidecar: Path, blocker: str = "B1") -> dict[str, object]:
     )
 
 
-def submit_delta(
-    sidecar: Path, kind: str, base: str, head: str
-) -> dict[str, object]:
+def submit_delta(sidecar: Path, kind: str, base: str, head: str) -> dict[str, object]:
     return result_json(
         run_guard(
             "submit-delta",
@@ -253,8 +302,47 @@ def submit_delta(
     )
 
 
-def review(sidecar: Path, repo: Path, findings: list[dict[str, object]]) -> dict[str, object]:
-    path = write_json(repo / "synthetic/review.json", {"findings": findings})
+def review(
+    sidecar: Path, repo: Path, findings: list[dict[str, object]]
+) -> dict[str, object]:
+    prepared = json.loads(json.dumps(findings))
+    state = json.loads(sidecar.read_text(encoding="utf-8"))
+    unit = state["unit_id"]
+    store = repo / f"artifacts/bianchini/v1/codex/convergence/P01/.proofs/{unit}.json"
+    store_value = (
+        json.loads(store.read_text(encoding="utf-8"))
+        if store.exists()
+        else {"proofs": {}}
+    )
+    for finding in prepared:
+        if finding.get("source") == "delta_regression" and not finding.get(
+            "base_proof_id"
+        ):
+            command = finding.pop("_test_command")
+            if command == ["AUTO_DELTA"]:
+                base_content = (
+                    git(repo, "show", f"{finding['delta_base']}:app.txt") + "\n"
+                )
+                command = [
+                    "python3",
+                    "-c",
+                    "from pathlib import Path; "
+                    f"expected={base_content!r}; path=Path('app.txt'); "
+                    "raise SystemExit(0 if path.exists() and path.read_text() == expected else 1)",
+                ]
+            base_proof = run_proof(repo, unit, command, commit=finding["delta_base"])
+            head_proof = run_proof(repo, unit, command, commit=finding["delta_head"])
+            finding["base_proof_id"] = base_proof["proof_id"]
+            finding["head_proof_id"] = head_proof["proof_id"]
+            if finding.get("structural_evidence") == "AUTO":
+                finding["structural_evidence"] = head_proof["proof_id"]
+        if finding.pop("_auto_resolution_proof", False):
+            blocker = state["blockers"][finding["id"]]
+            origin_id = blocker.get("head_proof_id") or blocker.get("proof_id")
+            origin = store_value["proofs"][origin_id]
+            proof = run_proof(repo, unit, origin["command"], cwd=origin["cwd"])
+            finding["proof_id"] = proof["proof_id"]
+    path = write_json(repo / "synthetic/review.json", {"findings": prepared})
     return result_json(
         run_guard("review", "--sidecar", str(sidecar), "--findings", str(path))
     )
@@ -266,13 +354,15 @@ def fix_review_cycle(
     start_fix(sidecar)
     base = git(repo, "rev-parse", "HEAD")
     current = (repo / "app.txt").read_text(encoding="utf-8")
-    head = commit_file(repo, current + f"fix-{index}\n", f"fix {index}")
+    suffix = "resolved-marker\n" if resolve else f"fix-{index}\n"
+    head = commit_file(repo, current + suffix, f"fix {index}")
     submit_delta(sidecar, "fix", base, head)
     return review(sidecar, repo, [frozen_resolved() if resolve else frozen_open()])
 
 
 def record_gate(repo: Path, sidecar: Path) -> dict[str, object]:
-    evidence = write_json(repo / "synthetic/gate.json", execution_evidence(exit_code=0))
+    unit = json.loads(sidecar.read_text(encoding="utf-8"))["unit_id"]
+    proof = run_proof(repo, unit, ["python3", "-c", "raise SystemExit(0)"])
     return result_json(
         run_guard(
             "gate",
@@ -280,28 +370,26 @@ def record_gate(repo: Path, sidecar: Path) -> dict[str, object]:
             str(sidecar),
             "--gate",
             "unit-tests",
-            "--status",
-            "passed",
-            "--evidence",
-            str(evidence),
+            "--proof-id",
+            str(proof["proof_id"]),
         )
     )
 
 
-def stop_evidence(kind: str) -> dict[str, object]:
+def stop_evidence(kind: str, proof_id: str) -> dict[str, object]:
     if kind == "essential_external_credential":
         return {
             "service": "synthetic-service",
             "missing_credential": "SYNTHETIC_TOKEN",
             "blocked_operation": "contract test",
-            "local_alternative_proof": "fixture local não satisfaz gate remoto",
+            "local_alternative_proof": proof_id,
         }
     if kind == "destructive_action":
         return {
             "action": "drop synthetic dataset",
             "target": "temporary fixture",
             "irreversible_effect": "fixture seria perdida",
-            "safe_alternative_proof": "cópia preservada não satisfaz requisito",
+            "safe_alternative_proof": proof_id,
         }
     if kind == "new_cost":
         return {
@@ -309,12 +397,12 @@ def stop_evidence(kind: str) -> dict[str, object]:
             "operation": "isolated test run",
             "estimate": 1.5,
             "currency": "BRL",
-            "indispensability_proof": "nenhum runner local cobre gate",
+            "indispensability_proof": proof_id,
         }
     return {
         "invariant": "gate exige plataforma ausente",
-        "attempts": [execution_evidence(exit_code=127)],
-        "safe_workaround_absence_proof": "alternativas seguras foram esgotadas",
+        "attempts": [{"proof_id": proof_id}],
+        "safe_workaround_absence_proof": proof_id,
     }
 
 
@@ -353,7 +441,9 @@ class CodexOverlayPackageTests(unittest.TestCase):
         for excluded in ("Fix loop", "Breaker", "Redesign", "Paradas"):
             self.assertNotIn(excluded.casefold(), folded)
 
-    def test_core_requires_canonical_subagents_and_maximum_safe_parallelism(self) -> None:
+    def test_core_requires_canonical_subagents_and_maximum_safe_parallelism(
+        self,
+    ) -> None:
         core = (OVERLAY / "references/EXECUTION_CORE_CODEX.md").read_text(
             encoding="utf-8"
         )
@@ -415,7 +505,9 @@ class CodexOverlayPackageTests(unittest.TestCase):
         for unsupported in ("model:", "reasoning_effort:", "subagents:", "agents:"):
             self.assertNotIn(unsupported, policy)
 
-    def test_codex_activation_policy_is_explicit_and_base_implicit_is_disabled(self) -> None:
+    def test_codex_activation_policy_is_explicit_and_base_implicit_is_disabled(
+        self,
+    ) -> None:
         overlay_policy = (OVERLAY / "agents/openai.yaml").read_text(encoding="utf-8")
         base_policy = BASE_POLICY.read_text(encoding="utf-8")
         skill = (OVERLAY / "SKILL.md").read_text(encoding="utf-8")
@@ -445,8 +537,18 @@ class ReviewGuardScenarios(unittest.TestCase):
         cls.guard = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.guard)
 
-    def test_transition_table_accepts_every_valid_and_rejects_every_invalid_edge(self) -> None:
-        actions = {"submit_delta", "fix", "redesign", "park", "complete", "stop", "review"}
+    def test_transition_table_accepts_every_valid_and_rejects_every_invalid_edge(
+        self,
+    ) -> None:
+        actions = {
+            "submit_delta",
+            "fix",
+            "redesign",
+            "park",
+            "complete",
+            "stop",
+            "review",
+        }
         for source, mapping in self.guard.TRANSITIONS.items():
             for action, targets in mapping.items():
                 for target in targets:
@@ -460,6 +562,240 @@ class ReviewGuardScenarios(unittest.TestCase):
                     state = {"phase": source, "events": [], "updated_at": ""}
                     with self.assertRaises(self.guard.GuardError):
                         self.guard.transition(state, action, target)
+
+    def test_proof_executes_real_argv_and_green_result_cannot_be_spoofed_red(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            proof = run_proof(
+                repo,
+                "U1",
+                [
+                    "python3",
+                    "-c",
+                    "import sys; print('out'); print('err', file=sys.stderr); raise SystemExit(0)",
+                ],
+            )
+            record = proof["proof"]
+            self.assertEqual(record["exit_code"], 0)
+            self.assertEqual(record["commit"], git(repo, "rev-parse", "HEAD"))
+            self.assertRegex(record["stdout_sha256"], r"^[0-9a-f]{64}$")
+            self.assertRegex(record["stderr_sha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual(
+                record["stdout_sha256"], hashlib.sha256(b"out\n").hexdigest()
+            )
+            self.assertEqual(
+                record["stderr_sha256"], hashlib.sha256(b"err\n").hexdigest()
+            )
+            self.assertRegex(record["signature"], r"^[0-9a-f]{64}$")
+            self.assertNotIn("stdout", record)
+            self.assertNotIn("stderr", record)
+
+            candidate = initial_blocker()
+            candidate.pop("_test_command")
+            candidate["proof_id"] = proof["proof_id"]
+            sidecar, frozen = freeze(repo, [candidate])
+            self.assertEqual(frozen["next_action"], "approve")
+            self.assertEqual(frozen["state"]["blockers"], {})
+            self.assertIn(
+                "proof real está verde",
+                frozen["state"]["deferred_hardening"][0]["deferred_reason"],
+            )
+
+            gate = result_json(
+                run_guard(
+                    "gate",
+                    "--sidecar",
+                    str(sidecar),
+                    "--gate",
+                    "unit-tests",
+                    "--proof-id",
+                    str(proof["proof_id"]),
+                )
+            )
+            self.assertEqual(gate["state"]["gates"]["unit-tests"]["status"], "passed")
+            green_u2 = run_proof(repo, "U2", ["python3", "-c", "raise SystemExit(0)"])
+            forged = initial_blocker()
+            forged.pop("_test_command")
+            forged["proof_id"] = green_u2["proof_id"]
+            forged["exit_code"] = 1
+            with self.assertRaises(AssertionError) as forged_error:
+                freeze(repo, [forged], unit="U2")
+            self.assertIn("evidência manual proibida", str(forged_error.exception))
+            spoof = run_guard(
+                "gate",
+                "--sidecar",
+                str(sidecar),
+                "--gate",
+                "unit-tests",
+                "--status",
+                "failed",
+                "--proof-id",
+                str(proof["proof_id"]),
+            )
+            self.assertEqual(spoof.returncode, 2)
+
+            sentinel = repo / "SHELL_INJECTION_EXECUTED"
+            literal = run_proof(
+                repo,
+                "U1",
+                [
+                    "python3",
+                    "-c",
+                    "import sys; print(sys.argv[1])",
+                    f"; touch {sentinel}",
+                ],
+            )
+            self.assertEqual(literal["proof"]["exit_code"], 0)
+            self.assertFalse(sentinel.exists())
+            timed = run_proof(
+                repo,
+                "U1",
+                ["python3", "-c", "import time; time.sleep(2)"],
+                timeout=0.01,
+            )
+            self.assertTrue(timed["proof"]["timed_out"])
+            self.assertNotEqual(timed["proof"]["exit_code"], 0)
+            missing_timeout = run_guard(
+                "proof",
+                "--root",
+                str(repo),
+                "--planning-version",
+                "v1",
+                "--plan",
+                "P01",
+                "--unit",
+                "U1",
+                "--commit",
+                git(repo, "rev-parse", "HEAD"),
+                "--cwd",
+                ".",
+                "--",
+                "python3",
+                "-c",
+                "raise SystemExit(0)",
+            )
+            self.assertEqual(missing_timeout.returncode, 2)
+
+    def test_proof_store_detects_tampering_and_parallel_writes_do_not_lose_records(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            command = [
+                "python3",
+                str(GUARD),
+                "proof",
+                "--root",
+                str(repo),
+                "--planning-version",
+                "v1",
+                "--plan",
+                "P01",
+                "--unit",
+                "U1",
+                "--commit",
+                git(repo, "rev-parse", "HEAD"),
+                "--cwd",
+                ".",
+                "--timeout",
+                "5",
+                "--",
+                "python3",
+                "-c",
+                "import time; time.sleep(0.1); raise SystemExit(0)",
+            ]
+            first = subprocess.Popen(
+                command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            second = subprocess.Popen(
+                command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            first_stdout, first_stderr = first.communicate(timeout=10)
+            second_stdout, second_stderr = second.communicate(timeout=10)
+            self.assertEqual(first.returncode, 0, first_stderr)
+            self.assertEqual(second.returncode, 0, second_stderr)
+            proof_ids = {
+                json.loads(first_stdout)["proof_id"],
+                json.loads(second_stdout)["proof_id"],
+            }
+            store_path = (
+                repo / "artifacts/bianchini/v1/codex/convergence/P01/.proofs/U1.json"
+            )
+            store = json.loads(store_path.read_text(encoding="utf-8"))
+            self.assertTrue(proof_ids.issubset(store["proofs"]))
+
+            proof_id = next(iter(proof_ids))
+            store_path.with_suffix(".json.bak").unlink(missing_ok=True)
+            store["proofs"][proof_id]["exit_code"] = 17
+            store_path.write_text(json.dumps(store), encoding="utf-8")
+            candidate = initial_blocker()
+            candidate.pop("_test_command")
+            candidate["proof_id"] = proof_id
+            with self.assertRaises(AssertionError) as raised:
+                freeze(repo, [candidate])
+            self.assertIn("assinatura guard-owned inválida", str(raised.exception))
+
+    def test_requirement_binding_and_three_root_cause_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_repo(repo)
+            proof = run_proof(repo, "U1", ["python3", "-c", "raise SystemExit(9)"])
+            findings: list[dict[str, object]] = []
+            for index in range(1, 6):
+                item = initial_blocker(f"B{index}")
+                item.pop("_test_command")
+                item["proof_id"] = proof["proof_id"]
+                item["root_cause"] = "same-root" if index in {1, 2} else f"root-{index}"
+                if index == 3:
+                    item["approved_requirement"] = (
+                        "comportamento aprovado da unidade sintética"
+                    )
+                findings.append(item)
+            missing = initial_blocker("B6")
+            missing.pop("_test_command")
+            missing["proof_id"] = proof["proof_id"]
+            missing["approved_requirement"] = "REQ-DOES-NOT-EXIST"
+            findings.append(missing)
+            _, frozen = freeze(repo, findings)
+            self.assertEqual(len(frozen["state"]["blockers"]), 3)
+            reasons = [
+                item["deferred_reason"]
+                for item in frozen["state"]["deferred_hardening"]
+            ]
+            self.assertTrue(
+                any("causa raiz consolidada" in reason for reason in reasons)
+            )
+            self.assertTrue(any("limite de três" in reason for reason in reasons))
+            self.assertTrue(any("task-brief congelado" in reason for reason in reasons))
+
+    def test_delta_uses_real_proofs_and_ignores_no_declared_exit_codes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            base = init_repo(repo)
+            sidecar, _ = freeze(repo, [])
+            head = commit_file(repo, "alpha\nchanged\nremove-me\n", "change")
+            green_command = ["python3", "-c", "raise SystemExit(0)"]
+            base_proof = run_proof(repo, "U1", green_command, commit=base)
+            head_proof = run_proof(repo, "U1", green_command, commit=head)
+            submit_delta(sidecar, "implementation", base, head)
+            finding = delta_finding(base, head)
+            finding.pop("_test_command")
+            finding["base_proof_id"] = base_proof["proof_id"]
+            finding["head_proof_id"] = head_proof["proof_id"]
+            finding["head_exit_code"] = 1
+            reviewed = review(sidecar, repo, [finding])
+            self.assertNotIn("R1", reviewed["state"]["blockers"])
+            self.assertIn(
+                "somente base_proof_id/head_proof_id",
+                reviewed["state"]["deferred_hardening"][-1]["deferred_reason"],
+            )
+            self.assertNotIn(
+                "head_exit_code", reviewed["state"]["deferred_hardening"][-1]
+            )
 
     def test_valid_fix_submit_review_sequence_and_no_consecutive_fix(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -481,9 +817,34 @@ class ReviewGuardScenarios(unittest.TestCase):
             )
             self.assertEqual(second.returncode, 2)
             base = git(repo, "rev-parse", "HEAD")
-            head = commit_file(repo, "alpha\nchanged\nremove-me\n", "fix")
+            head = commit_file(
+                repo,
+                "alpha\nchanged\nremove-me\nresolved-marker\n",
+                "fix",
+            )
             awaiting = submit_delta(sidecar, "fix", base, head)
             self.assertEqual(awaiting["phase"], "awaiting_review")
+            wrong = run_proof(
+                repo, "U1", ["python3", "-c", "raise SystemExit(0)"], commit=head
+            )
+            wrong_path = write_json(
+                repo / "synthetic/wrong-resolution.json",
+                {
+                    "findings": [
+                        {
+                            "id": "B1",
+                            "source": "frozen",
+                            "resolution": "resolved",
+                            "proof_id": wrong["proof_id"],
+                        }
+                    ]
+                },
+            )
+            wrong_result = run_guard(
+                "review", "--sidecar", str(sidecar), "--findings", str(wrong_path)
+            )
+            self.assertEqual(wrong_result.returncode, 2)
+            self.assertIn("mesmo comando", wrong_result.stderr)
             reviewed = review(sidecar, repo, [frozen_resolved()])
             self.assertEqual(reviewed["phase"], "review_frozen")
             self.assertEqual(reviewed["next_action"], "approve")
@@ -612,13 +973,17 @@ class ReviewGuardScenarios(unittest.TestCase):
             self.assertEqual(renamed_unit.returncode, 2)
             self.assertIn("identidade da unidade", renamed_unit.stderr)
 
-    def test_redesign_nonstructural_and_structural_without_evidence_are_rejected(self) -> None:
+    def test_redesign_nonstructural_and_structural_without_evidence_are_rejected(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
             init_repo(repo)
             invalid = initial_blocker(structural=True)
             invalid["structural_evidence"] = None
-            findings = write_json(repo / "synthetic/findings.json", {"findings": [invalid]})
+            findings = write_json(
+                repo / "synthetic/findings.json", {"findings": [invalid]}
+            )
             invalid_identity = hashlib.sha256(b"unit:U1").hexdigest()
             invalid_brief = write_task_brief(repo, "U1", invalid_identity)
             freeze_result = run_guard(
@@ -697,7 +1062,9 @@ class ReviewGuardScenarios(unittest.TestCase):
             )
             self.assertEqual(redesign.returncode, 2)
 
-    def test_submit_rejects_nonexistent_commit_wrong_base_wrong_head_and_nonancestor(self) -> None:
+    def test_submit_rejects_nonexistent_commit_wrong_base_wrong_head_and_nonancestor(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
             base = init_repo(repo)
@@ -767,7 +1134,10 @@ class ReviewGuardScenarios(unittest.TestCase):
             ("other.txt", 1, "fora do delta"),
             ("app.txt", 1, "contexto"),
         ):
-            with self.subTest(file=file, line=line), tempfile.TemporaryDirectory() as temp:
+            with (
+                self.subTest(file=file, line=line),
+                tempfile.TemporaryDirectory() as temp,
+            ):
                 repo = Path(temp) / "repo"
                 base = init_repo(repo)
                 commit_file(repo, "unchanged\n", "other", "other.txt")
@@ -784,7 +1154,9 @@ class ReviewGuardScenarios(unittest.TestCase):
                 deferred = reviewed["state"]["deferred_hardening"][-1]
                 self.assertIn(expected_reason, deferred["deferred_reason"])
 
-    def test_modified_added_removed_and_rename_lines_are_verified_by_real_git_diff(self) -> None:
+    def test_modified_added_removed_and_rename_lines_are_verified_by_real_git_diff(
+        self,
+    ) -> None:
         cases = (
             ("alpha\nchanged\nremove-me\n", "app.txt", 2, "modified"),
             ("alpha\nstable\nremove-me\nadded\n", "app.txt", 4, "added"),
@@ -839,9 +1211,14 @@ class ReviewGuardScenarios(unittest.TestCase):
             self.assertEqual(reviewed["next_action"], "approve")
             self.assertEqual(reviewed["state"]["deferred_hardening"][-1]["id"], "R1")
 
-    def test_reproduction_requires_base_green_head_red_and_does_not_execute_shell_text(self) -> None:
+    def test_reproduction_requires_base_green_head_red_and_does_not_execute_shell_text(
+        self,
+    ) -> None:
         for base_exit, head_exit in ((1, 1), (0, 0)):
-            with self.subTest(base=base_exit, head=head_exit), tempfile.TemporaryDirectory() as temp:
+            with (
+                self.subTest(base=base_exit, head=head_exit),
+                tempfile.TemporaryDirectory() as temp,
+            ):
                 repo = Path(temp) / "repo"
                 base = init_repo(repo)
                 sidecar, _ = freeze(repo, [])
@@ -860,7 +1237,9 @@ class ReviewGuardScenarios(unittest.TestCase):
                     ],
                 )
                 self.assertEqual(reviewed["next_action"], "approve")
-                self.assertEqual(reviewed["state"]["deferred_hardening"][-1]["id"], "R1")
+                self.assertEqual(
+                    reviewed["state"]["deferred_hardening"][-1]["id"], "R1"
+                )
 
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -876,7 +1255,12 @@ class ReviewGuardScenarios(unittest.TestCase):
                     delta_finding(
                         base,
                         head,
-                        command=["sh", "-c", f"touch {sentinel}"],
+                        command=[
+                            "python3",
+                            "-c",
+                            "from pathlib import Path; raise SystemExit(1 if 'changed' in Path('app.txt').read_text() else 0)",
+                            f"; touch {sentinel}",
+                        ],
                     )
                 ],
             )
@@ -925,23 +1309,33 @@ class ReviewGuardScenarios(unittest.TestCase):
             self.assertIn("revision antiga", stale.stderr)
             record_gate(repo, sidecar)
             self.assertEqual(
-                result_json(run_guard("complete", "--sidecar", str(sidecar)))[
-                    "phase"
-                ],
+                result_json(run_guard("complete", "--sidecar", str(sidecar)))["phase"],
                 "completed",
             )
 
-    def test_stop_requires_complete_structured_evidence_for_every_category(self) -> None:
-        for index, kind in enumerate(sorted({
-            "essential_external_credential",
-            "destructive_action",
-            "new_cost",
-            "real_impossibility",
-        })):
+    def test_stop_requires_complete_structured_evidence_for_every_category(
+        self,
+    ) -> None:
+        for index, kind in enumerate(
+            sorted(
+                {
+                    "essential_external_credential",
+                    "destructive_action",
+                    "new_cost",
+                    "real_impossibility",
+                }
+            )
+        ):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
                 repo = Path(temp) / "repo"
                 init_repo(repo)
                 sidecar, _ = freeze(repo, [], unit=f"U{index}")
+                failed = run_proof(
+                    repo,
+                    f"U{index}",
+                    ["python3", "-c", "raise SystemExit(7)"],
+                )
+                proof_id = str(failed["proof_id"])
                 missing = run_guard(
                     "stop",
                     "--sidecar",
@@ -952,7 +1346,7 @@ class ReviewGuardScenarios(unittest.TestCase):
                     str(repo / "synthetic/missing.json"),
                 )
                 self.assertEqual(missing.returncode, 2)
-                incomplete_value = stop_evidence(kind)
+                incomplete_value = stop_evidence(kind, proof_id)
                 incomplete_value.pop(next(iter(incomplete_value)))
                 incomplete = write_json(
                     repo / "synthetic/incomplete.json", incomplete_value
@@ -968,10 +1362,31 @@ class ReviewGuardScenarios(unittest.TestCase):
                 )
                 self.assertEqual(rejected.returncode, 2)
                 if kind == "real_impossibility":
-                    successful_attempt = stop_evidence(kind)
-                    successful_attempt["attempts"] = [
-                        execution_evidence(exit_code=0)
+                    forged_attempt = stop_evidence(kind, proof_id)
+                    forged_attempt["attempts"] = [
+                        {"proof_id": proof_id, "exit_code": 0}
                     ]
+                    forged_path = write_json(
+                        repo / "synthetic/forged-attempt.json", forged_attempt
+                    )
+                    rejected_forged = run_guard(
+                        "stop",
+                        "--sidecar",
+                        str(sidecar),
+                        "--kind",
+                        kind,
+                        "--evidence",
+                        str(forged_path),
+                    )
+                    self.assertEqual(rejected_forged.returncode, 2)
+                    self.assertIn("somente proof_id", rejected_forged.stderr)
+                    successful_attempt = stop_evidence(kind, proof_id)
+                    green = run_proof(
+                        repo,
+                        f"U{index}",
+                        ["python3", "-c", "raise SystemExit(0)"],
+                    )
+                    successful_attempt["attempts"] = [{"proof_id": green["proof_id"]}]
                     successful_path = write_json(
                         repo / "synthetic/successful-attempt.json",
                         successful_attempt,
@@ -986,7 +1401,9 @@ class ReviewGuardScenarios(unittest.TestCase):
                         str(successful_path),
                     )
                     self.assertEqual(rejected_success.returncode, 2)
-                valid = write_json(repo / "synthetic/valid.json", stop_evidence(kind))
+                valid = write_json(
+                    repo / "synthetic/valid.json", stop_evidence(kind, proof_id)
+                )
                 stopped = result_json(
                     run_guard(
                         "stop",

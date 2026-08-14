@@ -59,12 +59,14 @@ Antes de cada revisão, gerar entrada determinística com `bm.py review-package 
 
 Primeira revisão congela blockers. Blocker exige:
 
-- requisito aprovado identificável;
-- reprodução estruturada com `command` em argv, `cwd`, `exit_code` de falha e `observation`;
+- `approved_requirement` igual a um identificador ou trecho existente no `task-brief` congelado;
+- `proof_id` emitido pelo guard, com falha real no `HEAD` revisado;
 - impacto material;
 - cenário alcançável;
 - `risk_seam`;
 - metadados estruturais.
+
+O guard consolida findings pela causa raiz e congela no máximo três blockers iniciais. Duplicatas da mesma causa e findings além desse limite viram `deferred_hardening`. Requisito ausente do `task-brief` também vira hardening.
 
 Forma não estrutural:
 
@@ -77,7 +79,7 @@ Forma não estrutural:
 }
 ```
 
-Blocker estrutural usa `structural: true`, `structural_evidence` reproduzível e uma destas classes fechadas:
+Blocker estrutural usa `structural: true`, `structural_evidence` com `proof_id` vermelho no commit revisado e uma destas classes fechadas:
 
 - `architecture_boundary`;
 - `data_model`;
@@ -99,13 +101,13 @@ Novo `delta_regression` só vira blocker quando todas as provas existirem:
 4. `delta_head` descende de `delta_base`;
 5. arquivo do finding está confinado ao repositório;
 6. localização aponta linha adicionada, modificada ou removida pelo diff; linha apenas de contexto não vale;
-7. reprodução usa `command` como argv estruturado, `cwd` confinado, `base_exit_code: 0` e `head_exit_code` diferente de zero;
-8. mesma reprodução passa na base e falha no head;
+7. `base_proof_id` e `head_proof_id` foram emitidos pelo guard para o mesmo argv e cwd;
+8. proof da base pertence a `delta_base` e tem exit code real `0`; proof do head pertence a `delta_head` e tem exit code real diferente de `0`;
 9. explicação causal liga mudança do delta ao defeito.
 
 Rename deve ser resolvido pelo diff Git real. Linha removida referencia lado base e linha removida. Arquivo fora do diff, defeito preexistente, base e head com mesmo resultado ou cadeia Git inválida convertem finding para hardening.
 
-Guard nunca executa texto arbitrário, `shell=True`, string de shell ou expansão fornecida pelo finding. Aceita somente argumentos estruturados validados e cwd confinado.
+Guard nunca executa texto arbitrário do finding. O comando `proof` executa argv estruturado com `shell=False`, em checkout isolado do commit, cwd confinado e timeout obrigatório. Persiste comando, cwd, exit code real, commit e hashes SHA-256 dos bytes de stdout e stderr. Cada registro recebe assinatura guard-owned; gravações paralelas usam lock. Reviewer referencia somente o `proof_id` emitido.
 
 ## Fix, redesign e breaker
 
@@ -136,7 +138,7 @@ Nunca retornar `continue`. `completed` só pode ser retornado por `complete`, se
 
 ## Gates e conclusão
 
-Declarar cada gate obrigatório no `freeze`. Registrar resultado pelo guard com evidência JSON contendo `command` como argv, `cwd`, `exit_code` e `observation`. O guard prende a evidência ao commit atual. `complete` exige `HEAD` revisado, zero blocker aberto e todos os gates obrigatórios `passed` exatamente nesse commit. Hardening adiado não impede conclusão. Unidade `parked` continua incompleta.
+Declarar cada gate obrigatório no `freeze`. Registrar resultado com `gate --proof-id`; o guard deriva `passed` ou `failed` do exit code real e prende o proof ao commit atual. `complete` exige `HEAD` revisado, zero blocker aberto e todos os gates obrigatórios `passed` exatamente nesse commit. Hardening adiado não impede conclusão. Unidade `parked` continua incompleta.
 
 ## Paradas
 
@@ -156,7 +158,7 @@ Exige `provider`, `operation`, `estimate` positivo, `currency` ISO 4217 e `indis
 
 ### `real_impossibility`
 
-Exige `invariant`, lista não vazia `attempts` e `safe_workaround_absence_proof`. Cada tentativa contém `command` como argv, `cwd`, `exit_code` e `observation`.
+Exige `invariant`, lista não vazia `attempts` e `safe_workaround_absence_proof`. Cada tentativa contém somente `proof_id` real, vermelho e pertencente ao `HEAD` atual.
 
 Sem todos os campos estruturados, `stop` falha. Decisão técnica interna nunca retorna `ask_user` ou `stopped`: escolher opção reversível de menor risco, registrar decisão automática e continuar. Bloqueio local não para unidade independente.
 
@@ -165,12 +167,13 @@ Sem todos os campos estruturados, `stop` falha. Decisão técnica interna nunca 
 Usar `python3 <review_guard.py> <comando> --help` como autoridade para flags. Operações principais:
 
 ```bash
+python3 <review_guard.py> proof --root <workspace> --planning-version <version> --plan <plan> --unit <unit> --commit <commit> --cwd <cwd> --timeout <segundos> -- <argv...>
 python3 <review_guard.py> freeze --root <workspace> --planning-version <version> --plan <plan> --unit <unit> --unit-identity <unit_sha256_do_task_brief> --task-brief <task-brief.md> --seam <seam> --review-head <HEAD> --findings <findings.json> --required-gate <gate>
 python3 <review_guard.py> fix --sidecar <sidecar.json> --blocker <id> --summary <summary>
 python3 <review_guard.py> redesign --sidecar <sidecar.json> --blocker <id> --seam <seam> --summary <summary>
 python3 <review_guard.py> submit-delta --sidecar <sidecar.json> --kind <implementation|fix|redesign> --base <commit> --head <commit>
 python3 <review_guard.py> review --sidecar <sidecar.json> --findings <findings.json>
-python3 <review_guard.py> gate --sidecar <sidecar.json> --gate <gate> --status <passed|failed> --evidence <evidence.json>
+python3 <review_guard.py> gate --sidecar <sidecar.json> --gate <gate> --proof-id <proof_id>
 python3 <review_guard.py> decision --sidecar <sidecar.json> --kind <internal|local_block> --summary <summary>
 python3 <review_guard.py> stop --sidecar <sidecar.json> --kind <categoria> --evidence <evidence.json>
 python3 <review_guard.py> complete --sidecar <sidecar.json>

@@ -33,10 +33,10 @@ Resolver `scripts/review_guard.py` dentro desta skill. Operar o sidecar somente 
 1. Cumprir preflight, rota e aprovação definidos no núcleo.
 2. Ativar `/root/luna_max` como pool principal com até cinco atribuições simultâneas; usar duas atribuições `/root/sol_medium` quando elegíveis e até três para revisões críticas ou decisões arquiteturais independentes; preencher todos os slots seguros disponíveis.
 3. Implementar cada unidade e criar commit atômico.
-4. Na primeira revisão, congelar blockers e declarar gates pelo comando `freeze`, usando como `unit_identity` o SHA-256 da unidade emitido por `task-brief`.
+4. Executar evidências pelo comando `proof`; reviewers referenciam somente `proof_id`. Na primeira revisão, congelar no máximo três blockers consolidados por causa raiz e declarar gates pelo comando `freeze`, usando como `unit_identity` o SHA-256 da unidade emitido por `task-brief`.
 5. Após qualquer implementação subsequente, fix ou redesign, usar `submit-delta`. Revisão seguinte só ocorre em `awaiting_review` e cobre blockers congelados abertos e regressões comprovadas do delta.
 6. Seguir `next_action` determinístico do guard. Nunca inventar uma transição.
-7. Registrar gates obrigatórios no sidecar. Concluir somente sem blocker aberto e com todos os gates obrigatórios aprovados.
+7. Registrar gates obrigatórios com proof do `HEAD` atual. Concluir somente sem blocker aberto e com todos os gates obrigatórios aprovados.
 8. Continuar unidades independentes quando uma unidade ficar `parked` ou tiver bloqueio local; nunca encerrar enquanto houver trabalho executável.
 9. Cumprir release, homologação e entrega definidos no núcleo.
 
