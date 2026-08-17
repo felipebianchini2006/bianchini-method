@@ -28,6 +28,8 @@ Classifique cada finding como blocker comprovado ou hardening adiado. Blocker us
 
 Use `critical` somente para perda de dados, segurança explorável, indisponibilidade relevante ou contrato central impossível. Use `important` para requisito aprovado materialmente quebrado. Opinião de estilo, abstração preferida, defesa especulativa, cenário inalcançável ou prova incompleta vira `minor` ou `note` com `disposition: hardening`.
 
+Score global de cobertura ou mutação nunca é finding. Um mutante sobrevivente só pode virar blocker quando um `proof_id` demonstra cenário aprovado alcançável de risco alto/crítico cujo comportamento mudou sem o teste falhar; equivalente, inalcançável, duplicado ou sem impacto material permanece hardening. Consolidar survivors da mesma causa em um único finding.
+
 `approved_requirement` deve existir literalmente no `task-brief` congelado. Blocker inicial exige proof vermelho no `HEAD` revisado. O guard consolida causas iguais e congela no máximo três blockers; demais findings viram hardening.
 
 Blocker estrutural exige `structural: true`, `structural_evidence` contendo `proof_id` vermelho e `structural_class` em `architecture_boundary`, `data_model`, `public_contract`, `state_machine` ou `cross_cutting_invariant`. Não inferir estrutura apenas pela extensão do patch.

@@ -1069,6 +1069,46 @@ class AdaptivePolicyScenarios(unittest.TestCase):
         value = self.policy("--profile", "lean", "--risk", "low", "--change", "visual")
         self.assertEqual(value["visual_validation"], "screenshot_or_visual_regression")
 
+    def test_quality_strategy_keeps_unit_execution_focused(self) -> None:
+        value = self.policy(
+            "--profile", "standard", "--risk", "medium", "--change", "business-rule"
+        )
+        strategy = value["test_strategy"]
+        self.assertEqual(
+            strategy["fast"],
+            [
+                "targeted_unit_if_logic_changed",
+                "targeted_integration_if_boundary_changed",
+                "related_regression",
+            ],
+        )
+        self.assertNotIn("critical_journey_e2e", strategy["fast"])
+        self.assertNotIn("selective_mutation", strategy["fast"])
+        self.assertIn("critical_journey_e2e", strategy["plan"])
+        self.assertIn("selective_mutation_if_required", strategy["plan"])
+        self.assertIn("full_regression", strategy["release"])
+        self.assertIn("current_mutation_evidence_if_required", strategy["release"])
+
+    def test_mutation_policy_is_selective_and_never_uses_global_score(self) -> None:
+        visual = self.policy(
+            "--profile", "lean", "--risk", "low", "--change", "visual"
+        )
+        business = self.policy(
+            "--profile", "standard", "--risk", "medium", "--change", "business-rule"
+        )
+        payment = self.policy(
+            "--profile", "full", "--risk", "critical", "--change", "payment"
+        )
+        self.assertEqual(visual["mutation_policy"]["mode"], "not_required")
+        self.assertEqual(business["mutation_policy"]["mode"], "selective")
+        self.assertEqual(payment["mutation_policy"]["mode"], "required_selective")
+        for value in (visual, business, payment):
+            self.assertFalse(value["mutation_policy"]["global_score_gate"])
+            self.assertEqual(
+                value["mutation_policy"]["blocking_rule"],
+                "survivor_changes_approved_high_or_critical_behavior",
+            )
+
     def test_manual_out_of_scope_is_not_required(self) -> None:
         value = self.policy(
             "--profile", "lean", "--risk", "low", "--manual-pdf", "scope"
@@ -3277,6 +3317,32 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("manual_pdf: full", homologation)
         self.assertNotIn("Executar apenas lacunas", homologation)
         self.assertNotIn("Não repetir manualmente", homologation)
+
+    def test_adaptive_test_layers_are_distributed_without_per_task_campaigns(self) -> None:
+        gates = read(ROOT / "skills/_shared/ADAPTIVE_GATES.md")
+        contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
+        planning = read(SKILLS["sdd-planning"])
+        executor = read(SKILLS["executar-plano"])
+        bugfix = read(SKILLS["corrigir-bug"])
+        homologation = read(SKILLS["homologar-sistema"])
+        for expected in (
+            "Regressão é uma estratégia transversal",
+            "não são tarefas independentes",
+            "score global de mutação",
+            "mutante sobrevivente",
+        ):
+            self.assertIn(expected, contract)
+        for expected in (
+            "`fast`: unitários",
+            "`plan`: suítes afetadas",
+            "`release`: suíte unitária completa",
+            "mutation",
+        ):
+            self.assertIn(expected, gates)
+        self.assertIn("não criar tarefa por camada de teste", planning)
+        self.assertIn("não executar E2E completo ou mutação por unidade", executor)
+        self.assertIn("menor nível capaz de reproduzir", bugfix)
+        self.assertIn("não iniciar uma nova campanha unitária", homologation)
 
     def test_architecture_and_status_skills_exist_in_readme(self) -> None:
         readme = read(ROOT / "README.md")

@@ -108,9 +108,10 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
 - `release.candidate`, quando presente, exige fingerprint com `id`, `revision`, `build` e `checksum`.
 - `active_execution` pode registrar `plan_id`, `unit` e caminho absoluto de `workspace` durante a execução.
 - `telemetry.enabled: false` é o padrão. Quando habilitada explicitamente, registra apenas métricas numéricas locais em JSONL, sem prompts, código ou conteúdo de arquivos.
-- `verification.fast`: feedback durante grupo/slice/tarefa.
-- `verification.plan`: gate completo de cada plano.
-- `verification.release`: regressão e E2E automatizados antes da execução real do RC e da varredura visual.
+- `verification.fast`: unitários e integração/contrato focados mais regressão relacionada durante grupo/slice/tarefa; sem E2E completo ou mutação.
+- `verification.plan`: suítes afetadas, regressão do plano, E2E crítico e mutação seletiva quando `bm.py policy` exigir.
+- `verification.release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E crítico, regressão completa, build e evidência de mutação vigente quando obrigatória, antes da execução real do RC e da varredura visual.
+- As camadas são comandos dentro dos três estágios, não novos estados, tarefas ou campos no schema.
 
 Valide sempre antes de aprovação, execução, homologação e status:
 

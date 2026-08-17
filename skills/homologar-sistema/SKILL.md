@@ -34,12 +34,13 @@ Não homologar árvore fonte quando a entrega é outro artefato. Se uma platafor
 
 No RC atual:
 
-1. executar todos os comandos de `verification.release`;
-2. executar o E2E codificado existente para jornadas críticas;
-3. reunir relatórios e logs sanitizados;
-4. vincular cada evidência ao mesmo `rc`, `revision`, `build` e `checksum`;
-5. executar `bm.py proof-map` para identificar o que a automação realmente prova;
-6. corrigir falha de produto antes de avançar.
+1. executar todos os comandos de `verification.release`, incluindo suíte unitária completa configurada, integração/contratos aplicáveis, regressão completa, E2E das jornadas críticas, build e mutação exigida pela política;
+2. reunir relatórios e logs sanitizados, confirmando que evidência de mutação pertence ao commit/RC atual e ao seam exigido;
+3. vincular cada evidência ao mesmo `rc`, `revision`, `build` e `checksum`;
+4. executar `bm.py proof-map` para identificar o que a automação realmente prova;
+5. corrigir falha de produto antes de avançar.
+
+Homologação confirma as provas produzidas nos gates e depois opera o produto; não iniciar uma nova campanha unitária, de integração, E2E ou mutação dentro desta skill. Evidência obrigatória ausente ou obsoleta retorna ao `executar-plano`/`corrigir-bug` e mantém `BLOQUEADO`.
 
 O mapa automatizado orienta prioridade, não decide sozinho o aceite. “Os testes passaram”, “o código parece correto” e “não há lacuna manual” não autorizam pular a execução real. Não escrever uma nova suíte apenas para evitar abrir o sistema.
 
@@ -122,7 +123,8 @@ Após duas ondas de homologação sem convergir, declarar `BLOQUEADO`. Com telem
 `ACEITO` exige:
 
 - `verification.release: passed` ou exceção de escopo explícita;
-- E2E codificado aplicável aprovado;
+- unitários, integração/contratos, regressão e E2E crítico do `verification.release` aprovados;
+- evidência de mutação vigente quando `bm.py policy` marcar `selective` ou `required_selective`;
 - todas as plataformas e perfis obrigatórios executados no RC real;
 - todos os fluxos críticos e ações primárias da matriz com execução real `passed`;
 - varredura visual concluída para toda interface aplicável;

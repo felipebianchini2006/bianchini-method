@@ -91,6 +91,26 @@ Regras:
 - escalar o modo quando risco descoberto aumentar; não reduzir sem atualizar plano aprovado;
 - calcular política com `bm.py policy` e registrar o JSON no ledger.
 
+## Estratégia adaptativa de testes
+
+Regressão é uma estratégia transversal: ela reaproveita unitários, integração/contrato e E2E para provar que comportamento anterior não foi quebrado. Unitários, integração/contrato, E2E e mutation testing são famílias de gate; não são tarefas independentes, fases novas, revisões extras ou um subagente por camada.
+
+A composição obrigatória é proporcional ao estágio:
+
+- `verification.fast`: unitários focados quando lógica mudou, integração/contrato focada quando uma fronteira mudou e regressão diretamente relacionada. E2E focado só entra quando for o menor seam público capaz de provar a unidade; nunca executar a suíte E2E completa ou mutação aqui.
+- `verification.plan`: suítes dos módulos e fronteiras afetadas, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva quando `bm.py policy` exigir.
+- `verification.release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E de todas as jornadas críticas, regressão completa configurada, build do RC e evidência de mutação vigente quando obrigatória. “Completa” significa os comandos de release aprovados, não toda combinação possível de plataforma ou tela.
+
+Política de mutation testing:
+
+- `not_required`: risco baixo ou mudança puramente visual, documental ou mecânica;
+- `selective`: risco médio com regra material, cálculo, parser, permissão, estado ou transformação; usar somente seams alterados e ferramenta já existente ou aprovada;
+- `required_selective`: risco alto/crítico com regra material; o planejamento deve declarar comando e escopo antes da execução.
+
+Não usar score global de mutação como gate nem perseguir percentual. Um mutante sobrevivente só bloqueia quando prova que um comportamento aprovado de risco alto ou crítico pode mudar sem o teste falhar. Mutante equivalente, inalcançável ou sem impacto material recebe justificativa curta e não abre fix loop. Nunca instalar ferramenta de mutação durante uma unidade; ausência de ferramenta obrigatória deve ser resolvida no planejamento ou registrada como bloqueio antes da implementação.
+
+Após correção, reexecutar apenas a regressão afetada e vizinhos de risco. `verification.plan` e `verification.release` voltam a executar somente em seus gates. Evidência de mutação pertence ao commit/RC medido e fica obsoleta após alteração no seam.
+
 Usar os fix rounds máximos retornados por `bm.py policy`. O orçamento é contado por `risk_seam`, não por nome de tarefa ou plano: registrar o seam de risco no ledger a cada rodada e recalcular `bm.py policy` com `--risk-seam` e `--seam-round` acumulado do seam. Renomear, dividir ou reabrir a unidade não zera a contagem do mesmo seam.
 
 O breaker dispara na primeira destas condições:

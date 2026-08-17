@@ -1,4 +1,4 @@
-# Bianchini Method v2 — Standalone Adaptive
+# Bianchini Method v2.8 — Standalone Adaptive
 
 Sistema de sete skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
 
@@ -53,9 +53,27 @@ Não dependem do Superpowers. Usam estado validado, worktree obrigatória, artef
 
 | Risco | Execução | Revisão | Testes |
 |---|---|---|---|
-| baixo | `grouped` | gate do plano | por seam do grupo |
-| médio | `slice` | por slice vertical | por seam do slice |
-| alto/crítico | `strict` | por tarefa | RED/GREEN por tarefa |
+| baixo | `grouped` | gate do plano | unitário/integração/regressão focados; sem mutação |
+| médio | `slice` | por slice vertical | focados por slice; E2E crítico e mutação seletiva no gate |
+| alto/crítico | `strict` | por tarefa | RED/GREEN focal; mutação seletiva obrigatória no gate material |
+
+As camadas são distribuídas por estágio, sem nova tarefa por tipo de teste:
+
+```text
+verification.fast
+  -> unitários focados + integração/contrato focada + regressão relacionada
+
+verification.plan
+  -> suítes afetadas + regressão do plano + E2E crítico + mutação seletiva
+
+verification.release
+  -> suíte completa configurada + contratos + regressão + E2E crítico + build + mutação exigida
+
+homologar-sistema
+  -> confirmar provas do RC + operar sistema real + varredura visual
+```
+
+Regressão é transversal, não uma suíte separada. Mutation testing nunca roda por microtarefa, não usa score global como meta e só bloqueia quando um survivor prova falha de teste em comportamento aprovado de risco alto/crítico. O overlay Codex mantém esses limites explicitamente para não reabrir tarefas, revisões ou subagentes por camada.
 
 Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: renomear ou dividir a tarefa não zera o orçamento do mesmo seam. Finding de classe estrutural (crash window, partial commit, TOCTOU, retry após timeout, idempotência concorrente, recuperação após restart) ou dois pareceres consecutivos critical/important no mesmo seam disparam o breaker antecipado e exigem redesenho antes de novo patch. Não há quantidade mínima de tarefas ou agentes.
 
@@ -67,7 +85,7 @@ Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: ren
 - `auditar-arquitetura`: relatório manual de hotspots e mudanças recentes; invocação exclusivamente manual.
 - `status-projeto`: estado, gates, bloqueios e próximo passo, sem mutação.
 - `corrigir-bug`: causa raiz, regressão adequada ao seam, fix mínimo e reteste.
-- `homologar-sistema`: regressão/E2E, execução real do RC por perfil/plataforma, varredura visual e aceite.
+- `homologar-sistema`: confirma unitários/integração/regressão/E2E/mutação do release, executa o RC real por perfil/plataforma, faz varredura visual e decide o aceite.
 
 ### Contratos internos de subagentes
 
@@ -97,7 +115,7 @@ Novos planejamentos incluem `STACK_RESEARCH.md` em modo `repo_only`, `targeted_w
 
 ## Homologação e manual
 
-Homologação executa `verification.release`, E2E codificado e mapa de provas como baseline. Depois abre e opera o RC real por plataforma e perfil, percorre fluxos críticos e ações primárias, verifica estados de erro/recuperação, console/rede e executa varredura visual em toda interface aplicável.
+Homologação executa `verification.release` com unitários, integração/contratos, regressão, E2E crítico, build e mutação exigida, depois cria o mapa de provas como baseline. Depois abre e opera o RC real por plataforma e perfil, percorre fluxos críticos e ações primárias, verifica estados de erro/recuperação, console/rede e executa varredura visual em toda interface aplicável.
 
 `manual_pdf: scope` é o padrão. Os valores são `none | quick_start | full | scope`; ausência de conversor não bloqueia projeto sem manual contratado.
 

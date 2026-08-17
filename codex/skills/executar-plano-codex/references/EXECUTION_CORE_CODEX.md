@@ -74,9 +74,19 @@ Retomada começa com `workspace resume`. Ler checkpoint, estado, unidade atual e
 
 ## Implementação
 
-Antes da unidade, executar `bm.py policy` com perfil e risco. Confirmar coincidência com `execution` aprovado. Divergência pode aumentar garantia automaticamente; redução exige novo pacote aprovado.
+Antes da unidade, executar `bm.py policy` com perfil, risco e `Change` declarado no brief; planos antigos sem `Change` usam `behavioral` somente por compatibilidade. Confirmar coincidência com `execution` aprovado. Divergência pode aumentar garantia automaticamente; redução exige novo pacote aprovado.
 
 Em cada dispatch, passar ao subagente somente brief, relatório, ownership e contexto estritamente necessário. O coordenador mantém a fila global, integra resultados e executa em paralelo outra unidade independente.
+
+## Profundidade de testes sem overengineering
+
+Na implementação de cada unidade, executar somente `verification.fast`: unitário focado quando lógica mudou, integração/contrato focada quando uma fronteira mudou e regressão diretamente relacionada. E2E focado só entra quando for a menor prova pública da unidade; não executar E2E completo, regressão completa ou mutação por unidade.
+
+Uma família de teste não cria unidade, dispatch, revisor ou subagente. Não dividir uma tarefa aprovada em “unitários”, “integração”, “E2E” e “mutação”, não criar campanha de cobertura e não despachar agente para gate mecânico. O mesmo implementador executa os comandos aplicáveis e registra proofs.
+
+No `verification.plan`, executar suítes afetadas, regressão do plano e E2E das jornadas críticas entregues. Quando `bm.py policy` exigir mutation testing, fazer uma execução seletiva por seam de risco no `HEAD` final do gate, usando somente ferramenta e comando aprovados. Não instalar ferramenta, não perseguir score global e não repetir mutação após cada fix. Mutante sem prova de que altera comportamento aprovado de risco alto/crítico vira hardening adiado; mutante equivalente ou inalcançável recebe justificativa curta.
+
+No `verification.release`, usar os comandos aprovados para suíte unitária completa configurada, integração/contratos aplicáveis, regressão completa, E2E de todas as jornadas críticas, build e evidência de mutação vigente quando obrigatória. Homologação apenas confirma essa baseline e opera o RC real; não abre outra campanha automatizada.
 
 ### Grouped — baixo risco
 
@@ -116,13 +126,14 @@ Não fazer push, merge, deploy ou publicação por inferência.
 
 Depois das unidades:
 
-1. executar todos os comandos `verification.plan` no RC atual;
-2. registrar comando, cwd, horário, saída resumida e exit code;
-3. repetir gates afetados e dependentes após correções;
-4. gerar checkpoint final;
-5. marcar plano concluído no método base somente quando gates obrigatórios estiverem `passed`.
+1. executar todos os comandos `verification.plan` no RC atual, respeitando o limite de profundidade acima;
+2. registrar cada comando como proof do `HEAD` atual, incluindo a mutação seletiva exigida;
+3. repetir somente gates afetados e dependentes após correções; mutação volta a rodar apenas no seam alterado e no `HEAD` final;
+4. registrar comando, cwd, horário, saída resumida e exit code;
+5. gerar checkpoint final;
+6. marcar plano concluído no método base somente quando gates obrigatórios estiverem `passed`.
 
-`not_run`, flake aberto ou dependência indispensável mantém conclusão indisponível.
+`not_run`, flake aberto ou dependência indispensável mantém conclusão indisponível. Evidência de mutação anterior a alteração no seam é inválida.
 
 ## Release, homologação e entrega
 
@@ -130,7 +141,7 @@ Quando último plano aprovado concluir:
 
 1. identificar RC com fingerprint completo: `id`, `revision`, `build` e `checksum`;
 2. definir `release.status: candidate`;
-3. executar `homologar-sistema`, começando por `verification.release`;
+3. executar `homologar-sistema`, começando por `verification.release` completo e proporcional, sem criar novas unidades de teste;
 4. exigir `homologation: accepted` e status `homologated`;
 5. criar `artifacts/delivery/DELIVERY.md`;
 6. definir `release.status: ready`.

@@ -70,6 +70,8 @@ Testar uma hipótese por vez. Após três hipóteses refutadas, reler arquitetur
 
 ## 4. Regressão RED
 
+Escolher o menor nível capaz de reproduzir o defeito pela interface estável: unitário para lógica isolada, integração/contrato para fronteira, E2E focado para jornada externa e evidência visual para apresentação. Não subir de camada apenas para aumentar cobertura.
+
 Criar a menor prova que:
 
 - falha no código defeituoso pelo motivo correto;
@@ -96,6 +98,8 @@ Depois:
 6. provar sensibilidade do teste quando viável: reverter apenas o fix, confirmar RED e restaurar, ou demonstrar a falha no commit/base anterior.
 
 Para bug visual, capturar evidência equivalente GREEN no mesmo viewport/plataforma e conferir estados vizinhos e acessibilidade afetada.
+
+Não executar campanha completa de mutation testing dentro do fix loop. Quando o bug tocar regra material e a política do plano exigir mutação, registrar o seam e executar somente o alvo seletivo no próximo `verification.plan` ou `verification.release`. O fix round permanece RED/GREEN focal mais regressão vizinha.
 
 ## 6. Revisão
 

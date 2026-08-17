@@ -54,9 +54,11 @@ Retomada começa com `workspace resume`, lendo o caminho absoluto do checkpoint,
 
 ## 4. Executar pela política do plano
 
-Antes da unidade, executar `bm.py policy` com perfil/risco e confirmar que o resultado coincide com `execution` e `review` aprovados. Divergência aumenta garantia automaticamente; redução exige novo pacote aprovado.
+Antes da unidade, executar `bm.py policy` com perfil, risco e `Change` declarado no brief; planos antigos sem `Change` usam `behavioral` somente por compatibilidade. Confirmar que o resultado coincide com `execution` e `review` aprovados. Divergência aumenta garantia automaticamente; redução exige novo pacote aprovado.
 
 Quando o host suportar subagentes, o implementador padrão dos três modos segue o contrato [`../_shared/agents/implementation-worker.md`](../_shared/agents/implementation-worker.md). Passar ao subagente somente o caminho do contrato, o caminho do brief, o caminho do relatório e o contexto adicional estritamente necessário; não copiar o conteúdo do contrato para o brief ou prompt. Sem subagentes, cumprir o contrato inline.
+
+Durante a unidade, executar somente `verification.fast` proporcional ao seam: unitário focado, integração/contrato focada e regressão relacionada; não executar E2E completo ou mutação por unidade. E2E focado só é permitido quando for a menor prova pública da própria unidade. As camadas de teste não criam nova tarefa, dispatch, revisor ou subagente.
 
 ### Grouped — baixo risco
 
@@ -110,20 +112,22 @@ Fix round é hipótese, não entrega: somente RED/GREEN focal, regressão direta
 
 Depois das unidades:
 
-1. executar todos os comandos `verification.plan` no RC atual;
-2. registrar comando, cwd, horário, saída resumida e código de retorno;
-3. usar `corrigir-bug` para falha de produto e repetir gate afetado/dependentes;
-4. gerar checkpoint final;
-5. marcar plano `completed` somente com gates obrigatórios `passed`.
+1. executar todos os comandos `verification.plan` no RC atual: suítes afetadas de unitários e integração/contrato, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva quando `bm.py policy` exigir;
+2. limitar mutação aos seams materiais alterados, usando ferramenta e comando já aprovados. Não perseguir score global, não instalar ferramenta neste estágio e não criar tarefa separada para “melhorar cobertura”;
+3. mutante sobrevivente só bloqueia quando demonstra que comportamento aprovado de risco alto/crítico pode mudar sem o teste falhar. Equivalente, inalcançável ou sem impacto material recebe justificativa e não abre fix loop;
+4. registrar comando, cwd, horário, saída resumida, código de retorno e fingerprint do commit medido;
+5. usar `corrigir-bug` para falha de produto e repetir somente gate afetado/dependentes; mutação volta a rodar apenas no seam afetado e no `HEAD` final do gate;
+6. gerar checkpoint final;
+7. marcar plano `completed` somente com gates obrigatórios `passed`.
 
-`not_run`, flake aberto ou dependência indispensável mantém `blocked`.
+`not_run`, flake aberto ou dependência indispensável mantém `blocked`. Evidência de mutação anterior a uma alteração no seam fica obsoleta.
 
 ## 7. Release, homologação e revisão final
 
 Quando o último plano aprovado concluir:
 
 1. identificar RC com fingerprint completo `id`, `revision`, `build` e `checksum`, então definir `release.status: candidate`;
-2. executar `homologar-sistema`, que começa por `verification.release`;
+2. executar `homologar-sistema`, que começa por `verification.release` com suíte unitária completa configurada, integração/contratos aplicáveis, regressão completa, E2E crítico, build e evidência de mutação obrigatória;
 3. somente com `homologation: accepted` e status `homologated`, revisar o release inteiro;
 4. comparar spec, planos, contratos cruzados, achados adiados, segurança e diff desde a primeira `base_revision`;
 5. executar verificação ampla proporcional e registrar `final_review: approved`;

@@ -1518,6 +1518,30 @@ STRUCTURAL_FINDING_CLASSES = (
     "recovery_after_restart",
 )
 
+MUTATION_RELEVANT_CHANGES = frozenset(
+    {
+        "authorization",
+        "business-rule",
+        "calculation",
+        "data-transform",
+        "financial",
+        "inventory",
+        "migration",
+        "money",
+        "offline",
+        "parser",
+        "payment",
+        "permission",
+        "security",
+        "state-machine",
+        "stock",
+        "sync",
+    }
+)
+PURE_NON_LOGIC_CHANGES = frozenset(
+    {"copy", "docs", "documentation", "mechanical", "style", "visual"}
+)
+
 
 def policy(
     profile: str,
@@ -1546,7 +1570,16 @@ def policy(
     manual_required = manual_pdf in {"quick_start", "full"} or (
         manual_pdf == "scope" and manual_in_scope
     )
-    visual_validation = change == "visual"
+    change_kind = change.strip().lower().replace("_", "-")
+    visual_validation = change_kind == "visual"
+    if risk == "low" or change_kind in PURE_NON_LOGIC_CHANGES:
+        mutation_mode = "not_required"
+    elif risk in {"high", "critical"}:
+        mutation_mode = "required_selective"
+    elif change_kind in MUTATION_RELEVANT_CHANGES:
+        mutation_mode = "selective"
+    else:
+        mutation_mode = "not_required"
     effective_round = max(round_number, seam_round or 0)
     hypothesis_invalidated = bool(structural_findings) or consecutive_seam_findings >= 2
     return {
@@ -1566,6 +1599,36 @@ def policy(
         "manual_required": manual_required,
         "manual_level": manual_pdf if manual_required else "none",
         "visual_validation": "screenshot_or_visual_regression" if visual_validation else "behavioral_seam",
+        "test_strategy": {
+            "fast": [
+                "targeted_unit_if_logic_changed",
+                "targeted_integration_if_boundary_changed",
+                "related_regression",
+            ],
+            "plan": [
+                "affected_unit_suite",
+                "affected_integration_and_contracts",
+                "affected_regression",
+                "critical_journey_e2e",
+                "selective_mutation_if_required",
+            ],
+            "release": [
+                "complete_unit_suite",
+                "applicable_integration_and_contracts",
+                "critical_journey_e2e",
+                "full_regression",
+                "current_mutation_evidence_if_required",
+                "release_build",
+            ],
+        },
+        "mutation_policy": {
+            "mode": mutation_mode,
+            "scope": "changed_material_risk_seams",
+            "run_stage": "plan_and_release_only",
+            "global_score_gate": False,
+            "blocking_rule": "survivor_changes_approved_high_or_critical_behavior",
+            "install_new_tool_during_execution": False,
+        },
         "homologation_order": [
             "automated_regression",
             "coded_e2e",

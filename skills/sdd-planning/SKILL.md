@@ -58,7 +58,8 @@ Fazer uma passagem explícita antes de escrever os planos:
 
 - criar cobertura explícita de cada requisito aprovado em spec e plano;
 - fundir baseline, setup, lint e docs na primeira entrega que os utiliza;
-- manter regressão final, evidências e exploração em `verification.release` e `homologar-sistema`;
+- distribuir unitários, integração/contrato, E2E, regressão e mutação nos três estágios de verificação; não criar tarefa por camada de teste;
+- manter regressão ampla, E2E crítico, evidências exigidas e build em `verification.release`; manter execução real e exploração visual em `homologar-sistema`;
 - remover camadas, abstrações e tarefas sem critério de aceite próprio;
 - preferir contratos públicos e slices verticais a tarefas por arquivo ou tecnologia.
 
@@ -92,7 +93,7 @@ Incluir somente:
 - jornadas e critérios de aceite;
 - segurança/dados/migração/concorrência aplicáveis;
 - plataformas e integrações;
-- seams de teste observáveis;
+- seams de teste observáveis, jornadas E2E críticas e regras materiais candidatas a mutação seletiva;
 - manual/PDF somente se contratado;
 - decisões e bloqueios.
 
@@ -127,6 +128,7 @@ Cada tarefa/slice/grupo declara:
 
 **Execution:** grouped | slice | strict
 **Review:** plan_gate | per_slice | per_task
+**Change:** <categoria factual usada por bm.py policy>
 **Test seams:** <interfaces públicas verificadas>
 **Spec refs:** <seções exatas>
 **Files:** <caminhos>
@@ -142,16 +144,19 @@ Cada tarefa/slice/grupo declara:
 - `strict`: uma tarefa por unidade crítica, RED/GREEN e revisão independente.
 - Setup/config/docs pertencem à primeira unidade que os usa.
 - Não usar `TBD`, “tratar erros”, tarefas horizontais ou abstração futura.
+- Unitários, integração/contrato, E2E, regressão e mutação entram em `Verification` e nos gates; não criar tarefa por camada de teste, por arquivo de teste ou por ferramenta.
 
 ## 8. Definir verificação
 
 Descobrir comandos nativos do repositório e preencher:
 
-- `verification.fast`: feedback mínimo do grupo/slice/tarefa;
-- `verification.plan`: gate completo por plano;
-- `verification.release`: regressão, E2E codificado e build do RC.
+- `verification.fast`: unitários focados quando houver lógica, integração/contrato focada quando uma fronteira mudar e regressão relacionada. E2E focado só quando for o menor seam público; nunca a suíte completa ou mutação;
+- `verification.plan`: suítes afetadas, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva conforme `bm.py policy`;
+- `verification.release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E de todas as jornadas críticas, regressão completa configurada, build do RC e evidência de mutação vigente quando obrigatória.
 
-Gate indispensável indisponível é bloqueio, nunca `passed` presumido.
+Executar `bm.py policy` com a categoria `Change` real. Para `mutation_policy.mode: selective`, usar apenas ferramenta já presente ou explicitamente aprovada. Para `required_selective`, declarar antes da aprovação o comando, os seams materiais e a alternativa determinística caso a stack não tenha ferramenta madura. Nunca deixar instalação de mutation testing para a execução.
+
+Não usar score global de mutação, cobertura total ou quantidade mínima de testes como critério. E2E cobre jornadas críticas, não cada tela. Gate indispensável indisponível é bloqueio, nunca `passed` presumido.
 
 ## 9. Criar estado e pacote
 

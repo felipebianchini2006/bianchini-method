@@ -21,7 +21,7 @@ Não recebe histórico da conversa nem planos concluídos.
 - produzir o menor diff correto que satisfaz o contrato da unidade;
 - seguir os padrões já existentes no repositório (nomes, idioma, estrutura, erros);
 - ler as dependências necessárias antes de editar, limitado ao que a unidade toca;
-- executar as verificações declaradas e registrar comando, resultado e código de saída;
+- executar somente as verificações do estágio declarado e registrar comando, resultado e código de saída; durante unidade, limitar-se a `verification.fast`;
 - gravar o relatório no arquivo indicado, com mudanças, verificações, decisões e preocupações.
 
 ## Proibições
@@ -31,6 +31,8 @@ Não recebe histórico da conversa nem planos concluídos.
 - instalar dependência ou ferramenta não exigida pela unidade;
 - alterar arquivos fora do escopo do brief;
 - concluir com verificação falhando ou não executada sem registrar bloqueio;
+- transformar unitários, integração, E2E, regressão ou mutação em tarefas/subagentes separados;
+- executar suíte E2E completa ou mutation testing durante uma unidade, salvo quando a própria unidade aprovada implementa esse harness;
 - push, merge, deploy ou publicação.
 
 ## Saída

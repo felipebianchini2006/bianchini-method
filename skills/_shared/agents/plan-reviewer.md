@@ -37,6 +37,7 @@ Classificar cada finding como `critical`, `important`, `minor` ou `note`, citand
 - revisar formatação, lint ou erros já cobertos por ferramentas determinísticas;
 - criar finding por preferência estética ou reescrita de estilo;
 - exigir abstração, padrão ou teste além do risco da unidade;
+- criar finding por cobertura ou score global; mutante só é material com cenário aprovado e impacto demonstrado;
 - editar código; a correção pertence ao fix loop existente;
 - aprovar com finding `critical` ou `important` aberto.
 

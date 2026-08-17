@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.8.0 - Testes adaptativos sem custo por microtarefa
+
+- distribui unitários, integração/contrato, E2E, regressão e mutation testing entre `verification.fast`, `verification.plan` e `verification.release`;
+- mantém regressão como estratégia transversal e impede tarefa, revisão ou subagente por camada de teste;
+- limita o estágio `fast` a provas focadas, move E2E crítico e mutação seletiva para o gate do plano e reserva a regressão ampla para o release;
+- adiciona `test_strategy` e `mutation_policy` ao resultado de `bm.py policy`, sem alterar schema ou estado do projeto;
+- não usa score global de mutação e só bloqueia survivor que demonstre comportamento aprovado alto/crítico sem proteção;
+- protege o executor Codex contra E2E completo, regressão completa, mutação e campanhas de cobertura por unidade;
+- mantém `homologar-sistema` como consumidor das provas automatizadas e executor do passe real, sem recriar a campanha técnica.
+
 ## 2.7.0 - Homologação operacional no release candidate
 
 - mantém regressão e E2E como baseline, mas impede que automação isolada encerre a homologação de produtos com interface;

@@ -505,6 +505,24 @@ class CodexOverlayPackageTests(unittest.TestCase):
         for unsupported in ("model:", "reasoning_effort:", "subagents:", "agents:"):
             self.assertNotIn(unsupported, policy)
 
+    def test_codex_core_bounds_test_depth_without_reintroducing_overengineering(
+        self,
+    ) -> None:
+        core = (OVERLAY / "references/EXECUTION_CORE_CODEX.md").read_text(
+            encoding="utf-8"
+        )
+        for expected in (
+            "não executar E2E completo, regressão completa ou mutação por unidade",
+            "não cria unidade, dispatch, revisor ou subagente",
+            "uma execução seletiva por seam de risco",
+            "score global",
+            "hardening adiado",
+        ):
+            self.assertIn(expected, core)
+        self.assertIn("verification.fast", core)
+        self.assertIn("verification.plan", core)
+        self.assertIn("verification.release", core)
+
     def test_codex_activation_policy_is_explicit_and_base_implicit_is_disabled(
         self,
     ) -> None:
