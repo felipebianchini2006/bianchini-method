@@ -110,7 +110,7 @@ Copie o JSON abaixo. JSON é YAML válido e permite validação standalone sem d
 - `telemetry.enabled: false` é o padrão. Quando habilitada explicitamente, registra apenas métricas numéricas locais em JSONL, sem prompts, código ou conteúdo de arquivos.
 - `verification.fast`: feedback durante grupo/slice/tarefa.
 - `verification.plan`: gate completo de cada plano.
-- `verification.release`: regressão e E2E automatizados antes da exploração manual.
+- `verification.release`: regressão e E2E automatizados antes da execução real do RC e da varredura visual.
 
 Valide sempre antes de aprovação, execução, homologação e status:
 

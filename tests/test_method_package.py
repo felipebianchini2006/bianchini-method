@@ -1095,11 +1095,17 @@ class AdaptivePolicyScenarios(unittest.TestCase):
         self.assertEqual(quick["manual_level"], "quick_start")
         self.assertTrue(full["manual_required"])
 
-    def test_homologation_is_automation_first(self) -> None:
+    def test_homologation_combines_automation_with_real_system_acceptance(self) -> None:
         value = self.policy("--profile", "standard", "--risk", "medium")
         self.assertEqual(
             value["homologation_order"],
-            ["automated_regression", "coded_e2e", "proof_map", "manual_gaps"],
+            [
+                "automated_regression",
+                "coded_e2e",
+                "proof_map",
+                "real_system_pass",
+                "visual_sweep",
+            ],
         )
 
     def test_homologation_maps_real_e2e_evidence_before_manual_gaps(self) -> None:
@@ -3165,16 +3171,19 @@ class AgentContractScenarios(unittest.TestCase):
         self.assertIn("somente leitura", contract)
         self.assertIn("fix loop existente", contract)
 
-    def test_ui_reviewer_only_with_visual_scope(self) -> None:
+    def test_homologation_has_self_contained_real_ui_gate(self) -> None:
         homologation = read(SKILLS["homologar-sistema"])
-        self.assertIn("../_shared/agents/ui-finish-reviewer.md", homologation)
-        self.assertIn("Não executá-lo em API, CLI ou serviço sem interface", homologation)
-        contract = read(self.CONTRACTS["ui-finish-reviewer"])
-        self.assertIn("Não roda em API, CLI ou serviço sem interface", contract)
-        self.assertIn("`PASS`", contract)
-        self.assertIn("`HOLD`", contract)
-        self.assertIn("condição de reteste", contract)
-        self.assertIn("pesquisar concorrentes", contract)
+        for expected in (
+            "abrir e operar o release candidate",
+            "não substitui a execução real",
+            "todos os fluxos críticos",
+            "todas as ações primárias",
+            "Varredura visual obrigatória",
+            "console e rede",
+            "não há lacuna manual",
+        ):
+            self.assertIn(expected, homologation)
+        self.assertNotIn("aplicar o gate de acabamento do contrato", homologation)
 
     def test_no_global_install_and_no_extra_public_skill(self) -> None:
         expected = {*SKILL_NAMES, "_shared"}
@@ -3260,11 +3269,14 @@ class SkillBehaviorContracts(unittest.TestCase):
 
     def test_homologation_and_manual_contracts_are_explicit(self) -> None:
         homologation = read(SKILLS["homologar-sistema"])
-        self.assertIn("## 2. Automação primeiro", homologation)
+        self.assertIn("## 2. Baseline automatizada", homologation)
+        self.assertIn("## 4. Execução real obrigatória", homologation)
+        self.assertIn("## 5. Varredura visual obrigatória", homologation)
         self.assertIn("manual_pdf: none", homologation)
         self.assertIn("manual_pdf: quick_start", homologation)
         self.assertIn("manual_pdf: full", homologation)
-        self.assertIn("Não repetir manualmente", homologation)
+        self.assertNotIn("Executar apenas lacunas", homologation)
+        self.assertNotIn("Não repetir manualmente", homologation)
 
     def test_architecture_and_status_skills_exist_in_readme(self) -> None:
         readme = read(ROOT / "README.md")

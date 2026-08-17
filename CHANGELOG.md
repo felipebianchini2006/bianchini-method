@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.0 - Homologação operacional no release candidate
+
+- mantém regressão e E2E como baseline, mas impede que automação isolada encerre a homologação de produtos com interface;
+- exige abrir e operar o RC real por plataforma e perfil, cobrindo fluxos críticos e ações primárias expostas;
+- adiciona inventário da superfície executável, sucesso, validação/erro, cancelamento/recuperação, persistência e verificação de console/rede;
+- torna a varredura visual básica obrigatória para toda interface, independentemente de design importado ou brand kit;
+- concentra o contrato operacional e visual em `homologar-sistema/SKILL.md`, sem depender de prompt externo;
+- atualiza a ordem executável para `automated_regression -> coded_e2e -> proof_map -> real_system_pass -> visual_sweep`.
+
 ## 2.6.0 — Breaker epistêmico por seam de risco
 
 - `bm.py policy` passa a contar o orçamento de fix rounds por `risk_seam` (`--risk-seam`, `--seam-round`): renomear, dividir ou reabrir a tarefa não zera a contagem do mesmo seam;

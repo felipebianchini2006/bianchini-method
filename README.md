@@ -16,7 +16,7 @@ escopo aprovado
   -> aprovação única
   -> executar-plano
   -> gates por plano
-  -> homologar-sistema (automação primeiro)
+  -> homologar-sistema (automação + uso real do RC)
   -> revisão final
   -> entrega
 ```
@@ -67,11 +67,11 @@ Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: ren
 - `auditar-arquitetura`: relatório manual de hotspots e mudanças recentes; invocação exclusivamente manual.
 - `status-projeto`: estado, gates, bloqueios e próximo passo, sem mutação.
 - `corrigir-bug`: causa raiz, regressão adequada ao seam, fix mínimo e reteste.
-- `homologar-sistema`: regressão/E2E primeiro, exploração manual das lacunas e aceite.
+- `homologar-sistema`: regressão/E2E, execução real do RC por perfil/plataforma, varredura visual e aceite.
 
 ### Contratos internos de subagentes
 
-`skills/_shared/agents/` contém cinco contratos enxutos e agnósticos de stack, referenciados por caminho pelas skills do método completo: `repo-cartographer` (mapeamento opcional em `sdd-planning`), `implementation-worker` e `plan-reviewer` (`executar-plano`), `security-reviewer` (risco alto/crítico sensível) e `ui-finish-reviewer` (`homologar-sistema` com escopo visual). `/executar-direto` não os utiliza. Origem adaptada do projeto Agency Agents (MIT); ver [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+`skills/_shared/agents/` contém contratos enxutos e agnósticos de stack para cartografia, implementação, revisão e segurança. A homologação mantém o passe real e a validação visual diretamente em sua própria skill, sem depender de prompt externo. `/executar-direto` não utiliza subagentes. Origem adaptada do projeto Agency Agents (MIT); ver [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Estado e ferramentas
 
@@ -97,7 +97,7 @@ Novos planejamentos incluem `STACK_RESEARCH.md` em modo `repo_only`, `targeted_w
 
 ## Homologação e manual
 
-Homologação executa `verification.release`, E2E codificado e cria mapa de provas antes de interação manual. A exploração cobre somente lacunas, comportamento visual, acessibilidade, plataforma e integrações não provadas.
+Homologação executa `verification.release`, E2E codificado e mapa de provas como baseline. Depois abre e opera o RC real por plataforma e perfil, percorre fluxos críticos e ações primárias, verifica estados de erro/recuperação, console/rede e executa varredura visual em toda interface aplicável.
 
 `manual_pdf: scope` é o padrão. Os valores são `none | quick_start | full | scope`; ausência de conversor não bloqueia projeto sem manual contratado.
 
@@ -155,4 +155,4 @@ O runner recomendado executa cada classe em processo separado e libera recursos 
 python3 -m unittest discover -s tests -v
 ```
 
-Os testes usam projetos-fixture v1 legado, v2 grouped e v2 strict, além de cenários temporários para worktree, path traversal, fingerprints antigo/incorreto, telemetria opt-in, breaker, homologação automation-first, bug visual, auditoria e manual fora do escopo.
+Os testes usam projetos-fixture v1 legado, v2 grouped e v2 strict, além de cenários temporários para worktree, path traversal, fingerprints antigo/incorreto, telemetria opt-in, breaker, homologação com automação e execução real, bug visual, auditoria e manual fora do escopo.

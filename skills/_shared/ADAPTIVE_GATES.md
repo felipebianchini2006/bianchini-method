@@ -6,7 +6,7 @@ Quando a telemetria estiver habilitada, registrar após o gate apenas duração,
 
 - `fast`: menor comando útil durante grupo, slice ou tarefa;
 - `plan`: sequência completa ao concluir o plano;
-- `release`: regressão automatizada, E2E codificado e build do RC antes da homologação manual.
+- `release`: regressão automatizada, E2E codificado e build do RC antes da execução real e da varredura visual de homologação.
 
 ## Descoberta
 

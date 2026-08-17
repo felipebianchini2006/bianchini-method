@@ -1566,7 +1566,13 @@ def policy(
         "manual_required": manual_required,
         "manual_level": manual_pdf if manual_required else "none",
         "visual_validation": "screenshot_or_visual_regression" if visual_validation else "behavioral_seam",
-        "homologation_order": ["automated_regression", "coded_e2e", "proof_map", "manual_gaps"],
+        "homologation_order": [
+            "automated_regression",
+            "coded_e2e",
+            "proof_map",
+            "real_system_pass",
+            "visual_sweep",
+        ],
     }
 
 

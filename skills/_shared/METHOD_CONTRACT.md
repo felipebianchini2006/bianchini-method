@@ -173,7 +173,7 @@ O pacote contém escopo local, pesquisa da stack, spec, planos, revisão de plan
 
 Todo novo planejamento v2 usa `planning.quality_version: 1`, registra `planning.research_mode` e inclui `STACK_RESEARCH.md`. Selecionar o menor modo suficiente: `repo_only` para stack estabelecida sem integração/decisão sensível nova; `targeted_web` para API, biblioteca, pagamento, autenticação, mobile, infraestrutura ou decisão sensível a versão; `full` somente para garantia Full explícita, auditoria/regulação, arquitetura nova de alto impacto ou várias decisões críticas. `repo_only` inventaria manifests, lockfiles, CI, testes e padrões locais sem exigir URL. Os modos web exigem fontes primárias oficiais, URL e data. Registrar sempre o modo, o motivo e somente decisões aplicadas.
 
-O escopo aprovado define resultados e invariantes, não a decomposição operacional. Preservar 100% dele; simplificar implementação nunca significa retirar requisito. Reescrever planos legados ou externos em slices de entrega autocontidos; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências e exploração manual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
+O escopo aprovado define resultados e invariantes, não a decomposição operacional. Preservar 100% dele; simplificar implementação nunca significa retirar requisito. Reescrever planos legados ou externos em slices de entrega autocontidos; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências, execução real do RC e varredura visual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
 
 Antes do snapshot, executar:
 
@@ -203,7 +203,7 @@ bm.py snapshot verify <state> --root <repo>
 - execução lê plano atual e somente seus `spec_refs`;
 - grouped usa um brief/revisão por grupo; slice, por slice; strict, por tarefa;
 - revisor recebe brief, relatório e pacote de diff, nunca histórico inteiro;
-- homologação lê critérios, gates e resumos, abrindo detalhe só para lacuna/falha;
+- homologação lê critérios, gates e resumos, inventaria a superfície do RC e abre detalhes somente para executar jornadas, investigar falha ou validar divergência;
 - referências opcionais são carregadas na fase indicada.
 
 ## Fontes de verdade e segurança
