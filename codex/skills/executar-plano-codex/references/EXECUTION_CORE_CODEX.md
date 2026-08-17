@@ -6,7 +6,7 @@ Este arquivo contém somente preflight, rota, aprovação, worktree, implementa�
 
 1. Resolver `bm.py` da instalação ativa e executar `bm.py route`.
 2. Na rota v1, exigir Superpowers e executar integralmente o fluxo legado. Não misturar etapas v2 durante a fase. Após encerramento completo, executar a transição legada descrita abaixo.
-3. Na rota v2, executar `bm.py validate-state` e `bm.py snapshot verify`.
+3. Na rota v2, executar `bm.py validate-state` e `bm.py snapshot verify`. Em `planning.quality_version: 2`, exigir readiness válido e checker `passed` no digest aprovado.
 4. Executar `bm.py repo-hygiene check --repo <repo>`. Exigir ignore versionado e rejeitar `.superpowers/` rastreado.
 5. Aprovação `pending` só muda por aprovação explícita inequívoca do digest atual. O comando de execução não vale como aprovação.
 6. Na aprovação, verificar snapshot, commitar localmente somente pacote, estado e manifesto, então exigir árvore limpa.
@@ -78,6 +78,16 @@ Antes da unidade, executar `bm.py policy` com perfil, risco e `Change` declarado
 
 Em cada dispatch, passar ao subagente somente brief, relatório, ownership e contexto estritamente necessário. O coordenador mantém a fila global, integra resultados e executa em paralelo outra unidade independente.
 
+## Autonomia e plano congelado
+
+O plano aprovado permanece congelado. Antes de alterar decomposição, comandos, contratos ou design, executar `bm.py change-policy` e seguir uma destas classes:
+
+- `implementation_detail`: decisão técnica interna e reversível. Escolher a opção reversível de menor risco, registrar no relatório e continuar;
+- `bounded_amendment`: ajuste limitado de arquivo, comando ou ordem interna sem mudar entrega. Registrar no ledger/checkpoint e continuar, sem nova unidade, revisor ou aprovação;
+- `material_change`: mudança de escopo, contrato público, design aprovado ou invariante crítico. Não editar o plano nem improvisar; usar a categoria `material_change` do contrato de convergência com prova estruturada.
+
+A ordem automática é: decisão aprovada, padrão existente no repositório, stack já usada, documentação oficial e opção reversível de menor risco. Ler `USER_ACTIONS.md` uma vez e continuar com fakes, sandbox ou trabalho independente até o ponto em que a ação externa seja indispensável. Decisão interna não gera pergunta, nova decomposição ou revisão extra.
+
 ## Profundidade de testes sem overengineering
 
 Na implementação de cada unidade, executar somente `verification.fast`: unitário focado quando lógica mudou, integração/contrato focada quando uma fronteira mudou e regressão diretamente relacionada. E2E focado só entra quando for a menor prova pública da unidade; não executar E2E completo, regressão completa ou mutação por unidade.
@@ -144,7 +154,8 @@ Quando último plano aprovado concluir:
 3. executar `homologar-sistema`, começando por `verification.release` completo e proporcional, sem criar novas unidades de teste;
 4. exigir `homologation: accepted` e status `homologated`;
 5. criar `artifacts/delivery/DELIVERY.md`;
-6. definir `release.status: ready`.
+6. definir `release.status: ready`;
+7. em `planning.quality_version: 2`, executar `bm.py cycle-close` para sincronizar deltas nas specs atuais, arquivar o ciclo e preparar o próximo estado `idle`.
 
 Manual ou PDF entra na entrega somente quando `manual_pdf` e escopo exigirem.
 

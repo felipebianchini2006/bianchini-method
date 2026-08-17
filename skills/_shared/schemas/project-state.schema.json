@@ -23,73 +23,304 @@
     "next_action"
   ],
   "properties": {
-    "method_version": { "const": 2 },
-    "method_mode": { "const": "standalone-adaptive" },
-    "planning_version": { "type": "string", "pattern": "^v[1-9][0-9]*$" },
+    "method_version": {
+      "const": 2
+    },
+    "method_mode": {
+      "const": "standalone-adaptive"
+    },
+    "planning_version": {
+      "type": "string",
+      "pattern": "^v[1-9][0-9]*$"
+    },
     "planning_status": {
-      "enum": ["idle", "in_progress", "pending_approval", "approved", "blocked"]
+      "enum": [
+        "idle",
+        "in_progress",
+        "pending_approval",
+        "approved",
+        "blocked"
+      ]
     },
-    "execution_policy": { "const": "adaptive" },
-    "assurance_profile": { "enum": ["lean", "standard", "full"] },
-    "architecture_audit": { "enum": ["disabled", "optional", "required"] },
+    "execution_policy": {
+      "const": "adaptive"
+    },
+    "assurance_profile": {
+      "enum": [
+        "lean",
+        "standard",
+        "full"
+      ]
+    },
+    "architecture_audit": {
+      "enum": [
+        "disabled",
+        "optional",
+        "required"
+      ]
+    },
     "architecture_audit_status": {
-      "enum": ["not_run", "pending", "passed", "blocked"]
+      "enum": [
+        "not_run",
+        "pending",
+        "passed",
+        "blocked"
+      ]
     },
-    "manual_pdf": { "enum": ["none", "quick_start", "full", "scope"] },
+    "manual_pdf": {
+      "enum": [
+        "none",
+        "quick_start",
+        "full",
+        "scope"
+      ]
+    },
     "scope": {
       "type": "object",
-      "required": ["status", "source"],
+      "required": [
+        "status",
+        "source"
+      ],
       "properties": {
-        "status": { "enum": ["pending", "approved"] },
-        "source": { "type": ["string", "null"] },
-        "approved_at": { "type": ["string", "null"] }
+        "status": {
+          "enum": [
+            "pending",
+            "approved"
+          ]
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approved_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "planning": {
       "type": "object",
-      "required": ["spec", "review"],
+      "required": [
+        "spec",
+        "review"
+      ],
       "properties": {
-        "quality_version": { "const": 1 },
-        "research_mode": {
-          "enum": ["repo_only", "targeted_web", "full", null]
+        "quality_version": {
+          "enum": [
+            1,
+            2
+          ]
         },
-        "research": { "type": ["string", "null"] },
-        "spec": { "type": ["string", "null"] },
-        "review": { "type": ["string", "null"] }
+        "research_mode": {
+          "enum": [
+            "repo_only",
+            "targeted_web",
+            "full",
+            null
+          ]
+        },
+        "research": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readiness": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user_actions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "design_manifest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "change_root": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_specs": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checker": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "status",
+            "rounds",
+            "history_path",
+            "package_digest",
+            "report_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending",
+                "changes_requested",
+                "passed",
+                "blocked"
+              ]
+            },
+            "rounds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "history_path": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+            },
+            "package_digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "report_digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
       }
     },
     "complexity_review": {
       "type": "object",
-      "required": ["decision", "justification", "deferred_scope"],
+      "required": [
+        "decision",
+        "justification",
+        "deferred_scope"
+      ],
       "properties": {
         "decision": {
-          "enum": ["pending", "within_budget", "split", "indivisible"]
+          "enum": [
+            "pending",
+            "within_budget",
+            "split",
+            "indivisible"
+          ]
         },
-        "justification": { "type": ["string", "null"] },
-        "deferred_scope": { "type": "array", "items": { "type": "string" } },
-        "scope_split_approved": { "type": "boolean" },
-        "scope_split_approved_by": { "type": ["string", "null"] },
-        "scope_split_approved_at": { "type": ["string", "null"] }
+        "justification": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deferred_scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scope_split_approved": {
+          "type": "boolean"
+        },
+        "scope_split_approved_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope_split_approved_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "approval": {
       "type": "object",
-      "required": ["status", "approved_plans", "package"],
+      "required": [
+        "status",
+        "approved_plans",
+        "package"
+      ],
       "properties": {
-        "status": { "enum": ["pending", "approved", "rejected", "invalidated"] },
-        "approved_at": { "type": ["string", "null"] },
-        "approved_by": { "type": ["string", "null"] },
-        "approved_plans": { "type": "array", "items": { "type": "string" } },
+        "status": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "invalidated"
+          ]
+        },
+        "approved_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approved_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approved_plans": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "package": {
           "type": "object",
-          "required": ["algorithm", "manifest_path", "manifest_digest", "files"],
+          "required": [
+            "algorithm",
+            "manifest_path",
+            "manifest_digest",
+            "files"
+          ],
           "properties": {
-            "algorithm": { "const": "sha256-manifest-v1" },
+            "algorithm": {
+              "const": "sha256-manifest-v1"
+            },
             "manifest_path": {
               "type": "string",
               "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
             },
-            "manifest_digest": { "type": ["string", "null"] },
+            "manifest_digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "files": {
               "type": "array",
               "items": {
@@ -118,82 +349,253 @@
           "gates"
         ],
         "properties": {
-          "id": { "type": "string" },
-          "path": { "type": "string" },
-          "status": { "enum": ["planned", "approved", "in_progress", "completed", "blocked"] },
-          "risk": { "enum": ["low", "medium", "high", "critical"] },
-          "execution": { "enum": ["grouped", "slice", "strict"] },
-          "review": { "enum": ["plan_gate", "per_slice", "per_task"] },
-          "test_seams": { "type": "array", "items": { "type": "string" } },
-          "depends_on": { "type": "array", "items": { "type": "string" } },
-          "ledger": { "type": "string" },
-          "gates": { "type": "array", "items": { "type": "string" } }
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "approved",
+              "in_progress",
+              "completed",
+              "blocked"
+            ]
+          },
+          "risk": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "execution": {
+            "enum": [
+              "grouped",
+              "slice",
+              "strict"
+            ]
+          },
+          "review": {
+            "enum": [
+              "plan_gate",
+              "per_slice",
+              "per_task"
+            ]
+          },
+          "test_seams": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ledger": {
+            "type": "string"
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
     "verification": {
       "type": "object",
-      "required": ["fast", "plan", "release"],
+      "required": [
+        "fast",
+        "plan",
+        "release"
+      ],
       "properties": {
-        "fast": { "$ref": "#/$defs/verificationStage" },
-        "plan": { "$ref": "#/$defs/verificationStage" },
-        "release": { "$ref": "#/$defs/verificationStage" }
+        "fast": {
+          "$ref": "#/$defs/verificationStage"
+        },
+        "plan": {
+          "$ref": "#/$defs/verificationStage"
+        },
+        "release": {
+          "$ref": "#/$defs/verificationStage"
+        }
       }
     },
     "release": {
       "type": "object",
-      "required": ["status", "final_gate", "homologation", "final_review", "delivery"],
+      "required": [
+        "status",
+        "final_gate",
+        "homologation",
+        "final_review",
+        "delivery"
+      ],
       "properties": {
-        "status": { "enum": ["pending", "candidate", "homologated", "ready", "blocked"] },
-        "platforms": { "type": "array", "items": { "type": "string" } },
-        "profiles": { "type": "array", "items": { "type": "string" } },
-        "candidate": {
-          "type": ["object", "null"],
-          "required": ["id", "revision", "build", "checksum"],
-          "properties": {
-            "id": { "type": "string", "pattern": ".+" },
-            "revision": { "type": "string", "pattern": ".+" },
-            "build": { "type": "string", "pattern": ".+" },
-            "checksum": { "type": "string", "pattern": ".+" }
+        "status": {
+          "enum": [
+            "pending",
+            "candidate",
+            "homologated",
+            "ready",
+            "blocked"
+          ]
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         },
-        "final_gate": { "const": "homologar-sistema" },
-        "homologation": { "enum": ["pending", "in_progress", "accepted", "blocked"] },
-        "final_review": { "enum": ["pending", "in_progress", "approved", "changes_requested", "blocked"] },
-        "delivery": { "enum": ["pending", "ready", "blocked"] }
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "candidate": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "id",
+            "revision",
+            "build",
+            "checksum"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": ".+"
+            },
+            "revision": {
+              "type": "string",
+              "pattern": ".+"
+            },
+            "build": {
+              "type": "string",
+              "pattern": ".+"
+            },
+            "checksum": {
+              "type": "string",
+              "pattern": ".+"
+            }
+          }
+        },
+        "final_gate": {
+          "const": "homologar-sistema"
+        },
+        "homologation": {
+          "enum": [
+            "pending",
+            "in_progress",
+            "accepted",
+            "blocked"
+          ]
+        },
+        "final_review": {
+          "enum": [
+            "pending",
+            "in_progress",
+            "approved",
+            "changes_requested",
+            "blocked"
+          ]
+        },
+        "delivery": {
+          "enum": [
+            "pending",
+            "ready",
+            "blocked"
+          ]
+        }
       }
     },
     "active_execution": {
-      "type": ["object", "null"],
-      "required": ["plan_id", "unit", "workspace"],
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "plan_id",
+        "unit",
+        "workspace"
+      ],
       "properties": {
-        "plan_id": { "type": "string" },
-        "unit": { "type": "string" },
-        "gate": { "type": ["string", "null"] },
-        "workspace": { "type": "string" }
+        "plan_id": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "gate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace": {
+          "type": "string"
+        }
       }
     },
     "telemetry": {
       "type": "object",
-      "required": ["enabled", "path"],
+      "required": [
+        "enabled",
+        "path"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
+        "enabled": {
+          "type": "boolean"
+        },
         "path": {
           "type": "string",
           "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
         }
       }
     },
-    "blockers": { "type": "array", "items": { "type": "object" } },
-    "next_action": { "type": "string" }
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "next_action": {
+      "type": "string"
+    }
   },
   "$defs": {
     "verificationStage": {
       "type": "object",
-      "required": ["commands", "status"],
+      "required": [
+        "commands",
+        "status"
+      ],
       "properties": {
-        "commands": { "type": "array", "items": { "type": "string" } },
-        "status": { "enum": ["pending", "passed", "failed", "not_run", "blocked"] }
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "passed",
+            "failed",
+            "not_run",
+            "blocked"
+          ]
+        }
       }
     }
   }

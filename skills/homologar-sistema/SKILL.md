@@ -44,6 +44,8 @@ Homologação confirma as provas produzidas nos gates e depois opera o produto; 
 
 O mapa automatizado orienta prioridade, não decide sozinho o aceite. “Os testes passaram”, “o código parece correto” e “não há lacuna manual” não autorizam pular a execução real. Não escrever uma nova suíte apenas para evitar abrir o sistema.
 
+Não iniciar novo planejamento, campanha de arquitetura ou redesign durante homologação. Divergência interna segue `change-policy`; somente mudança material comprovada invalida o pacote afetado.
+
 ## 3. Inventário e matriz de aceite
 
 Ler critérios e jornadas da spec, plataformas/perfis do estado, cabeçalhos dos planos e resumos dos ledgers. Depois, inspecionar a navegação do RC para inventariar telas, menus, rotas e ações expostas.
@@ -96,7 +98,7 @@ Em cada tela ou família visual distinta, verificar:
 - foco visível, teclado e nomes acessíveis aplicáveis;
 - modais, menus, dropdowns, toasts e feedback após ações;
 - loading, vazio, erro, sucesso e disabled relevantes;
-- fidelidade ao design aprovado e ao brand kit, quando existirem.
+- fidelidade ao `DESIGN_MANIFEST.json`, contrato, prototype e brand kit aprovados, quando existirem; arquivos visuais sem manifesto são ignorados.
 
 Capturar screenshot de cada estado visual distinto necessário para provar o resultado e de toda falha. Não bloquear por preferência estética pessoal. Um achado visual bloqueia apenas quando viola o escopo, prejudica compreensão, acessibilidade, responsividade ou conclusão da jornada.
 
@@ -105,6 +107,7 @@ Capturar screenshot de cada estado visual distinto necessário para provar o res
 Para cada falha, registrar plataforma, perfil, jornada, passo, esperado, real, severidade, classificação e evidência.
 
 - produto `critical` ou `important`: executar `corrigir-bug` no mesmo workspace;
+- divergência de escopo, contrato público ou design aprovado: classificar com `change-policy`; `material_change` bloqueia apenas a área afetada e não vira fix loop;
 - ambiente: reparar o harness e repetir;
 - externo: validar contrato/degradação e bloquear quando indispensável;
 - fora de escopo: registrar limitação sem ampliar o RC.
@@ -135,7 +138,7 @@ Após duas ondas de homologação sem convergir, declarar `BLOQUEADO`. Com telem
 
 Caso contrário, `BLOQUEADO` com o próximo requisito verificável. Não inventar “aceito com ressalvas”.
 
-Ao aceitar, gravar `release.homologation: accepted` e `release.status: homologated`.
+Ao aceitar, gravar `release.homologation: accepted` e `release.status: homologated`. A sincronização de specs ocorre somente depois de revisão final e entrega `ready`, por `cycle-close`; homologação não edita `current/specs`.
 
 ## 8. Manual conforme escopo
 

@@ -43,7 +43,14 @@ STOP_KINDS = {
     "essential_external_credential",
     "destructive_action",
     "new_cost",
+    "material_change",
     "real_impossibility",
+}
+MATERIAL_CHANGE_KINDS = {
+    "scope",
+    "public_contract",
+    "approved_design",
+    "critical_invariant",
 }
 PHASES = {
     "review_frozen",
@@ -2050,6 +2057,40 @@ def validate_stop_evidence(
             "estimate": estimate,
             "currency": currency,
         }
+    if kind == "material_change":
+        fields = (
+            "approved_requirement",
+            "change_kind",
+            "current_contract",
+            "required_change",
+            "execution_blocker",
+            "evidence_proof_id",
+        )
+        if any(not nonempty(value.get(field)) for field in fields):
+            raise GuardError("evidência de mudança material incompleta")
+        change_kind = value["change_kind"].strip()
+        if change_kind not in MATERIAL_CHANGE_KINDS:
+            raise GuardError("change_kind inválido para mudança material")
+        brief_content = frozen_task_brief_content(state, root)
+        approved_requirement = value["approved_requirement"].strip()
+        if approved_requirement not in brief_content:
+            raise GuardError("approved_requirement ausente do task-brief congelado")
+        proof_id = value["evidence_proof_id"].strip()
+        require_proof(
+            state,
+            proof_id,
+            commit=expected_commit,
+            success=False,
+            label="material_change.evidence_proof_id",
+        )
+        return {
+            "approved_requirement": approved_requirement,
+            "change_kind": change_kind,
+            "current_contract": value["current_contract"].strip(),
+            "required_change": value["required_change"].strip(),
+            "execution_blocker": value["execution_blocker"].strip(),
+            "evidence_proof_id": proof_id,
+        }
     if kind == "real_impossibility":
         if not nonempty(value.get("invariant")) or not nonempty(
             value.get("safe_workaround_absence_proof")
@@ -2088,7 +2129,7 @@ def command_stop(args: argparse.Namespace) -> dict[str, Any]:
     state, recovered, migrated = load_sidecar(path)
     ensure_mutable(state)
     if args.kind not in STOP_KINDS:
-        raise GuardError("somente quatro categorias podem produzir stopped")
+        raise GuardError(f"somente {len(STOP_KINDS)} categorias podem produzir stopped")
     root = Path(state["repository_root"])
     evidence_path = confined_path(root, args.evidence, "stop evidence", must_exist=True)
     head = current_head(root)

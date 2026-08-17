@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import unicodedata
@@ -138,6 +140,11 @@ def validate_node(value: Any, rule: dict[str, Any], schema: dict[str, Any], at: 
     }
     if allowed and not any(isinstance(value, type_map[item]) for item in allowed):
         return [f"{at}: tipo inválido; esperado {allowed}"]
+    if isinstance(value, int) and not isinstance(value, bool):
+        if "minimum" in rule and value < rule["minimum"]:
+            errors.append(f"{at}: menor que minimum {rule['minimum']}")
+        if "maximum" in rule and value > rule["maximum"]:
+            errors.append(f"{at}: maior que maximum {rule['maximum']}")
     if isinstance(value, dict):
         for key in rule.get("required", []):
             if key not in value:
@@ -195,9 +202,25 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
             errors.append("state.scope: idle exige escopo pendente e sem fonte aprovada")
         if any(
             state["planning"].get(field) is not None
-            for field in ("research", "spec", "review")
+            for field in (
+                "research",
+                "readiness",
+                "user_actions",
+                "spec",
+                "review",
+                "checker",
+                "design_manifest",
+                "change_root",
+            )
         ):
-            errors.append("state.planning: idle não pode apontar pesquisa, spec ou revisão")
+            errors.append(
+                "state.planning: idle não pode apontar pesquisa, readiness, spec, revisão ou mudança"
+            )
+        current_specs = state["planning"].get("current_specs")
+        if current_specs is not None and (
+            not isinstance(current_specs, str) or not current_specs.strip()
+        ):
+            errors.append("state.planning.current_specs: idle exige caminho válido ou null")
         complexity = state.get("complexity_review")
         if complexity is not None and (
             complexity.get("decision") != "pending"
@@ -252,13 +275,38 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
             errors.append("state.scope: ciclo ativo exige escopo aprovado e fonte local")
         if not state["planning"]["spec"] or not state["planning"]["review"]:
             errors.append("state.planning: ciclo ativo exige spec e revisão")
-        if state["planning"].get("quality_version") == 1:
+        quality_version = state["planning"].get("quality_version")
+        if quality_version in {1, 2}:
             if not state["planning"].get("research"):
-                errors.append("state.planning.research: contrato de qualidade v1 exige pesquisa")
+                errors.append(
+                    f"state.planning.research: contrato de qualidade v{quality_version} exige pesquisa"
+                )
             if not isinstance(state.get("complexity_review"), dict):
                 errors.append(
-                    "state.complexity_review: contrato de qualidade v1 exige revisão de complexidade"
+                    f"state.complexity_review: contrato de qualidade v{quality_version} exige revisão de complexidade"
                 )
+        if quality_version == 2:
+            for field in ("readiness", "user_actions", "change_root", "current_specs"):
+                if not isinstance(state["planning"].get(field), str) or not state[
+                    "planning"
+                ][field].strip():
+                    errors.append(f"state.planning.{field}: contrato de qualidade v2 exige caminho")
+            checker = state["planning"].get("checker")
+            if not isinstance(checker, dict):
+                errors.append("state.planning.checker: contrato de qualidade v2 exige objeto")
+            elif state["approval"]["status"] == "approved":
+                if checker.get("status") != "passed":
+                    errors.append("state.planning.checker.status: aprovação exige passed")
+                if checker.get("rounds") not in {1, 2}:
+                    errors.append("state.planning.checker.rounds: aprovação exige 1 ou 2")
+                for digest_field in ("package_digest", "report_digest"):
+                    digest_value = checker.get(digest_field)
+                    if not isinstance(digest_value, str) or not re.fullmatch(
+                        r"[0-9a-f]{64}", digest_value
+                    ):
+                        errors.append(
+                            f"state.planning.checker.{digest_field}: aprovação exige digest válido"
+                        )
     if len(plan_ids) != len(set(plan_ids)):
         errors.append("state.plans: IDs duplicados")
     active = state.get("active_execution")
@@ -326,6 +374,11 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
         }
         if state["planning"].get("research"):
             contract_files.add(state["planning"]["research"])
+        if state["planning"].get("quality_version") == 2:
+            for field in ("readiness", "user_actions", "design_manifest"):
+                value = state["planning"].get(field)
+                if value:
+                    contract_files.add(value)
         missing_contract_files = sorted(contract_files - package_files)
         if missing_contract_files:
             errors.append(
@@ -468,13 +521,104 @@ def confined_path(root: Path, value: str, label: str) -> Path:
     return target
 
 
+def reject_symlink_chain(root: Path, path: Path, label: str) -> None:
+    base = root.resolve()
+    candidate = path if path.is_absolute() else base / path
+    try:
+        relative = candidate.absolute().relative_to(base)
+    except ValueError as error:
+        raise BMError(f"{label} fora da raiz: {candidate}") from error
+    current = base
+    for part in relative.parts:
+        current = current / part
+        if current.exists() and current.is_symlink():
+            raise BMError(f"{label} contém symlink: {current}", EXIT_BLOCKED)
+
+
+def reject_tree_symlinks(root: Path, directory: Path, label: str) -> None:
+    base = root.resolve()
+    candidate = directory if directory.is_absolute() else base / directory
+    reject_symlink_chain(base, candidate, label)
+    if not candidate.exists():
+        return
+    if not candidate.is_dir():
+        raise BMError(f"{label} deve ser diretório: {candidate}", EXIT_BLOCKED)
+    for current, directories, files in os.walk(candidate, followlinks=False):
+        current_path = Path(current)
+        for name in [*directories, *files]:
+            entry = current_path / name
+            if entry.is_symlink():
+                raise BMError(f"{label} contém symlink: {entry}", EXIT_BLOCKED)
+
+
+def atomic_write_bytes(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with temporary.open("wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def atomic_write_json(path: Path, value: Any) -> None:
+    atomic_write_bytes(
+        path,
+        (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
+    )
+
+
+def json_document(text: str, label: str) -> dict[str, Any]:
+    fenced = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+    candidate = fenced.group(1) if fenced else text
+    try:
+        value = json.loads(candidate)
+    except json.JSONDecodeError as error:
+        raise BMError(f"{label}: JSON inválido na linha {error.lineno}") from error
+    if not isinstance(value, dict):
+        raise BMError(f"{label}: esperado objeto JSON")
+    return value
+
+
+def next_planning_version(value: str) -> str:
+    match = re.fullmatch(r"v([1-9][0-9]*)", value)
+    if not match:
+        raise BMError("planning_version inválida; esperado v1, v2, ...")
+    return f"v{int(match.group(1)) + 1}"
+
+
+def relative_to_root(root: Path, path: Path, label: str) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError as error:
+        raise BMError(f"{label} fora da raiz: {path}") from error
+
+
+def path_under_root(root: Path, value: Path, label: str) -> Path:
+    base = root.resolve()
+    candidate = value if value.is_absolute() else base / value
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(base)
+    except ValueError as error:
+        raise BMError(f"{label} fora da raiz: {value}") from error
+    reject_symlink_chain(base, candidate, label)
+    return resolved
+
+
 ROOT_SUPERPOWERS_IGNORE = "/.superpowers/"
 ROOT_SUPERPOWERS_ARCHIVE = "docs/bianchini/legacy/root-superpowers"
 DIRECT_SCRATCH_ROOT = ".superpowers/bianchini/direct"
 LEGACY_STATE_ARCHIVE = "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md"
-IDLE_NEXT_ACTION = (
-    "Aguardar novo escopo; então executar /sdd-planning para iniciar o ciclo v1 standalone."
-)
+def idle_next_action(planning_version: str) -> str:
+    return (
+        "Aguardar novo escopo; então executar /sdd-planning para iniciar o ciclo "
+        f"{planning_version} standalone."
+    )
 LEGACY_COMPLETED_STATUSES = {
     "completed",
     "done",
@@ -489,6 +633,155 @@ LEGACY_BLOCKING_STATUSES = {
     "blocked",
     "em_andamento",
 }
+
+
+DESIGN_MANIFEST_REQUIRED = (
+    "schema_version",
+    "status",
+    "source",
+    "scope_source",
+    "scope_digest",
+    "design_digest",
+    "contract",
+    "prototype",
+    "tokens",
+    "screenshots",
+    "surfaces",
+    "breakpoints",
+    "files",
+)
+
+
+def design_audit(
+    root: Path,
+    scope_path: Path,
+    manifest_path: Path,
+    seal: bool,
+) -> dict[str, Any]:
+    base = root.resolve()
+    if not base.is_dir():
+        raise BMError(f"raiz de design não encontrada: {root}")
+    scope = path_under_root(base, scope_path, "scope de design")
+    manifest_file = path_under_root(base, manifest_path, "manifesto de design")
+    if not scope.is_file():
+        raise BMError(f"scope de design ausente: {scope}")
+    if not manifest_file.is_file():
+        raise BMError(f"manifesto de design ausente: {manifest_file}")
+    manifest = json_document(manifest_file.read_text(encoding="utf-8"), "manifesto de design")
+    missing = [field for field in DESIGN_MANIFEST_REQUIRED if field not in manifest]
+    if missing:
+        raise BMError("manifesto de design incompleto: " + ", ".join(missing))
+    if manifest.get("schema_version") != 1:
+        raise BMError("manifesto de design: schema_version esperado 1")
+    if manifest.get("status") not in {"draft", "approved"}:
+        raise BMError("manifesto de design: status esperado draft ou approved")
+    if manifest.get("source") not in {"generated", "imported", "existing"}:
+        raise BMError("manifesto de design: source inválido")
+    files = manifest.get("files")
+    if not isinstance(files, list) or not files or not all(
+        isinstance(item, str) and item for item in files
+    ):
+        raise BMError("manifesto de design: files deve ser lista não vazia")
+    if len(files) != len(set(files)):
+        raise BMError("manifesto de design: files contém duplicatas")
+    manifest_relative = relative_to_root(base, manifest_file, "manifesto de design")
+    design_root = manifest_file.parent.resolve()
+    required_file_fields = ("contract", "prototype", "tokens")
+    for field in required_file_fields:
+        value = manifest.get(field)
+        if not isinstance(value, str) or value not in files:
+            raise BMError(f"manifesto de design: {field} deve constar em files")
+    screenshots = manifest.get("screenshots")
+    if not isinstance(screenshots, list) or not screenshots or not all(
+        isinstance(item, str) and item in files for item in screenshots
+    ):
+        raise BMError("manifesto de design: screenshots deve ser lista não vazia e referenciar files")
+    screenshot_extensions = {".png", ".jpg", ".jpeg", ".webp"}
+    for item in screenshots:
+        screenshot = path_under_root(base, Path(item), f"screenshot de design {item}")
+        if screenshot.suffix.lower() not in screenshot_extensions:
+            raise BMError(f"manifesto de design: screenshot deve ser PNG, JPEG ou WebP: {item}")
+        if not screenshot.is_file() or screenshot.stat().st_size == 0:
+            raise BMError(f"manifesto de design: screenshot vazio ou ausente: {item}")
+    for field in ("surfaces", "breakpoints"):
+        value = manifest.get(field)
+        if not isinstance(value, list) or not value or not all(
+            isinstance(item, str) and item.strip() for item in value
+        ):
+            raise BMError(f"manifesto de design: {field} deve ser lista não vazia")
+    for item in files:
+        target = path_under_root(base, Path(item), f"arquivo de design {item}")
+        try:
+            target.relative_to(design_root)
+        except ValueError as error:
+            raise BMError(
+                f"manifesto de design: arquivo fora do diretório do manifesto: {item}"
+            ) from error
+        if not target.is_file():
+            raise BMError(f"manifesto de design: arquivo ausente: {item}")
+        if target.stat().st_size == 0:
+            raise BMError(f"manifesto de design: arquivo vazio: {item}")
+    contract = path_under_root(base, Path(str(manifest["contract"])), "contract")
+    prototype = path_under_root(base, Path(str(manifest["prototype"])), "prototype")
+    tokens = path_under_root(base, Path(str(manifest["tokens"])), "tokens")
+    if contract.suffix.lower() != ".md":
+        raise BMError("manifesto de design: contract deve ser Markdown")
+    if prototype.suffix.lower() != ".html":
+        raise BMError("manifesto de design: prototype deve ser HTML estático")
+    if tokens.suffix.lower() != ".css":
+        raise BMError("manifesto de design: tokens deve ser CSS")
+    scope_relative = relative_to_root(base, scope, "scope de design")
+    scope_digest = file_digest(scope)
+    digest_manifest = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"status", "scope_digest", "design_digest"}
+    }
+    digest_manifest["scope_source"] = scope_relative
+    metadata = json.dumps(
+        digest_manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    design_digest = hashlib.sha256(
+        build_manifest(base, files) + b"\0" + metadata
+    ).hexdigest()
+    if seal:
+        manifest["scope_source"] = scope_relative
+        manifest["scope_digest"] = scope_digest
+        manifest["design_digest"] = design_digest
+        atomic_write_json(manifest_file, manifest)
+    else:
+        if manifest.get("status") != "approved":
+            raise BMError(
+                "BLOQUEADO: manifesto de design ainda não está approved",
+                EXIT_BLOCKED,
+            )
+        if manifest.get("scope_source") != scope_relative:
+            raise BMError(
+                "BLOQUEADO: manifesto de design aponta outro scope_source",
+                EXIT_BLOCKED,
+            )
+        if manifest.get("scope_digest") != scope_digest:
+            raise BMError(
+                "BLOQUEADO: scope_digest do design está obsoleto",
+                EXIT_BLOCKED,
+            )
+        if manifest.get("design_digest") != design_digest:
+            raise BMError(
+                "BLOQUEADO: design_digest divergiu dos arquivos atuais",
+                EXIT_BLOCKED,
+            )
+    return {
+        "valid": True,
+        "action": "seal" if seal else "verify",
+        "status": manifest.get("status"),
+        "manifest": manifest_relative,
+        "scope_source": scope_relative,
+        "scope_digest": scope_digest,
+        "design_digest": design_digest,
+        "files": sorted(files),
+        "surfaces": manifest["surfaces"],
+        "breakpoints": manifest["breakpoints"],
+    }
 
 
 def tracked_root_superpowers(root: Path) -> list[str]:
@@ -726,7 +1019,10 @@ def repository_hygiene(
     }
 
 
-def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
+def idle_v2_state(
+    planning_version: str = "v1",
+    current_specs: str = "docs/bianchini/current/specs",
+) -> dict[str, Any]:
     if not re.fullmatch(r"v[1-9][0-9]*", planning_version):
         raise BMError("planning_version inválida; esperado v1, v2, ...")
     return {
@@ -741,11 +1037,17 @@ def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
         "manual_pdf": "scope",
         "scope": {"status": "pending", "source": None, "approved_at": None},
         "planning": {
-            "quality_version": 1,
+            "quality_version": 2,
             "research_mode": None,
             "research": None,
+            "readiness": None,
+            "user_actions": None,
             "spec": None,
             "review": None,
+            "checker": None,
+            "design_manifest": None,
+            "change_root": None,
+            "current_specs": current_specs,
         },
         "complexity_review": {
             "decision": "pending",
@@ -791,7 +1093,7 @@ def idle_v2_state(planning_version: str = "v1") -> dict[str, Any]:
             "path": f"artifacts/bianchini/{planning_version}/telemetry.jsonl",
         },
         "blockers": [],
-        "next_action": IDLE_NEXT_ACTION,
+        "next_action": idle_next_action(planning_version),
     }
 
 
@@ -979,7 +1281,7 @@ def legacy_transition(
         "legacy_archive": archive_path.relative_to(root).as_posix(),
         "staged": sorted(staged),
         "completion_evidence": completion_evidence,
-        "next_action": IDLE_NEXT_ACTION,
+        "next_action": next_state["next_action"],
     }
     if proof_result is not None:
         result["completion_proof"] = proof_result
@@ -1241,9 +1543,753 @@ def recommended_planning_profile(
     ]
 
 
-def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]:
+READINESS_COLLECTION_PATTERNS = {
+    "decisions": re.compile(r"^D-[0-9]{3}$"),
+    "assumptions": re.compile(r"^A-[0-9]{3}$"),
+    "pitfalls": re.compile(r"^P-[0-9]{3}$"),
+    "user_actions": re.compile(r"^U-[0-9]{3}$"),
+    "spikes": re.compile(r"^S-[0-9]{3}$"),
+    "design_surfaces": re.compile(r"^DS-[0-9]{3}$"),
+    "spec_deltas": re.compile(r"^SD-[0-9]{3}$"),
+}
+READINESS_IMPACT_KEYS = ("applications", "modules", "contracts", "data", "platforms")
+READINESS_HIGH_IMPACT = {"high", "critical"}
+
+
+def readiness_document(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise BMError(f"readiness ausente: {path}")
+    return json_document(path.read_text(encoding="utf-8"), "READINESS.md")
+
+
+def destination_path(value: str) -> str:
+    return value.split("#", 1)[0].strip()
+
+
+def planning_input_paths(state: dict[str, Any]) -> list[str]:
+    review = state.get("planning", {}).get("review")
+    excluded = {review} if isinstance(review, str) else set()
+    return sorted(
+        item
+        for item in state["approval"]["package"]["files"]
+        if item not in excluded
+    )
+
+
+def planning_input_digest(state: dict[str, Any], root: Path) -> str:
+    paths = planning_input_paths(state)
+    if not paths:
+        raise BMError("checker: pacote sem entradas auditáveis")
+    return hashlib.sha256(build_manifest(root, paths)).hexdigest()
+
+
+def repository_revision(root: Path) -> str:
+    base = root.resolve()
+    top = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=base,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if top.returncode != 0:
+        return "new-project"
+    if Path(top.stdout.strip()).resolve() != base:
+        raise BMError("readiness: --root deve apontar para a raiz Git")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=base,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return head.stdout.strip() if head.returncode == 0 else "unborn"
+
+
+def validate_readiness(
+    state: dict[str, Any], root: Path, package_files: set[str]
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    planning = state["planning"]
+    change_root_value = planning.get("change_root")
+    change_root_path: Path | None = None
+    if not isinstance(change_root_value, str) or not change_root_value:
+        errors.append("planning.change_root: diretório canônico obrigatório")
+    else:
+        try:
+            change_root_path = confined_path(root, change_root_value, "planning.change_root")
+            reject_symlink_chain(root, root / change_root_value, "planning.change_root")
+        except BMError as error:
+            errors.append(str(error))
+        else:
+            if not change_root_path.is_dir():
+                errors.append("planning.change_root: diretório ausente")
+    readiness_value = planning.get("readiness")
+    readiness_path, _ = planning_file(root, readiness_value, "planning.readiness")
+    if readiness_path is None or not readiness_path.is_file():
+        return {}, ["planning.readiness: READINESS.md local é obrigatório"], []
+    readiness = readiness_document(readiness_path)
+    if readiness.get("schema_version") != 1:
+        errors.append("readiness.schema_version: esperado 1")
+    if readiness.get("status") != "ready":
+        errors.append("readiness.status: esperado ready antes dos planos")
+    scope_value = state["scope"].get("source")
+    scope_path, _ = planning_file(root, scope_value, "scope.source")
+    if scope_path is None or not scope_path.is_file():
+        errors.append("readiness.scope_digest: escopo local ausente")
+    elif readiness.get("scope_digest") != file_digest(scope_path):
+        errors.append("readiness.scope_digest: divergiu do escopo aprovado")
+
+    def require_change_path(path: Path | None, label: str) -> None:
+        if path is None or change_root_path is None:
+            return
+        try:
+            path.resolve().relative_to(change_root_path.resolve())
+        except ValueError:
+            errors.append(f"{label}: deve ficar dentro de planning.change_root")
+
+    require_change_path(scope_path, "scope.source")
+    require_change_path(readiness_path, "planning.readiness")
+    declared_revision = readiness.get("repository_revision")
+    if not isinstance(declared_revision, str) or not declared_revision.strip():
+        errors.append("readiness.repository_revision: valor factual obrigatório")
+    elif state.get("approval", {}).get("status") != "approved":
+        try:
+            current_revision = repository_revision(root)
+        except BMError as error:
+            errors.append(str(error))
+        else:
+            if declared_revision != current_revision:
+                errors.append(
+                    "readiness.repository_revision: repositório mudou após o gate de prontidão"
+                )
+    design_required = readiness.get("design_required")
+    if not isinstance(design_required, bool):
+        errors.append("readiness.design_required: esperado boolean")
+    impact_map = readiness.get("impact_map")
+    if not isinstance(impact_map, dict):
+        errors.append("readiness.impact_map: objeto obrigatório")
+    else:
+        for key in READINESS_IMPACT_KEYS:
+            value = impact_map.get(key)
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) and item.strip() for item in value
+            ):
+                errors.append(f"readiness.impact_map.{key}: esperado lista de strings")
+
+    identifiers: set[str] = set()
+    plan_ids = {plan["id"] for plan in state["plans"]}
+    package_content: dict[str, str] = {}
+
+    def content_for(path_value: str) -> str:
+        if path_value not in package_content:
+            path, content = planning_file(root, path_value, f"readiness destination {path_value}")
+            if path is None or not content:
+                errors.append(f"readiness destination ausente ou vazio: {path_value}")
+                package_content[path_value] = ""
+            else:
+                package_content[path_value] = content
+        return package_content[path_value]
+
+    def check_destinations(item: dict[str, Any], identifier: str) -> None:
+        destinations = item.get("destinations")
+        if not isinstance(destinations, list) or not destinations or not all(
+            isinstance(value, str) and value.strip() for value in destinations
+        ):
+            errors.append(f"readiness {identifier}: destinations não vazio é obrigatório")
+            return
+        for raw in destinations:
+            path_value = destination_path(raw)
+            if path_value not in package_files:
+                errors.append(
+                    f"readiness {identifier}: destino fora do pacote aprovado: {path_value}"
+                )
+                continue
+            if identifier not in content_for(path_value):
+                errors.append(
+                    f"readiness {identifier}: ID ausente no destino {path_value}"
+                )
+
+    collections: dict[str, list[dict[str, Any]]] = {}
+    for name, pattern in READINESS_COLLECTION_PATTERNS.items():
+        value = readiness.get(name)
+        if not isinstance(value, list):
+            errors.append(f"readiness.{name}: esperado lista")
+            collections[name] = []
+            continue
+        collections[name] = []
+        for index, item in enumerate(value):
+            if not isinstance(item, dict):
+                errors.append(f"readiness.{name}[{index}]: esperado objeto")
+                continue
+            identifier = item.get("id")
+            if not isinstance(identifier, str) or not pattern.fullmatch(identifier):
+                errors.append(f"readiness.{name}[{index}].id: formato inválido")
+                continue
+            if identifier in identifiers:
+                errors.append(f"readiness: ID duplicado {identifier}")
+            identifiers.add(identifier)
+            collections[name].append(item)
+            check_destinations(item, identifier)
+
+    for item in collections["decisions"]:
+        identifier = item["id"]
+        if not str(item.get("statement") or "").strip():
+            errors.append(f"readiness {identifier}: statement obrigatório")
+        if not str(item.get("evidence") or "").strip():
+            errors.append(f"readiness {identifier}: evidence obrigatório")
+
+    for item in collections["assumptions"]:
+        identifier = item["id"]
+        impact = item.get("impact")
+        status = item.get("status")
+        if impact not in {"low", "medium", "high", "critical"}:
+            errors.append(f"readiness {identifier}: impact inválido")
+        if status not in {"confirmed", "bounded", "not_applicable"}:
+            errors.append(f"readiness {identifier}: suposição ainda não resolvida")
+        if impact in READINESS_HIGH_IMPACT and not str(item.get("evidence") or "").strip():
+            errors.append(f"readiness {identifier}: evidência obrigatória para alto impacto")
+        if status == "bounded" and not str(item.get("fallback") or "").strip():
+            errors.append(f"readiness {identifier}: fallback obrigatório quando bounded")
+
+    for item in collections["pitfalls"]:
+        identifier = item["id"]
+        impact = item.get("impact")
+        if impact not in {"low", "medium", "high", "critical"}:
+            errors.append(f"readiness {identifier}: impact inválido")
+        if impact in READINESS_HIGH_IMPACT:
+            for field in ("prevention", "recovery", "verification"):
+                if not str(item.get(field) or "").strip():
+                    errors.append(f"readiness {identifier}: {field} obrigatório")
+
+    user_actions_value = planning.get("user_actions")
+    user_actions_path, user_actions_content = planning_file(
+        root, user_actions_value, "planning.user_actions"
+    )
+    if user_actions_path is None or not user_actions_content:
+        errors.append("planning.user_actions: USER_ACTIONS.md local é obrigatório")
+    require_change_path(user_actions_path, "planning.user_actions")
+    for field in ("research", "spec", "review"):
+        field_path, _ = planning_file(root, planning.get(field), f"planning.{field}")
+        require_change_path(field_path, f"planning.{field}")
+    for plan in state["plans"]:
+        plan_path, _ = planning_file(root, plan.get("path"), f"plan {plan.get('id')}")
+        require_change_path(plan_path, f"plan {plan.get('id')}")
+    for item in collections["user_actions"]:
+        identifier = item["id"]
+        if item.get("needed_by") not in plan_ids:
+            errors.append(f"readiness {identifier}: needed_by deve apontar plano existente")
+        if not isinstance(item.get("can_continue_without"), bool):
+            errors.append(f"readiness {identifier}: can_continue_without deve ser boolean")
+        if item.get("can_continue_without") and not str(item.get("fallback") or "").strip():
+            errors.append(f"readiness {identifier}: fallback obrigatório")
+        if not str(item.get("evidence_required") or "").strip():
+            errors.append(f"readiness {identifier}: evidence_required obrigatório")
+        if identifier not in user_actions_content:
+            errors.append(f"planning.user_actions: ação {identifier} ausente")
+
+    for item in collections["spikes"]:
+        identifier = item["id"]
+        if item.get("status") not in {"passed", "failed", "not_needed"}:
+            errors.append(f"readiness {identifier}: spike deve estar encerrado")
+        if item.get("status") == "passed":
+            if not str(item.get("evidence") or "").strip():
+                errors.append(f"readiness {identifier}: evidence obrigatório")
+            if not str(item.get("decision") or "").strip():
+                errors.append(f"readiness {identifier}: decision obrigatória")
+        if item.get("status") == "failed":
+            errors.append(f"readiness {identifier}: spike falhou e bloqueia o plano")
+
+    design_manifest_value = planning.get("design_manifest")
+    design_summary: dict[str, Any] | None = None
+    if design_required:
+        if not isinstance(design_manifest_value, str) or not design_manifest_value:
+            errors.append("planning.design_manifest: design obrigatório sem manifesto aprovado")
+        if not collections["design_surfaces"]:
+            errors.append("readiness.design_surfaces: UI obrigatória sem superfície DS")
+    if isinstance(design_manifest_value, str) and design_manifest_value:
+        if design_manifest_value not in package_files:
+            errors.append("planning.design_manifest: manifesto ausente do pacote")
+        elif scope_path is not None:
+            try:
+                design_summary = design_audit(
+                    root,
+                    scope_path,
+                    confined_path(root, design_manifest_value, "planning.design_manifest"),
+                    False,
+                )
+                for item in design_summary["files"]:
+                    if item not in package_files:
+                        errors.append(
+                            f"planning.design_manifest: arquivo de design fora do pacote: {item}"
+                        )
+            except BMError as error:
+                errors.append(str(error))
+    for item in collections["design_surfaces"]:
+        identifier = item["id"]
+        if item.get("required") is not True:
+            warnings.append(f"readiness {identifier}: superfície opcional não deve ampliar escopo")
+        if item.get("manifest_ref") != design_manifest_value:
+            errors.append(f"readiness {identifier}: manifest_ref diverge do estado")
+
+    current_specs_value = planning.get("current_specs")
+    if not isinstance(current_specs_value, str) or not current_specs_value:
+        errors.append("planning.current_specs: diretório canônico obrigatório")
+        current_specs_root = None
+    else:
+        current_specs_root = confined_path(root, current_specs_value, "planning.current_specs")
+        reject_symlink_chain(root, root / current_specs_value, "planning.current_specs")
+    if not collections["spec_deltas"]:
+        warnings.append("readiness.spec_deltas vazio: ciclo não altera comportamento persistido nas specs atuais")
+    spec_deltas: list[dict[str, str]] = []
+    spec_sources: set[str] = set()
+    spec_targets: set[str] = set()
+    for item in collections["spec_deltas"]:
+        identifier = item["id"]
+        source = item.get("source")
+        target = item.get("target")
+        if not isinstance(source, str) or source not in package_files:
+            errors.append(f"readiness {identifier}: source deve constar no pacote")
+            continue
+        if not isinstance(target, str) or not target:
+            errors.append(f"readiness {identifier}: target obrigatório")
+            continue
+        if source in spec_sources:
+            errors.append(f"readiness {identifier}: source duplicado em spec_deltas")
+        if target in spec_targets:
+            errors.append(f"readiness {identifier}: target duplicado em spec_deltas")
+        spec_sources.add(source)
+        spec_targets.add(target)
+        source_path, source_content = planning_file(root, source, f"readiness {identifier}.source")
+        require_change_path(source_path, f"readiness {identifier}.source")
+        if source_path is None or not source_content:
+            errors.append(f"readiness {identifier}: source ausente ou vazio")
+        elif identifier not in source_content:
+            errors.append(f"readiness {identifier}: ID ausente no source")
+        target_path = confined_path(root, target, f"readiness {identifier}.target")
+        reject_symlink_chain(root, root / target, f"readiness {identifier}.target")
+        if current_specs_root is not None:
+            try:
+                target_path.relative_to(current_specs_root.resolve())
+            except ValueError as error:
+                errors.append(f"readiness {identifier}: target fora de current_specs")
+        if target_path.exists():
+            if target not in package_files:
+                errors.append(
+                    f"readiness {identifier}: spec atual existente deve constar no pacote"
+                )
+        spec_deltas.append({"id": identifier, "source": source, "target": target})
+
+    return (
+        {
+            "status": readiness.get("status"),
+            "scope_digest": readiness.get("scope_digest"),
+            "design_required": design_required,
+            "design": design_summary,
+            "counts": {name: len(value) for name, value in collections.items()},
+            "coverage_gaps": sorted(set(errors)),
+            "spec_deltas": spec_deltas,
+        },
+        errors,
+        warnings,
+    )
+
+
+def checker_report(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise BMError(f"checker: relatório ausente: {path}")
+    report = json_document(path.read_text(encoding="utf-8"), "PLANNING_REVIEW.md")
+    verdict = report.get("verdict")
+    if verdict not in {"passed", "changes_requested", "blocked"}:
+        raise BMError("checker: verdict inválido")
+    findings = report.get("findings")
+    if not isinstance(findings, list):
+        raise BMError("checker: findings deve ser lista")
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            raise BMError(f"checker: finding {index} deve ser objeto")
+        if finding.get("severity") not in {"critical", "important", "minor", "note"}:
+            raise BMError(f"checker: finding {index} tem severity inválida")
+        for field in ("id", "summary", "evidence"):
+            if not isinstance(finding.get(field), str) or not finding[field].strip():
+                raise BMError(f"checker: finding {index} sem {field}")
+    material_findings = [
+        finding
+        for finding in findings
+        if finding.get("severity") in {"critical", "important"}
+    ]
+    if verdict == "passed" and material_findings:
+        raise BMError("checker: passed não aceita finding critical/important")
+    if verdict in {"changes_requested", "blocked"} and not material_findings:
+        raise BMError(f"checker: {verdict} exige finding critical/important")
+    identifiers = [finding["id"].strip() for finding in findings]
+    if len(identifiers) != len(set(identifiers)):
+        raise BMError("checker: IDs de findings duplicados")
+    return report
+
+
+def planning_check_record(
+    state_path: Path, root: Path, report_path: Path
+) -> dict[str, Any]:
     state = validate_state(state_path)
-    quality_enabled = state.get("planning", {}).get("quality_version") == 1
+    if state.get("planning", {}).get("quality_version") != 2:
+        raise BMError("planning-check exige planning.quality_version 2")
+    planning_audit(state_path, root, strict=True, require_checker=False)
+    planning = state["planning"]
+    checker = planning.get("checker")
+    if not isinstance(checker, dict):
+        raise BMError("planning.checker: contrato ausente")
+    canonical_review = planning.get("review")
+    report_file = path_under_root(root, report_path, "checker report")
+    if not isinstance(canonical_review, str) or relative_to_root(
+        root, report_file, "checker report"
+    ) != canonical_review:
+        raise BMError(
+            "BLOQUEADO: planning-check deve usar exatamente planning.review",
+            EXIT_BLOCKED,
+        )
+    history_value = checker.get("history_path")
+    if not isinstance(history_value, str) or not history_value:
+        raise BMError("planning.checker.history_path: caminho obrigatório")
+    history_path = confined_path(root, history_value, "planning.checker.history_path")
+    reject_symlink_chain(root, history_path, "planning.checker.history_path")
+    history: list[dict[str, Any]] = []
+    if history_path.is_file():
+        for line_number, line in enumerate(
+            history_path.read_text(encoding="utf-8").splitlines(), 1
+        ):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise BMError(
+                    f"checker: histórico inválido na linha {line_number}"
+                ) from error
+            if not isinstance(value, dict):
+                raise BMError(f"checker: histórico inválido na linha {line_number}")
+            history.append(value)
+    if len(history) >= 2 or (history and history[-1].get("verdict") == "blocked"):
+        raise BMError(
+            "BLOQUEADO: checker atingiu o máximo de duas revisões",
+            EXIT_BLOCKED,
+        )
+    report = checker_report(report_file)
+    digest = planning_input_digest(state, root)
+    round_number = len(history) + 1
+    if round_number == 2:
+        if history[-1].get("verdict") not in {"changes_requested", "passed"}:
+            raise BMError("BLOQUEADO: segunda revisão não foi autorizada", EXIT_BLOCKED)
+        if history[-1].get("package_digest") == digest:
+            raise BMError(
+                "BLOQUEADO: segunda revisão exige correção factual no pacote",
+                EXIT_BLOCKED,
+            )
+        if history[-1].get("report_digest") == file_digest(report_file):
+            raise BMError(
+                "BLOQUEADO: segunda revisão exige relatório novo para o pacote corrigido",
+                EXIT_BLOCKED,
+            )
+        if report["verdict"] == "changes_requested":
+            raise BMError(
+                "BLOQUEADO: segunda revisão deve aprovar ou bloquear",
+                EXIT_BLOCKED,
+            )
+    report_digest = file_digest(report_file)
+    record = {
+        "schema_version": 1,
+        "round": round_number,
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "package_digest": digest,
+        "report_digest": report_digest,
+        "verdict": report["verdict"],
+        "findings": report["findings"],
+    }
+    history_existed = history_path.exists()
+    history_bytes = history_path.read_bytes() if history_existed else b""
+    state_bytes = state_path.read_bytes()
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with history_path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        checker.update(
+            {
+                "status": report["verdict"],
+                "rounds": round_number,
+                "package_digest": digest,
+                "report_digest": report_digest,
+            }
+        )
+        atomic_write_json(state_path, state)
+    except Exception:
+        atomic_write_bytes(state_path, state_bytes)
+        if history_existed:
+            atomic_write_bytes(history_path, history_bytes)
+        elif history_path.exists():
+            history_path.unlink()
+        raise
+    return {
+        "recorded": True,
+        "round": round_number,
+        "status": report["verdict"],
+        "package_digest": digest,
+        "report_digest": report_digest,
+        "history_path": relative_to_root(root, history_path, "checker history"),
+        "next_action": (
+            "freeze_and_request_approval"
+            if report["verdict"] == "passed"
+            else "apply_single_correction"
+            if report["verdict"] == "changes_requested"
+            else "planning_blocked"
+        ),
+    }
+
+
+def change_policy(
+    *,
+    scope_change: bool,
+    public_contract_change: bool,
+    approved_design_change: bool,
+    new_cost: bool,
+    irreversible_action: bool,
+    external_impossibility: bool,
+    critical_invariant: bool,
+    plan_command: bool,
+    file_location: bool,
+    internal_order: bool,
+) -> dict[str, Any]:
+    plan_invalidating = any(
+        (
+            scope_change,
+            public_contract_change,
+            approved_design_change,
+            external_impossibility,
+            critical_invariant,
+        )
+    )
+    authorization_only = any((new_cost, irreversible_action)) and not plan_invalidating
+    material = plan_invalidating or authorization_only
+    bounded = any((plan_command, file_location, internal_order))
+    if plan_invalidating:
+        classification = "material_change"
+        action = "invalidate_package_and_replan_affected_scope"
+        reapproval = True
+    elif authorization_only:
+        classification = "material_change"
+        action = "pause_for_owner_authorization_without_replanning"
+        reapproval = True
+    elif bounded:
+        classification = "bounded_amendment"
+        action = "record_in_ledger_and_continue"
+        reapproval = False
+    else:
+        classification = "implementation_detail"
+        action = "decide_reversibly_record_if_material_and_continue"
+        reapproval = False
+    return {
+        "classification": classification,
+        "action": action,
+        "reapproval_required": reapproval,
+        "plan_invalidating": plan_invalidating,
+        "plan_files_mutable": False,
+        "extra_review_required": plan_invalidating,
+        "redesign_allowed": plan_invalidating,
+    }
+
+
+def cycle_close(state_path: Path, root: Path) -> dict[str, Any]:
+    base = root.resolve()
+    if Path(run_git(["rev-parse", "--show-toplevel"], base)).resolve() != base:
+        raise BMError("--root deve apontar para a raiz Git")
+    state_file = path_under_root(base, state_path, "PROJECT_STATE")
+    if not state_file.is_file():
+        raise BMError("PROJECT_STATE ausente")
+    state_relative = relative_to_root(base, state_file, "PROJECT_STATE")
+    try:
+        tracked = run_git(["ls-files", "--error-unmatch", "--", state_relative], base)
+    except BMError as error:
+        raise BMError(
+            "BLOQUEADO: cycle-close exige PROJECT_STATE commitado",
+            EXIT_BLOCKED,
+        ) from error
+    if tracked != state_relative:
+        raise BMError("BLOQUEADO: PROJECT_STATE não está rastreado", EXIT_BLOCKED)
+    dirty = run_git(["status", "--porcelain=v1", "--untracked-files=all"], base)
+    if dirty:
+        changed = [line[3:] if len(line) > 3 else line for line in dirty.splitlines()]
+        raise BMError(
+            "BLOQUEADO: cycle-close exige release commitado e árvore limpa: "
+            + ", ".join(changed[:8]),
+            EXIT_BLOCKED,
+        )
+    state = validate_state(state_file)
+    if state.get("planning", {}).get("quality_version") != 2:
+        raise BMError("cycle-close exige planning.quality_version 2")
+    incomplete_plans = [plan["id"] for plan in state["plans"] if plan["status"] != "completed"]
+    release_gate_passed = state["verification"]["release"]["status"] == "passed"
+    active_execution = state.get("active_execution")
+    if incomplete_plans or not release_gate_passed or active_execution is not None:
+        reasons: list[str] = []
+        if incomplete_plans:
+            reasons.append("planos completed obrigatórios: " + ", ".join(incomplete_plans))
+        if not release_gate_passed:
+            reasons.append("verification.release passed obrigatório")
+        if active_execution is not None:
+            reasons.append("active_execution deve estar null")
+        raise BMError("BLOQUEADO: cycle-close exige " + "; ".join(reasons), EXIT_BLOCKED)
+    release = state["release"]
+    if not (
+        release.get("status") == "ready"
+        and release.get("homologation") == "accepted"
+        and release.get("final_review") == "approved"
+        and release.get("delivery") == "ready"
+    ):
+        raise BMError(
+            "BLOQUEADO: cycle-close exige release ready, homologação aceita, revisão aprovada e entrega pronta",
+            EXIT_BLOCKED,
+        )
+    snapshot(state_file, base, verify=True)
+    package_files = set(state["approval"]["package"]["files"])
+    readiness_summary, readiness_errors, _ = validate_readiness(state, base, package_files)
+    if readiness_errors:
+        raise BMError(
+            "BLOQUEADO: readiness inválido no fechamento:\n- "
+            + "\n- ".join(readiness_errors),
+            EXIT_BLOCKED,
+        )
+    planning = state["planning"]
+    change_root_value = planning.get("change_root")
+    current_specs_value = planning.get("current_specs")
+    if not isinstance(change_root_value, str) or not isinstance(current_specs_value, str):
+        raise BMError("cycle-close: change_root/current_specs ausentes")
+    change_root = confined_path(base, change_root_value, "planning.change_root")
+    current_specs = confined_path(base, current_specs_value, "planning.current_specs")
+    reject_tree_symlinks(base, change_root, "planning.change_root")
+    reject_tree_symlinks(base, current_specs, "planning.current_specs")
+    if not change_root.is_dir():
+        raise BMError("cycle-close: change_root ausente")
+    version = state["planning_version"]
+    archive_value = f"docs/bianchini/archive/{version}"
+    archive_root = confined_path(base, archive_value, "cycle archive")
+    reject_symlink_chain(base, archive_root, "cycle archive")
+    if archive_root.exists():
+        raise BMError(
+            f"BLOQUEADO: archive já existe: {archive_value}", EXIT_BLOCKED
+        )
+    deltas = readiness_summary.get("spec_deltas") or []
+    prepared: list[tuple[str, Path, str, Path, bytes]] = []
+    target_backups: dict[Path, bytes | None] = {}
+    for item in deltas:
+        source_value = item["source"]
+        target_value = item["target"]
+        source = confined_path(base, source_value, f"{item['id']}.source")
+        target = confined_path(base, target_value, f"{item['id']}.target")
+        reject_symlink_chain(base, source, f"{item['id']}.source")
+        reject_symlink_chain(base, target, f"{item['id']}.target")
+        if not source.is_file():
+            raise BMError(f"cycle-close: source ausente: {source_value}")
+        try:
+            source.relative_to(change_root.resolve())
+        except ValueError as error:
+            raise BMError(f"cycle-close: source fora do change_root: {source_value}") from error
+        try:
+            target.relative_to(current_specs.resolve())
+        except ValueError as error:
+            raise BMError(f"cycle-close: target fora de current_specs: {target_value}") from error
+        if source == target:
+            raise BMError("cycle-close: source e target não podem ser iguais")
+        content = source.read_bytes()
+        prepared.append((item["id"], source, target_value, target, content))
+        target_backups[target] = target.read_bytes() if target.is_file() else None
+
+    backup_root = confined_path(
+        base,
+        f".superpowers/bianchini/cycle-close/{version}",
+        "cycle backup",
+    )
+    if backup_root.exists():
+        shutil.rmtree(backup_root)
+    backup_root.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(change_root, backup_root)
+    state_bytes = state_file.read_bytes()
+    manifest_path = confined_path(
+        base, state["approval"]["package"]["manifest_path"], "approval manifest"
+    )
+    manifest_bytes = manifest_path.read_bytes()
+    try:
+        archive_root.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(backup_root, archive_root)
+        atomic_write_bytes(archive_root / "FINAL_PROJECT_STATE.json", state_bytes)
+        atomic_write_bytes(archive_root / "APPROVAL_MANIFEST.sha256", manifest_bytes)
+        synchronized: list[dict[str, str]] = []
+        for identifier, _, target_value, target, content in prepared:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_bytes(target, content)
+            synchronized.append({"id": identifier, "target": target_value})
+        next_version = next_planning_version(version)
+        next_state = idle_v2_state(next_version, current_specs_value)
+        atomic_write_json(state_file, next_state)
+        shutil.rmtree(change_root)
+        stage_paths = [archive_value, change_root_value, state_relative]
+        if current_specs.exists() or prepared:
+            stage_paths.insert(0, current_specs_value)
+        run_git(["add", "-A", "--", *stage_paths], base)
+    except Exception as error:
+        atomic_write_bytes(state_file, state_bytes)
+        for target, original in target_backups.items():
+            if original is None:
+                if target.exists():
+                    target.unlink()
+            else:
+                atomic_write_bytes(target, original)
+        if archive_root.exists():
+            shutil.rmtree(archive_root)
+        if not change_root.exists():
+            shutil.copytree(backup_root, change_root)
+        reset_paths = [archive_value, change_root_value, state_relative]
+        if current_specs.exists() or prepared:
+            reset_paths.insert(0, current_specs_value)
+        subprocess.run(
+            ["git", "reset", "-q", "HEAD", "--", *reset_paths],
+            cwd=base,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        raise BMError(f"BLOQUEADO: cycle-close revertido: {error}", EXIT_BLOCKED) from error
+    finally:
+        if backup_root.exists():
+            shutil.rmtree(backup_root)
+        try:
+            backup_root.parent.rmdir()
+        except OSError:
+            pass
+    return {
+        "closed": True,
+        "previous_planning_version": version,
+        "planning_version": next_version,
+        "archive": archive_value,
+        "current_specs": current_specs_value,
+        "synchronized": synchronized,
+        "state": state_relative,
+        "staged": sorted(run_git(["diff", "--cached", "--name-only"], base).splitlines()),
+        "next_action": next_state["next_action"],
+    }
+
+
+def planning_audit(
+    state_path: Path,
+    root: Path,
+    strict: bool,
+    require_checker: bool = True,
+) -> dict[str, Any]:
+    state = validate_state(state_path)
+    quality_version = state.get("planning", {}).get("quality_version")
+    quality_enabled = quality_version in {1, 2}
+    quality_v2 = quality_version == 2
     enforced = strict or quality_enabled
     errors: list[str] = []
     warnings: list[str] = []
@@ -1253,7 +2299,7 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         limits = PLANNING_LIMITS_BY_PROFILE[state["assurance_profile"]]
         return {
             "valid": True,
-            "quality_contract": "legacy-compatible",
+            "quality_contract": "planning-quality-v2" if quality_v2 else "legacy-compatible",
             "profile": state["assurance_profile"],
             "recommended_profile": "lean",
             "metrics": {**{key: 0 for key in limits}, "package_words": 0},
@@ -1269,9 +2315,18 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
     review_value = state["planning"].get("review")
     plan_values = [plan["path"] for plan in state["plans"]]
     contract_values = [research_value, spec_value, review_value, *plan_values]
+    if quality_v2:
+        contract_values.extend(
+            [
+                state["planning"].get("readiness"),
+                state["planning"].get("user_actions"),
+            ]
+        )
+        if state["planning"].get("design_manifest"):
+            contract_values.append(state["planning"]["design_manifest"])
     if enforced:
         if not quality_enabled:
-            errors.append("planning.quality_version: esperado 1 para novo planejamento")
+            errors.append("planning.quality_version: esperado 1 ou 2 para novo planejamento")
         if research_mode is not None and research_mode not in RESEARCH_MODES:
             errors.append(
                 "planning.research_mode: esperado repo_only, targeted_web ou full"
@@ -1384,6 +2439,37 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
                 f"plano {plan['id']}: possível duplicação do gate homologar-sistema"
             )
 
+    readiness_summary: dict[str, Any] | None = None
+    if quality_v2:
+        readiness_summary, readiness_errors, readiness_warnings = validate_readiness(
+            state, root, package_files
+        )
+        errors.extend(readiness_errors)
+        warnings.extend(readiness_warnings)
+        checker = state["planning"].get("checker")
+        if require_checker:
+            if not isinstance(checker, dict):
+                errors.append("planning.checker: contrato obrigatório ausente")
+            else:
+                if checker.get("status") != "passed":
+                    errors.append("planning.checker.status: esperado passed")
+                rounds = checker.get("rounds")
+                if not isinstance(rounds, int) or isinstance(rounds, bool) or rounds not in {1, 2}:
+                    errors.append("planning.checker.rounds: esperado 1 ou 2")
+                try:
+                    current_digest = planning_input_digest(state, root)
+                except BMError as error:
+                    errors.append(str(error))
+                else:
+                    if checker.get("package_digest") != current_digest:
+                        errors.append("planning.checker.package_digest: pacote mudou após a revisão")
+                review_value = state["planning"].get("review")
+                review_path, _ = planning_file(root, review_value, "planning.review")
+                if review_path is None or not review_path.is_file():
+                    errors.append("planning.checker.report_digest: planning.review ausente")
+                elif checker.get("report_digest") != file_digest(review_path):
+                    errors.append("planning.checker.report_digest: relatório mudou após a revisão")
+
     if enforced:
         for stage, stage_value in state["verification"].items():
             commands = stage_value.get("commands", [])
@@ -1478,7 +2564,13 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         raise BMError("planejamento inválido:\n- " + "\n- ".join(dict.fromkeys(errors)))
     return {
         "valid": True,
-        "quality_contract": "planning-quality-v1" if quality_enabled else "legacy-compatible",
+        "quality_contract": (
+            "planning-quality-v2"
+            if quality_v2
+            else "planning-quality-v1"
+            if quality_enabled
+            else "legacy-compatible"
+        ),
         "profile": profile,
         "recommended_profile": recommended_profile,
         "research_mode": research_mode,
@@ -1486,12 +2578,13 @@ def planning_audit(state_path: Path, root: Path, strict: bool) -> dict[str, Any]
         "limits": limits,
         "budget_exceeded": exceeded,
         "warnings": sorted(set(warnings)),
+        "readiness": readiness_summary,
     }
 
 
 def snapshot(state_path: Path, root: Path, verify: bool) -> dict[str, Any]:
     state = validate_state(state_path)
-    if state.get("planning", {}).get("quality_version") == 1:
+    if state.get("planning", {}).get("quality_version") in {1, 2}:
         planning_audit(state_path, root, strict=True)
     package = state["approval"]["package"]
     content = build_manifest(root, package["files"])
@@ -1628,6 +2721,28 @@ def policy(
             "global_score_gate": False,
             "blocking_rule": "survivor_changes_approved_high_or_critical_behavior",
             "install_new_tool_during_execution": False,
+        },
+        "autonomy_policy": {
+            "decision_order": [
+                "approved_owner_decision",
+                "existing_repository_pattern",
+                "existing_stack_and_dependencies",
+                "official_documentation",
+                "lowest_risk_reversible_option",
+            ],
+            "stop_categories": [
+                "essential_external_credential",
+                "new_cost",
+                "destructive_or_irreversible_action",
+                "material_scope_contract_or_design_change",
+                "proven_real_impossibility",
+            ],
+        },
+        "plan_change_policy": {
+            "implementation_detail": "decide_and_continue",
+            "bounded_amendment": "record_in_ledger_without_editing_approved_plan",
+            "plan_invalidating_material_change": "invalidate_and_replan_affected_scope",
+            "authorization_material_change": "pause_for_owner_authorization_without_replanning",
         },
         "homologation_order": [
             "automated_regression",
@@ -3030,6 +4145,13 @@ def state_summary(path: Path, root: Path | None = None) -> dict[str, Any]:
         "assurance_profile": state["assurance_profile"],
         "planning_version": state["planning_version"],
         "planning_status": state["planning_status"],
+        "planning_quality_version": state.get("planning", {}).get("quality_version"),
+        "readiness": state.get("planning", {}).get("readiness"),
+        "user_actions": state.get("planning", {}).get("user_actions"),
+        "design_manifest": state.get("planning", {}).get("design_manifest"),
+        "change_root": state.get("planning", {}).get("change_root"),
+        "current_specs": state.get("planning", {}).get("current_specs"),
+        "checker": state.get("planning", {}).get("checker"),
         "approval": state["approval"]["status"],
         "approval_digest": state["approval"]["package"].get("manifest_digest"),
         "approved_plans": state["approval"]["approved_plans"],
@@ -3089,7 +4211,10 @@ def render_status(summary: dict[str, Any]) -> str:
         "# Status do projeto\n\n"
         f"- Método: v2 {summary['method_mode']} / planejamento {summary['planning_version']}\n"
         f"- Perfil: {summary['assurance_profile']}\n"
-        f"- Planejamento: {summary['planning_status']}\n"
+        f"- Planejamento: {summary['planning_status']} / qualidade v{summary.get('planning_quality_version') or 'legado'}\n"
+        f"- Readiness: {summary.get('readiness') or 'não aplicável'} / checker {((summary.get('checker') or {}).get('status') or 'não aplicável')}\n"
+        f"- Design: {summary.get('design_manifest') or 'não aplicável'}\n"
+        f"- Specs atuais: {summary.get('current_specs') or 'não aplicável'} / mudança {summary.get('change_root') or 'não aplicável'}\n"
         f"- Aprovação: {summary['approval']} / digest {summary['approval_digest']}\n"
         f"- Planos: {plans or 'nenhum'}\n"
         f"- Plano ativo: {summary['active_plan'] or 'nenhum'} / "
@@ -3145,6 +4270,34 @@ def parser() -> argparse.ArgumentParser:
     planning_check.add_argument("state", type=Path)
     planning_check.add_argument("--root", type=Path, required=True)
     planning_check.add_argument("--strict", action="store_true")
+
+    design = commands.add_parser("design-audit")
+    design.add_argument("action", choices=["seal", "verify"])
+    design.add_argument("--root", type=Path, required=True)
+    design.add_argument("--scope", type=Path, required=True)
+    design.add_argument("--manifest", type=Path, required=True)
+
+    checker = commands.add_parser("planning-check")
+    checker.add_argument("action", choices=["record"])
+    checker.add_argument("--state", type=Path, required=True)
+    checker.add_argument("--root", type=Path, required=True)
+    checker.add_argument("--report", type=Path, required=True)
+
+    change = commands.add_parser("change-policy")
+    change.add_argument("--scope-change", action="store_true")
+    change.add_argument("--public-contract-change", action="store_true")
+    change.add_argument("--approved-design-change", action="store_true")
+    change.add_argument("--new-cost", action="store_true")
+    change.add_argument("--irreversible-action", action="store_true")
+    change.add_argument("--external-impossibility", action="store_true")
+    change.add_argument("--critical-invariant", action="store_true")
+    change.add_argument("--plan-command", action="store_true")
+    change.add_argument("--file-location", action="store_true")
+    change.add_argument("--internal-order", action="store_true")
+
+    close = commands.add_parser("cycle-close")
+    close.add_argument("--state", type=Path, required=True)
+    close.add_argument("--root", type=Path, required=True)
 
     decide = commands.add_parser("policy")
     decide.add_argument("--profile", choices=["lean", "standard", "full"], required=True)
@@ -3322,6 +4475,34 @@ def main() -> int:
             emit(snapshot(args.state, args.root, args.action == "verify"))
         elif args.command == "planning-audit":
             emit(planning_audit(args.state, args.root, args.strict))
+        elif args.command == "design-audit":
+            emit(
+                design_audit(
+                    args.root,
+                    args.scope,
+                    args.manifest,
+                    args.action == "seal",
+                )
+            )
+        elif args.command == "planning-check":
+            emit(planning_check_record(args.state, args.root, args.report))
+        elif args.command == "change-policy":
+            emit(
+                change_policy(
+                    scope_change=args.scope_change,
+                    public_contract_change=args.public_contract_change,
+                    approved_design_change=args.approved_design_change,
+                    new_cost=args.new_cost,
+                    irreversible_action=args.irreversible_action,
+                    external_impossibility=args.external_impossibility,
+                    critical_invariant=args.critical_invariant,
+                    plan_command=args.plan_command,
+                    file_location=args.file_location,
+                    internal_order=args.internal_order,
+                )
+            )
+        elif args.command == "cycle-close":
+            emit(cycle_close(args.state, args.root))
         elif args.command == "policy":
             emit(
                 policy(

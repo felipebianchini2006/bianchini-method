@@ -1,0 +1,6 @@
+interface:
+  display_name: "Design Projeto"
+  short_description: "Cria protótipo HTML e contrato visual antes do planejamento"
+  default_prompt: "Use $design-projeto para criar um protótipo visual estático ligado ao escopo, sem implementar código de produção."
+policy:
+  allow_implicit_invocation: false

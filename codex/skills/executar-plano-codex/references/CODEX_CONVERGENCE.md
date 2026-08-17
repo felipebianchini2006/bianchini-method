@@ -109,6 +109,12 @@ Rename deve ser resolvido pelo diff Git real. Linha removida referencia lado bas
 
 Guard nunca executa texto arbitrário do finding. O comando `proof` executa argv estruturado com `shell=False`, em checkout isolado do commit, cwd confinado e timeout obrigatório. Persiste comando, cwd, exit code real, commit e hashes SHA-256 dos bytes de stdout e stderr. Cada registro recebe assinatura guard-owned; gravações paralelas usam lock. Reviewer referencia somente o `proof_id` emitido.
 
+## Plano congelado e classe da mudança
+
+`implementation_detail` ou `bounded_amendment` não autoriza nova decomposição, novo blocker, nova unidade ou novo ciclo de revisão. O executor registra a decisão e continua no mesmo sidecar. Somente `material_change` comprovada por `bm.py change-policy` pode interromper a unidade por mudança de escopo, contrato público, design aprovado ou invariante crítico.
+
+Finding de qualidade dentro do contrato aprovado segue fix. Uma alternativa interna melhor não transforma o plano em inválido. Mudança material comprovada não vira blocker estrutural para obter redesign; usa `stop --kind material_change`.
+
 ## Fix, redesign e breaker
 
 Máximo: dois fix rounds totais por identidade de unidade. Uma rodada pode cobrir vários blockers abertos. Após cada fix, commitar, submeter delta e revisar antes de iniciar outra rodada.
@@ -155,6 +161,10 @@ Exige `action`, `target`, `irreversible_effect` e `safe_alternative_proof`.
 ### `new_cost`
 
 Exige `provider`, `operation`, `estimate` positivo, `currency` ISO 4217 e `indispensability_proof`.
+
+### `material_change`
+
+Exige `approved_requirement`, `change_kind`, contrato atual, mudança necessária, motivo que bloqueia a execução e `evidence_proof_id` vermelho no `HEAD` atual. `change_kind` aceita somente `scope`, `public_contract`, `approved_design` ou `critical_invariant`.
 
 ### `real_impossibility`
 

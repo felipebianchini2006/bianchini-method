@@ -16,6 +16,7 @@ SHARDS = (
     "RoutingAndStateScenarios",
     "SnapshotScenarios",
     "PlanningQualityScenarios",
+    "PlanningStabilityScenarios",
     "AdaptivePolicyScenarios",
     "WorkspaceAndArtifactScenarios",
     "BehavioralProjectScenarios",

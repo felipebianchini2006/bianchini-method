@@ -18,6 +18,7 @@ CLI = ROOT / "scripts" / "bm.py"
 FIXTURES = ROOT / "tests" / "fixtures"
 PROJECT_FIXTURES = FIXTURES / "projects"
 SKILL_NAMES = (
+    "design-projeto",
     "sdd-planning",
     "executar-plano",
     "executar-direto",
@@ -969,6 +970,950 @@ class PlanningQualityScenarios(unittest.TestCase):
             )
             self.assertEqual(accepted["research_mode"], "targeted_web")
             self.assertIn("somente para compatibilidade", accepted["warnings"][0])
+
+
+class PlanningStabilityScenarios(unittest.TestCase):
+    def make_project(
+        self,
+        root: Path,
+        *,
+        design: bool = False,
+        initialize_git: bool = False,
+    ) -> Path:
+        repository_revision = init_repo(root) if initialize_git else "new-project"
+        change_root = root / "docs/bianchini/changes/v1"
+        current_specs = root / "docs/bianchini/current/specs"
+        scope = change_root / "inputs/APPROVED_SCOPE.md"
+        research = change_root / "STACK_RESEARCH.md"
+        readiness = change_root / "READINESS.md"
+        user_actions = change_root / "USER_ACTIONS.md"
+        spec = change_root / "specs/system-change.md"
+        delta = change_root / "spec-deltas/system.md"
+        review = change_root / "PLANNING_REVIEW.md"
+        plan = change_root / "plans/P01-system.md"
+        state_path = root / "docs/living/PROJECT_STATE.md"
+        for path in (
+            scope,
+            research,
+            readiness,
+            user_actions,
+            spec,
+            delta,
+            review,
+            plan,
+            state_path,
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        scope.write_text(
+            "# Escopo aprovado\n\nCriar painel web com autenticação e cadastro.\n",
+            encoding="utf-8",
+        )
+        research.write_text(
+            "# Stack Research\n\n"
+            "Research mode: repo_only\n"
+            "Motivo: stack local estabelecida e sem integração externa nova.\n\n"
+            "## Stack detectada\n\n- Python e HTML.\n\n"
+            "## Inventário local\n\n"
+            "- Manifests: nenhum.\n"
+            "- Lockfiles: nenhum.\n"
+            "- CI: unittest.\n"
+            "- Testes: unittest.\n"
+            "- Padrões locais: biblioteca padrão.\n\n"
+            "## Decisões aplicadas\n\n- D-001 mantém o menor fluxo robusto.\n\n"
+            "## Riscos e lacunas\n\n- P-001 cobre recuperação da sessão.\n- S-001 validou a persistência local.\n",
+            encoding="utf-8",
+        )
+        spec.write_text(
+            "# Change Spec\n\n"
+            "## Contratos\n\n"
+            "D-001 define autenticação por sessão. A-001 foi limitada por evidência local.\n"
+            "P-001 exige recuperação após reinício. U-001 deve existir antes do gate P01.\n"
+            "SD-001 substitui o contrato atual do domínio."
+            + (" DS-001 fixa o app shell e o fluxo principal.\n" if design else "\n"),
+            encoding="utf-8",
+        )
+        delta.write_text(
+            "# Sistema atual após v1\n\n"
+            "SD-001. D-001: sessão autenticada, recuperação P-001 e ação U-001.\n",
+            encoding="utf-8",
+        )
+        plan.write_text(
+            "---\nplan_id: P01\nmethod_version: 2\nrisk: medium\n"
+            "execution: slice\nreview: per_slice\ndepends_on: []\n---\n\n"
+            "# P01 Sistema\n\n"
+            "### Slice 1 — Entregar autenticação e painel\n\n"
+            "**Execution:** slice\n"
+            "**Review:** per_slice\n"
+            "**Change:** state-machine\n"
+            "**Readiness refs:** D-001, A-001, P-001, U-001, SD-001"
+            + (", DS-001\n" if design else "\n")
+            + "**Test seams:** sessão pública e navegação\n"
+            "**Spec refs:** specs/system-change.md#contratos\n"
+            "**Files:** src/auth.py, web/index.html, tests/test_auth.py\n"
+            "**Contract:** login cria sessão; reinício preserva estado válido\n"
+            "**Verification:** `python3 -m unittest tests.test_auth` retorna 0\n"
+            "**Done when:** jornada crítica e recuperação passam\n",
+            encoding="utf-8",
+        )
+        user_actions.write_text(
+            "# User Actions\n\n"
+            "## U-001\n\n"
+            "- Ação: fornecer credencial de sandbox.\n"
+            "- Necessário até: P01.\n"
+            "- Pode continuar sem: sim, usando fixture local.\n"
+            "- Evidência: segredo presente no ambiente de homologação.\n",
+            encoding="utf-8",
+        )
+        design_manifest = None
+        design_files: list[str] = []
+        if design:
+            design_root = root / "docs/design/v1"
+            prototype = design_root / "prototype/index.html"
+            contract = design_root / "DESIGN_CONTRACT.md"
+            tokens = design_root / "tokens.css"
+            screenshot = design_root / "screenshots/desktop.png"
+            manifest = design_root / "DESIGN_MANIFEST.json"
+            for path in (prototype, contract, tokens, screenshot, manifest):
+                path.parent.mkdir(parents=True, exist_ok=True)
+            prototype.write_text("<!doctype html><title>Prototype</title><main>App shell</main>\n", encoding="utf-8")
+            contract.write_text("# Design Contract\n\nDS-001 app shell e fluxo principal.\n", encoding="utf-8")
+            tokens.write_text(":root { --space-1: 4px; }\n", encoding="utf-8")
+            screenshot.write_bytes(b"\x89PNG\r\n\x1a\nBM-test-evidence")
+            files = [
+                "docs/design/v1/DESIGN_CONTRACT.md",
+                "docs/design/v1/prototype/index.html",
+                "docs/design/v1/tokens.css",
+                "docs/design/v1/screenshots/desktop.png",
+            ]
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "status": "draft",
+                        "source": "generated",
+                        "scope_source": "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md",
+                        "scope_digest": None,
+                        "design_digest": None,
+                        "contract": files[0],
+                        "prototype": files[1],
+                        "tokens": files[2],
+                        "screenshots": [files[3]],
+                        "surfaces": ["app-shell", "primary-flow"],
+                        "breakpoints": ["desktop", "mobile"],
+                        "files": files,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            sealed = cli_json(
+                "design-audit",
+                "seal",
+                "--root",
+                str(root),
+                "--scope",
+                str(scope),
+                "--manifest",
+                str(manifest),
+            )
+            value = json.loads(read(manifest))
+            value["status"] = "approved"
+            manifest.write_text(json.dumps(value, indent=2), encoding="utf-8")
+            verified = cli_json(
+                "design-audit",
+                "verify",
+                "--root",
+                str(root),
+                "--scope",
+                str(scope),
+                "--manifest",
+                str(manifest),
+            )
+            self.assertEqual(sealed["design_digest"], verified["design_digest"])
+            design_manifest = "docs/design/v1/DESIGN_MANIFEST.json"
+            design_files = [design_manifest, *files]
+
+        readiness_data = {
+            "schema_version": 1,
+            "status": "ready",
+            "scope_digest": file_sha256(scope),
+            "repository_revision": repository_revision,
+            "design_required": design,
+            "impact_map": {
+                "applications": ["web"],
+                "modules": ["auth"],
+                "contracts": ["session"],
+                "data": ["users"],
+                "platforms": ["browser"],
+            },
+            "decisions": [
+                {
+                    "id": "D-001",
+                    "statement": "Usar sessão autenticada.",
+                    "evidence": "APPROVED_SCOPE.md",
+                    "destinations": [
+                        "docs/bianchini/changes/v1/specs/system-change.md",
+                        "docs/bianchini/changes/v1/plans/P01-system.md",
+                    ],
+                }
+            ],
+            "assumptions": [
+                {
+                    "id": "A-001",
+                    "statement": "Sessão local atende o ciclo.",
+                    "impact": "high",
+                    "status": "bounded",
+                    "evidence": "STACK_RESEARCH.md#Inventário local",
+                    "fallback": "Bloquear publicação externa.",
+                    "destinations": [
+                        "docs/bianchini/changes/v1/specs/system-change.md",
+                        "docs/bianchini/changes/v1/plans/P01-system.md",
+                    ],
+                }
+            ],
+            "pitfalls": [
+                {
+                    "id": "P-001",
+                    "statement": "Sessão inválida após reinício.",
+                    "impact": "high",
+                    "prevention": "Persistir estado mínimo.",
+                    "recovery": "Invalidar e voltar ao login.",
+                    "verification": "Teste de reinício controlado.",
+                    "destinations": [
+                        "docs/bianchini/changes/v1/specs/system-change.md",
+                        "docs/bianchini/changes/v1/plans/P01-system.md",
+                    ],
+                }
+            ],
+            "user_actions": [
+                {
+                    "id": "U-001",
+                    "action": "Fornecer credencial de sandbox.",
+                    "needed_by": "P01",
+                    "can_continue_without": True,
+                    "fallback": "Fixture local.",
+                    "evidence_required": "Credencial presente no ambiente.",
+                    "destinations": [
+                        "docs/bianchini/changes/v1/USER_ACTIONS.md",
+                        "docs/bianchini/changes/v1/plans/P01-system.md",
+                    ],
+                }
+            ],
+            "spikes": [
+                {
+                    "id": "S-001",
+                    "question": "Persistência local funciona no runner?",
+                    "status": "passed",
+                    "evidence": "STACK_RESEARCH.md#Inventário local",
+                    "decision": "Usar fixture determinística.",
+                    "destinations": ["docs/bianchini/changes/v1/STACK_RESEARCH.md"],
+                }
+            ],
+            "design_surfaces": (
+                [
+                    {
+                        "id": "DS-001",
+                        "surface": "App shell e fluxo principal.",
+                        "manifest_ref": design_manifest,
+                        "required": True,
+                        "destinations": [
+                            "docs/design/v1/DESIGN_CONTRACT.md",
+                            "docs/bianchini/changes/v1/specs/system-change.md",
+                            "docs/bianchini/changes/v1/plans/P01-system.md",
+                        ],
+                    }
+                ]
+                if design
+                else []
+            ),
+            "spec_deltas": [
+                {
+                    "id": "SD-001",
+                    "domain": "system",
+                    "source": "docs/bianchini/changes/v1/spec-deltas/system.md",
+                    "target": "docs/bianchini/current/specs/system.md",
+                    "destinations": [
+                        "docs/bianchini/changes/v1/specs/system-change.md",
+                        "docs/bianchini/changes/v1/plans/P01-system.md",
+                        "docs/bianchini/changes/v1/spec-deltas/system.md",
+                    ],
+                }
+            ],
+        }
+        readiness.write_text(
+            "# Planning Readiness\n\n```json\n"
+            + json.dumps(readiness_data, ensure_ascii=False, indent=2)
+            + "\n```\n",
+            encoding="utf-8",
+        )
+        review.write_text(
+            "# Planning Review\n\n```json\n"
+            + json.dumps({"verdict": "passed", "findings": []}, indent=2)
+            + "\n```\n",
+            encoding="utf-8",
+        )
+        state = json.loads(read(FIXTURES / "project-state-v2.json"))
+        state["planning_status"] = "in_progress"
+        state["assurance_profile"] = "standard"
+        state["scope"] = {
+            "status": "approved",
+            "source": "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md",
+            "approved_at": "2026-08-17T12:00:00Z",
+        }
+        state["planning"] = {
+            "quality_version": 2,
+            "research_mode": "repo_only",
+            "research": "docs/bianchini/changes/v1/STACK_RESEARCH.md",
+            "readiness": "docs/bianchini/changes/v1/READINESS.md",
+            "user_actions": "docs/bianchini/changes/v1/USER_ACTIONS.md",
+            "spec": "docs/bianchini/changes/v1/specs/system-change.md",
+            "review": "docs/bianchini/changes/v1/PLANNING_REVIEW.md",
+            "checker": {
+                "status": "pending",
+                "rounds": 0,
+                "history_path": "artifacts/bianchini/v1/planning/checker.jsonl",
+                "package_digest": None,
+                "report_digest": None,
+            },
+            "design_manifest": design_manifest,
+            "change_root": "docs/bianchini/changes/v1",
+            "current_specs": "docs/bianchini/current/specs",
+        }
+        state["complexity_review"] = {
+            "decision": "within_budget",
+            "justification": None,
+            "deferred_scope": [],
+            "scope_split_approved": False,
+            "scope_split_approved_by": None,
+            "scope_split_approved_at": None,
+        }
+        state["approval"].update(
+            {
+                "status": "pending",
+                "approved_at": None,
+                "approved_by": None,
+                "approved_plans": [],
+            }
+        )
+        state["approval"]["package"]["manifest_digest"] = None
+        state["approval"]["package"]["manifest_path"] = (
+            "artifacts/bianchini/v1/approval/manifest.sha256"
+        )
+        state["plans"] = [
+            {
+                "id": "P01",
+                "path": "docs/bianchini/changes/v1/plans/P01-system.md",
+                "status": "planned",
+                "risk": "medium",
+                "execution": "slice",
+                "review": "per_slice",
+                "test_seams": ["session", "navigation"],
+                "depends_on": [],
+                "ledger": "artifacts/bianchini/v1/ledgers/P01.md",
+                "gates": ["test", "e2e"],
+            }
+        ]
+        package_files = [
+            state["scope"]["source"],
+            state["planning"]["research"],
+            state["planning"]["readiness"],
+            state["planning"]["user_actions"],
+            state["planning"]["spec"],
+            "docs/bianchini/changes/v1/spec-deltas/system.md",
+            state["planning"]["review"],
+            state["plans"][0]["path"],
+            *design_files,
+        ]
+        state["approval"]["package"]["files"] = package_files
+        state["verification"] = {
+            "fast": {
+                "commands": ["python3 -m unittest tests.test_auth"],
+                "status": "pending",
+            },
+            "plan": {
+                "commands": ["python3 -m unittest discover -s tests"],
+                "status": "pending",
+            },
+            "release": {
+                "commands": ["python3 -m unittest discover -s tests"],
+                "status": "pending",
+            },
+        }
+        state["release"].update(
+            {
+                "status": "pending",
+                "platforms": ["web"],
+                "profiles": ["admin"],
+                "candidate": None,
+                "homologation": "pending",
+                "final_review": "pending",
+                "delivery": "pending",
+            }
+        )
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        return state_path
+
+    def pass_checker(self, state_path: Path, root: Path) -> dict[str, object]:
+        result = cli_json(
+            "planning-check",
+            "record",
+            "--state",
+            str(state_path),
+            "--root",
+            str(root),
+            "--report",
+            str(root / json.loads(read(state_path))["planning"]["review"]),
+        )
+        return result
+
+    def test_design_can_be_sealed_and_verified_before_project_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root, design=True)
+            manifest = root / json.loads(read(state))["planning"]["design_manifest"]
+            verified = cli_json(
+                "design-audit",
+                "verify",
+                "--root",
+                str(root),
+                "--scope",
+                str(root / "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md"),
+                "--manifest",
+                str(manifest),
+            )
+            self.assertTrue(verified["valid"])
+            self.assertEqual(verified["status"], "approved")
+
+    def test_design_requires_observable_screenshot_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root, design=True)
+            manifest_path = root / json.loads(read(state))["planning"]["design_manifest"]
+            manifest = json.loads(read(manifest_path))
+            manifest["status"] = "draft"
+            manifest["screenshots"] = []
+            manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            result = cli(
+                "design-audit",
+                "seal",
+                "--root",
+                str(root),
+                "--scope",
+                str(root / "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md"),
+                "--manifest",
+                str(manifest_path),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("screenshots", result.stderr)
+
+    def test_design_rejects_empty_contract_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root, design=True)
+            manifest_path = root / json.loads(read(state))["planning"]["design_manifest"]
+            manifest = json.loads(read(manifest_path))
+            (root / manifest["contract"]).write_bytes(b"")
+            result = cli(
+                "design-audit",
+                "verify",
+                "--root",
+                str(root),
+                "--scope",
+                str(root / "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md"),
+                "--manifest",
+                str(manifest_path),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("arquivo vazio", result.stderr)
+
+    def test_design_rejects_manifest_metadata_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root, design=True)
+            manifest_path = root / json.loads(read(state))["planning"]["design_manifest"]
+            manifest = json.loads(read(manifest_path))
+            manifest["surfaces"].append("unauthorized-surface")
+            manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            result = cli(
+                "design-audit",
+                "verify",
+                "--root",
+                str(root),
+                "--scope",
+                str(root / "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md"),
+                "--manifest",
+                str(manifest_path),
+            )
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("design_digest", result.stderr)
+
+    def test_design_rejects_stale_scope_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state = self.make_project(root, design=True)
+            scope = root / json.loads(read(state))["scope"]["source"]
+            scope.write_text(read(scope) + "mudança material\n", encoding="utf-8")
+            result = cli(
+                "design-audit",
+                "verify",
+                "--root",
+                str(root),
+                "--scope",
+                str(scope),
+                "--manifest",
+                str(root / json.loads(read(state))["planning"]["design_manifest"]),
+            )
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("scope_digest", result.stderr)
+
+    def test_quality_v2_requires_readiness_coverage_and_checker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            pending = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(pending.returncode, 2)
+            self.assertIn("checker", pending.stderr)
+            passed = self.pass_checker(state_path, root)
+            self.assertEqual(passed["status"], "passed")
+            state = json.loads(read(state_path))
+            state["planning_status"] = "pending_approval"
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            audited = cli_json(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(audited["quality_contract"], "planning-quality-v2")
+            self.assertEqual(audited["readiness"]["coverage_gaps"], [])
+
+    def test_readiness_is_invalidated_when_repository_head_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "repo"
+            state_path = self.make_project(root, initialize_git=True)
+            (root / "app.txt").write_text("changed after readiness\n", encoding="utf-8")
+            git(root, "add", "app.txt")
+            git(root, "commit", "-m", "change repository after readiness")
+            result = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("repository_revision", result.stderr)
+
+    def test_high_impact_assumption_requires_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            readiness_path = root / state["planning"]["readiness"]
+            fenced = re.search(r"```json\s*(.*?)\s*```", read(readiness_path), re.S)
+            data = json.loads(fenced.group(1))
+            data["assumptions"][0]["evidence"] = ""
+            readiness_path.write_text(
+                "# Planning Readiness\n\n```json\n"
+                + json.dumps(data, indent=2)
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            result = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("A-001", result.stderr)
+            self.assertIn("evidência", result.stderr)
+
+    def test_planning_checker_allows_one_correction_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            review = root / state["planning"]["review"]
+            review.write_text(
+                "# Planning Review\n\n```json\n"
+                + json.dumps(
+                    {
+                        "verdict": "changes_requested",
+                        "findings": [
+                            {
+                                "id": "C-001",
+                                "severity": "important",
+                                "summary": "Clarificar recuperação.",
+                                "evidence": "P-001",
+                            }
+                        ],
+                    },
+                    indent=2,
+                )
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            first = self.pass_checker(state_path, root)
+            self.assertEqual(first["round"], 1)
+            self.assertEqual(first["status"], "changes_requested")
+            spec = root / state["planning"]["spec"]
+            spec.write_text(read(spec) + "\nCorreção única do checker.\n", encoding="utf-8")
+            review.write_text(
+                "# Planning Review\n\n```json\n"
+                + json.dumps({"verdict": "passed", "findings": []}, indent=2)
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            second = self.pass_checker(state_path, root)
+            self.assertEqual(second["round"], 2)
+            self.assertEqual(second["status"], "passed")
+            third = cli(
+                "planning-check",
+                "record",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--report",
+                str(review),
+            )
+            self.assertEqual(third.returncode, 3)
+            self.assertIn("máximo de duas revisões", third.stderr)
+
+    def test_checker_allows_one_factual_amendment_after_first_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            first = self.pass_checker(state_path, root)
+            self.assertEqual(first["status"], "passed")
+            state = json.loads(read(state_path))
+            spec = root / state["planning"]["spec"]
+            spec.write_text(read(spec) + "\nAjuste factual final.\n", encoding="utf-8")
+            review = root / state["planning"]["review"]
+            review.write_text(
+                "```json\n"
+                + json.dumps({
+                    "verdict": "passed",
+                    "findings": [],
+                    "review_note": "pacote corrigido revisado novamente",
+                })
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            second = self.pass_checker(state_path, root)
+            self.assertEqual(second["round"], 2)
+            self.assertEqual(second["status"], "passed")
+            third = cli(
+                "planning-check",
+                "record",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--report",
+                str(root / state["planning"]["review"]),
+            )
+            self.assertEqual(third.returncode, 3)
+            self.assertIn("máximo de duas revisões", third.stderr)
+
+    def test_checker_uses_canonical_review_and_rejects_empty_correction_loop(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            alternative = root / "alternative-review.md"
+            alternative.write_text(
+                "```json\n" + json.dumps({"verdict": "passed", "findings": []}) + "\n```\n",
+                encoding="utf-8",
+            )
+            wrong_path = cli(
+                "planning-check",
+                "record",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--report",
+                str(alternative),
+            )
+            self.assertEqual(wrong_path.returncode, 3)
+            self.assertIn("planning.review", wrong_path.stderr)
+
+            state = json.loads(read(state_path))
+            review = root / state["planning"]["review"]
+            review.write_text(
+                "```json\n"
+                + json.dumps(
+                    {
+                        "verdict": "changes_requested",
+                        "findings": [
+                            {
+                                "id": "N-001",
+                                "severity": "note",
+                                "summary": "Preferência sem impacto.",
+                                "evidence": "estilo",
+                            }
+                        ],
+                    }
+                )
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            empty_loop = cli(
+                "planning-check",
+                "record",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--report",
+                str(review),
+            )
+            self.assertEqual(empty_loop.returncode, 2)
+            self.assertIn("critical/important", empty_loop.stderr)
+
+    def test_checker_binds_the_approved_review_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            self.pass_checker(state_path, root)
+            state = json.loads(read(state_path))
+            review = root / state["planning"]["review"]
+            review.write_text(
+                "```json\n"
+                + json.dumps({
+                    "verdict": "passed",
+                    "findings": [{
+                        "id": "N-999",
+                        "severity": "note",
+                        "summary": "alteração posterior",
+                        "evidence": "sem revisão",
+                    }],
+                })
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            result = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("report_digest", result.stderr)
+
+    def test_change_policy_prevents_redesign_for_internal_adjustments(self) -> None:
+        internal = cli_json("change-policy")
+        bounded = cli_json("change-policy", "--plan-command")
+        material = cli_json("change-policy", "--public-contract-change")
+        self.assertEqual(internal["classification"], "implementation_detail")
+        self.assertEqual(bounded["classification"], "bounded_amendment")
+        self.assertEqual(material["classification"], "material_change")
+        self.assertFalse(internal["reapproval_required"])
+        self.assertFalse(bounded["plan_files_mutable"])
+        self.assertTrue(material["reapproval_required"])
+        self.assertTrue(material["plan_invalidating"])
+        self.assertTrue(material["redesign_allowed"])
+        cost = cli_json("change-policy", "--new-cost")
+        self.assertEqual(cost["classification"], "material_change")
+        self.assertTrue(cost["reapproval_required"])
+        self.assertFalse(cost["plan_invalidating"])
+        self.assertFalse(cost["redesign_allowed"])
+
+    def test_quality_v2_requires_change_artifacts_inside_change_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            original = root / state["plans"][0]["path"]
+            external = root / "docs/plans/P01-system.md"
+            external.parent.mkdir(parents=True, exist_ok=True)
+            external.write_bytes(original.read_bytes())
+            state["approval"]["package"]["files"].remove(state["plans"][0]["path"] )
+            state["plans"][0]["path"] = "docs/plans/P01-system.md"
+            state["approval"]["package"]["files"].append(state["plans"][0]["path"] )
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            result = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("planning.change_root", result.stderr)
+
+    def test_readiness_rejects_duplicate_current_spec_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_project(root)
+            state = json.loads(read(state_path))
+            readiness_path = root / state["planning"]["readiness"]
+            match = re.search(r"```json\s*(.*?)\s*```", read(readiness_path), re.S)
+            readiness = json.loads(match.group(1))
+            duplicate = dict(readiness["spec_deltas"][0])
+            duplicate["id"] = "SD-002"
+            duplicate["destinations"] = list(duplicate["destinations"])
+            for destination in duplicate["destinations"]:
+                path = root / destination
+                path.write_text(read(path) + "\nSD-002\n", encoding="utf-8")
+            readiness["spec_deltas"].append(duplicate)
+            readiness_path.write_text(
+                "# Planning Readiness\n\n```json\n"
+                + json.dumps(readiness, indent=2)
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            result = cli(
+                "planning-audit", str(state_path), "--root", str(root), "--strict"
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("target duplicado", result.stderr)
+
+    def test_cycle_close_requires_completed_plans_and_release_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "repo"
+            state_path = self.make_project(root, initialize_git=True)
+            self.pass_checker(state_path, root)
+            state = json.loads(read(state_path))
+            state["planning_status"] = "pending_approval"
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            created = cli_json("snapshot", "create", str(state_path), "--root", str(root))
+            state = json.loads(read(state_path))
+            state["planning_status"] = "approved"
+            state["approval"].update(
+                {
+                    "status": "approved",
+                    "approved_at": "2026-08-17T13:00:00Z",
+                    "approved_by": "owner",
+                    "approved_plans": ["P01"],
+                }
+            )
+            state["approval"]["package"]["manifest_digest"] = created["digest"]
+            state["plans"][0]["status"] = "approved"
+            state["verification"]["plan"]["status"] = "passed"
+            state["verification"]["release"]["status"] = "pending"
+            state["release"].update(
+                {
+                    "status": "ready",
+                    "candidate": {
+                        "id": "rc-1",
+                        "revision": "abc",
+                        "build": "1",
+                        "checksum": "sha256:abc",
+                    },
+                    "homologation": "accepted",
+                    "final_review": "approved",
+                    "delivery": "ready",
+                }
+            )
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            git(root, "add", ".")
+            git(root, "commit", "-m", "invalid ready release")
+            result = cli("cycle-close", "--state", str(state_path), "--root", str(root))
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("planos completed", result.stderr)
+            self.assertIn("verification.release passed", result.stderr)
+
+    def test_cycle_close_allows_archive_without_behavioral_spec_delta(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "repo"
+            state_path = self.make_project(root, initialize_git=True)
+            state = json.loads(read(state_path))
+            readiness_path = root / state["planning"]["readiness"]
+            match = re.search(r"```json\s*(.*?)\s*```", read(readiness_path), re.S)
+            readiness = json.loads(match.group(1))
+            readiness["spec_deltas"] = []
+            readiness_path.write_text(
+                "# Planning Readiness\n\n```json\n"
+                + json.dumps(readiness, indent=2)
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            delta_path = "docs/bianchini/changes/v1/spec-deltas/system.md"
+            state["approval"]["package"]["files"].remove(delta_path)
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            self.pass_checker(state_path, root)
+            state = json.loads(read(state_path))
+            state["planning_status"] = "pending_approval"
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            created = cli_json("snapshot", "create", str(state_path), "--root", str(root))
+            state = json.loads(read(state_path))
+            state["planning_status"] = "approved"
+            state["approval"].update(
+                {
+                    "status": "approved",
+                    "approved_at": "2026-08-17T13:00:00Z",
+                    "approved_by": "owner",
+                    "approved_plans": ["P01"],
+                }
+            )
+            state["approval"]["package"]["manifest_digest"] = created["digest"]
+            state["plans"][0]["status"] = "completed"
+            state["verification"]["plan"]["status"] = "passed"
+            state["verification"]["release"]["status"] = "passed"
+            state["release"].update(
+                {
+                    "status": "ready",
+                    "candidate": {
+                        "id": "rc-1",
+                        "revision": "abc",
+                        "build": "1",
+                        "checksum": "sha256:abc",
+                    },
+                    "homologation": "accepted",
+                    "final_review": "approved",
+                    "delivery": "ready",
+                }
+            )
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            git(root, "add", ".")
+            git(root, "commit", "-m", "non behavioral release")
+            closed = cli_json("cycle-close", "--state", str(state_path), "--root", str(root))
+            self.assertEqual(closed["synchronized"], [])
+            self.assertTrue((root / "docs/bianchini/archive/v1/READINESS.md").is_file())
+
+    def test_cycle_close_syncs_current_specs_archives_change_and_increments_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "repo"
+            state_path = self.make_project(root, initialize_git=True)
+            self.pass_checker(state_path, root)
+            state = json.loads(read(state_path))
+            state["planning_status"] = "pending_approval"
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            created = cli_json("snapshot", "create", str(state_path), "--root", str(root))
+            state = json.loads(read(state_path))
+            state["planning_status"] = "approved"
+            state["approval"].update(
+                {
+                    "status": "approved",
+                    "approved_at": "2026-08-17T13:00:00Z",
+                    "approved_by": "owner",
+                    "approved_plans": ["P01"],
+                }
+            )
+            state["approval"]["package"]["manifest_digest"] = created["digest"]
+            state["plans"][0]["status"] = "completed"
+            state["verification"]["plan"]["status"] = "passed"
+            state["verification"]["release"]["status"] = "passed"
+            state["release"].update(
+                {
+                    "status": "ready",
+                    "candidate": {
+                        "id": "rc-1",
+                        "revision": "abc",
+                        "build": "1",
+                        "checksum": "sha256:abc",
+                    },
+                    "homologation": "accepted",
+                    "final_review": "approved",
+                    "delivery": "ready",
+                }
+            )
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            git(root, "add", ".")
+            git(root, "commit", "-m", "release ready")
+            closed = cli_json(
+                "cycle-close", "--state", str(state_path), "--root", str(root)
+            )
+            self.assertEqual(closed["planning_version"], "v2")
+            self.assertEqual(
+                read(root / "docs/bianchini/current/specs/system.md"),
+                "# Sistema atual após v1\n\nSD-001. D-001: sessão autenticada, recuperação P-001 e ação U-001.\n",
+            )
+            self.assertTrue((root / "docs/bianchini/archive/v1/READINESS.md").is_file())
+            self.assertFalse((root / "docs/bianchini/changes/v1").exists())
+            idle = json.loads(read(state_path))
+            self.assertEqual(idle["planning_status"], "idle")
+            self.assertEqual(idle["planning_version"], "v2")
+            self.assertIn("ciclo v2 standalone", idle["next_action"])
+            self.assertEqual(idle["planning"]["current_specs"], "docs/bianchini/current/specs")
+
 
 
 class AdaptivePolicyScenarios(unittest.TestCase):

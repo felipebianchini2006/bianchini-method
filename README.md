@@ -1,6 +1,8 @@
-# Bianchini Method v2.8 — Standalone Adaptive
+# Bianchini Method v3.0 — Planning Stability
 
-Sistema de sete skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
+`v3.0` é a versão do pacote. `method_version` permanece `2` para preservar compatibilidade dos projetos standalone existentes.
+
+Sistema de oito skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
 
 | Situação | Fluxo |
 |---|---|
@@ -8,20 +10,23 @@ Sistema de sete skills para planejar, executar, auditar, corrigir, homologar e a
 | Projeto pequeno ou entrega coesa | `/executar-direto` |
 | Projeto complexo, multifase ou de alto risco | `/sdd-planning` + `/executar-plano` |
 
-## Fluxo v2
+## Fluxo atual
 
 ```text
 escopo aprovado
+  -> design-projeto, somente para UI nova/material sem design válido
+  -> readiness: decisões, suposições, pitfalls, ações externas e spikes
   -> sdd-planning
+  -> checker semântico, no máximo duas passagens
   -> aprovação única
-  -> executar-plano
+  -> executar-plano com autonomia e plano congelado
   -> gates por plano
-  -> homologar-sistema (automação + uso real do RC)
-  -> revisão final
-  -> entrega
+  -> homologar-sistema: automação + uso real do RC
+  -> revisão final e entrega
+  -> cycle-close: sincronizar specs atuais e arquivar ciclo
 ```
 
-`sdd-planning` pesquisa a stack em fontes primárias, aplica as decisões à spec e simplifica a execução sem reduzir o escopo aprovado. `status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
+`sdd-planning` valida readiness, pesquisa a stack, aplica decisões e pitfalls à spec e congela planos sem reduzir o escopo aprovado. `status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
 `auditar-arquitetura` é manual, report-only e executada apenas sob pedido explícito.
 
 ## Compatibilidade
@@ -48,6 +53,33 @@ Ao concluir e commitar todos os gates e a entrega da última fase legado, `execu
 ```
 
 Não dependem do Superpowers. Usam estado validado, worktree obrigatória, artefatos persistentes e gates nativos do projeto.
+
+## Estabilidade e autonomia
+
+Novos ciclos usam:
+
+```text
+docs/bianchini/current/specs/      -> comportamento atual aceito
+docs/bianchini/changes/vN/         -> mudança atual
+docs/bianchini/archive/vN/         -> ciclo encerrado
+docs/design/vN/                    -> protótipo e contrato visual aprovados
+```
+
+`READINESS.md` resolve antes do plano:
+
+```text
+D-* decisões
+A-* suposições
+P-* pitfalls
+U-* ações externas
+S-* spikes
+DS-* superfícies visuais
+SD-* próximas specs de domínio
+```
+
+O checker permite uma correção. Depois da aprovação, detalhes internos e ajustes limitados são registrados no ledger sem editar o plano. Escopo, contrato público, design aprovado, impossibilidade externa ou invariante crítico comprovado invalidam o plano apenas na área afetada. Novo custo ou ação irreversível apenas pausam para autorização; não autorizam redesign por si só.
+
+A ordem autônoma é: decisão aprovada -> padrão do repositório -> stack existente -> documentação oficial -> opção reversível de menor risco. O agente não interrompe por escolha técnica interna.
 
 ## Política adaptativa
 
@@ -79,6 +111,7 @@ Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: ren
 
 ## Skills
 
+- `design-projeto`: protótipo HTML estático, tokens, contrato e manifesto visual ligados ao escopo.
 - `sdd-planning`: pesquisa atual da stack, spec, simplificação, planos, gates e aprovação única.
 - `executar-plano`: execução v1 legado ou v2 isolada/adaptativa.
 - `executar-direto`: entrega pequena e coesa com brief compacto, scratch ignorado, verificação obrigatória para conclusão e estados terminais; invocação exclusivamente manual por `/executar-direto`.
@@ -100,7 +133,8 @@ Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: ren
 O CLI usa somente a biblioteca padrão Python e fornece:
 
 ```text
-validate-state  route  legacy-transition  planning-audit  snapshot  policy  workspace(create|check|locate|resume)
+validate-state  route  legacy-transition  design-audit  planning-audit  planning-check
+change-policy  cycle-close  snapshot  policy  workspace(create|check|locate|resume)
 repo-hygiene(check|migrate)  task-brief  report  review-package
 checkpoint  proof-map  telemetry  status
 ```
@@ -111,7 +145,7 @@ Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é b
 
 Novos planejamentos incluem `STACK_RESEARCH.md` em modo `repo_only`, `targeted_web` ou `full`. `planning-audit --strict` retorna os limites vigentes, bloqueia evidência insuficiente, placeholders, comandos em prosa e planos dependentes de fontes legadas. Lean permanece tipicamente pequeno e sem mínimo; Standard e Full absorvem escopos/risco maiores sem retirar requisitos aprovados. Qualquer `deferred_scope` exige autorização explícita registrada do responsável. O snapshot reaplica o gate automaticamente.
 
-`/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; documentos ativos v2 ficam em `docs/bianchini/<planning_version>/`.
+`/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; mudanças ativas ficam em `docs/bianchini/changes/<planning_version>/`; specs aceitas ficam em `docs/bianchini/current/specs/`.
 
 ## Homologação e manual
 
@@ -141,6 +175,7 @@ Nenhuma instalação ou sincronização é executada automaticamente.
 ## Uso
 
 ```text
+/design-projeto
 /sdd-planning
 /executar-direto
 /auditar-arquitetura
@@ -173,4 +208,4 @@ O runner recomendado executa cada classe em processo separado e libera recursos 
 python3 -m unittest discover -s tests -v
 ```
 
-Os testes usam projetos-fixture v1 legado, v2 grouped e v2 strict, além de cenários temporários para worktree, path traversal, fingerprints antigo/incorreto, telemetria opt-in, breaker, homologação com automação e execução real, bug visual, auditoria e manual fora do escopo.
+Os testes usam projetos-fixture v1 legado, v2 grouped e v2 strict, além de cenários temporários para design manifest, readiness, checker limitado, specs atuais/deltas, cycle-close, worktree, path traversal, fingerprints antigo/incorreto, telemetria opt-in, breaker, homologação com automação e execução real, bug visual, auditoria e manual fora do escopo.

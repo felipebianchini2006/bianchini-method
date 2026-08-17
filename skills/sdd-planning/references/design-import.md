@@ -1,14 +1,15 @@
 # Importação enxuta de design
 
-Use somente quando houver referência visual.
+Use somente quando existir `docs/design/<version>/DESIGN_MANIFEST.json` aprovado e válido para o mesmo escopo.
 
-1. Preservar o arquivo original. Se houver ZIP, validar path traversal e symlinks antes de extrair.
-2. Criar inventário curto com páginas, componentes reutilizáveis, tokens visuais, assets, fontes, breakpoints e estados realmente presentes.
-3. Capturar screenshot apenas de cada layout distinto. Usar desktop e mobile somente quando a responsividade alterar a estrutura.
-4. Não capturar todas as combinações de estado. Registrar loading, vazio e erro apenas quando existirem no design ou forem críticos para a jornada.
-5. Não extrair texto integral para JSON salvo quando o conteúdo precisar ser comparado automaticamente.
-6. Criar hashes somente quando for importante detectar mudanças posteriores nos arquivos de referência.
-7. Fidelidade significa preservar hierarquia, tokens e comportamento visível. Não inventar melhorias.
-8. Encerrar qualquer servidor temporário ao final.
+1. Executar `bm.py design-audit verify`; arquivo solto em `docs/design` não é fonte de verdade.
+2. Preservar originais. ZIP exige bloqueio de path traversal e symlink antes de extrair.
+3. Usar o inventário do manifesto: superfícies, contrato, prototype, tokens, screenshots, breakpoints e arquivos.
+4. Planejar pela hierarquia, tokens, componentes, estados e comportamento visível do contrato.
+5. Não capturar toda combinação equivalente. Desktop/mobile somente quando a estrutura mudar.
+6. Não extrair texto integral para JSON nem gerar hashes paralelos; o manifesto é a identidade única.
+7. Fidelidade preserva o design aprovado. Melhoria estética nova exige `/design-projeto`, não improviso no plano.
+8. Incluir manifesto e todos os arquivos listados no pacote aprovado.
+9. Encerrar qualquer servidor temporário.
 
-No perfil Full, screenshots e mapa de implementação podem ser ampliados conforme `full-assurance.md`.
+Design antigo, incompleto ou com `scope_digest` divergente é ignorado e não pode restringir a implementação.

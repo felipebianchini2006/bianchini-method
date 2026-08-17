@@ -25,8 +25,8 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva 
 Mostrar:
 
 - método/rota e `planning_version`;
-- `planning_status`, digest e aprovação;
-- planos por status e unidade atual;
+- `planning_status`, `quality_version`, readiness, checker, digest e aprovação;
+- design aprovado, specs atuais, mudança ativa, planos por status e unidade atual;
 - política `grouped|slice|strict` de cada plano ativo;
 - plano/unidade/gate atuais e próximo plano executável com seu modo;
 - `verification.fast`, `plan` e `release`;

@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.0.0 - Planning Stability e design independente
+
+- adiciona `/design-projeto` para gerar protótipo HTML estático, tokens, contrato e manifesto visual antes do SDD, sem depender do Claude;
+- aceita design somente por `DESIGN_MANIFEST.json` aprovado e ligado ao hash do escopo;
+- adiciona `READINESS.md` e `USER_ACTIONS.md` com decisões, suposições, pitfalls, ações externas, spikes, superfícies e specs de domínio rastreáveis;
+- limita o checker semântico a duas passagens e uma única correção;
+- congela planos aprovados e classifica divergências como detalhe interno, ajuste limitado ou mudança material;
+- amplia o envelope de autonomia e restringe interrupções a dependência externa, custo, ação irreversível, mudança material ou impossibilidade comprovada;
+- cria specs atuais em `docs/bianchini/current/specs/`, mudanças em `changes/` e archive determinístico por `cycle-close`;
+- preserva projetos v1 e ciclos `quality_version: 1` já aprovados sem migração no meio da execução;
+- aplica as mesmas barreiras de redesign e autonomia ao overlay Codex.
+
 ## 2.8.0 - Testes adaptativos sem custo por microtarefa
 
 - distribui unitários, integração/contrato, E2E, regressão e mutation testing entre `verification.fast`, `verification.plan` e `verification.release`;

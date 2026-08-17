@@ -1,6 +1,6 @@
 # Contrato do Bianchini Method
 
-Referência normativa das sete skills. Use [`scripts/bm.py`](scripts/bm.py) para decisões frágeis e repetíveis; não reimplemente essas primitivas em prompts.
+Referência normativa das oito skills. Use [`scripts/bm.py`](scripts/bm.py) para decisões frágeis e repetíveis; não reimplemente essas primitivas em prompts.
 
 ## Execução direta explícita
 
@@ -72,6 +72,91 @@ python3 <bm.py> validate-state docs/living/PROJECT_STATE.md
 ```
 
 O schema canônico está em [`schemas/project-state.schema.json`](schemas/project-state.schema.json).
+
+Novos ciclos usam `planning.quality_version: 2`. Pacotes `quality_version: 1` já aprovados continuam válidos até seu encerramento; não são convertidos no meio da execução.
+
+## Design antes do planejamento
+
+`/design-projeto` é a única skill pública que pode criar uma referência visual nova antes do SDD. Ela produz HTML/CSS/JS estático em `docs/design/<version>/`, sem código de produção.
+
+Somente `DESIGN_MANIFEST.json` com `status: approved`, `scope_digest` atual e `design_digest` válido é fonte de verdade. Arquivos soltos sob `docs/design`, screenshot antigo ou protótipo de outro escopo são ignorados.
+
+```bash
+bm.py design-audit seal --root <repo> --scope <scope> --manifest <manifest>
+bm.py design-audit verify --root <repo> --scope <scope> --manifest <manifest>
+```
+
+Interface nova, redesign, delta visual com decisão nova ou fluxo visual material sem manifesto válido executa `/design-projeto` antes de `/sdd-planning`. Mudança pequena que preserva o design system existente segue os tokens e componentes do repositório sem criar protótipo. Projeto sem interface não cria design.
+
+## Readiness e estabilidade do plano
+
+Antes da spec e dos planos, todo novo ciclo cria `READINESS.md` com JSON determinístico e `USER_ACTIONS.md`. IDs têm funções fechadas:
+
+- `D-*`: decisão travada;
+- `A-*`: suposição confirmada ou limitada;
+- `P-*`: pitfall com prevenção, recuperação e verificação;
+- `U-*`: ação externa com plano limite e fallback;
+- `S-*`: spike encerrado;
+- `DS-*`: superfície visual do manifesto;
+- `SD-*`: próxima spec de domínio.
+
+Cada item declara destinos e o ID deve existir neles. Suposição alta/crítica sem evidência, pitfall crítico sem mitigação, spike pendente/falho, design obrigatório sem manifesto ou ação externa sem limite bloqueiam o pacote antes da aprovação.
+
+O checker semântico tem no máximo duas passagens:
+
+```text
+passagem 1 -> aprovar, bloquear ou pedir uma correção
+passagem 2 -> aprovar ou bloquear
+```
+
+```bash
+bm.py planning-check record --state <state> --root <repo> --report <PLANNING_REVIEW.md>
+```
+
+O histórico é append-only e liga cada passagem aos digests do pacote e do relatório. Alterar uma entrada ou o `PLANNING_REVIEW.md` depois de `passed` invalida o checker. Terceira passagem é proibida.
+
+## Plano congelado e mudanças durante execução
+
+O pacote aprovado é imutável. Use `bm.py change-policy` para classificar divergências:
+
+- `implementation_detail`: escolha interna reversível; decidir e continuar;
+- `bounded_amendment`: caminho, comando ou ordem interna; registrar no ledger e continuar sem editar o plano aprovado;
+- `material_change` invalidante: escopo, contrato público, design aprovado, impossibilidade externa ou invariante crítico; invalidar o pacote e replanejar apenas a área afetada.
+- `material_change` de autorização: novo custo ou ação irreversível; pausar para decisão do responsável sem redesign. Só replanejar se a decisão alterar escopo, contrato ou design.
+
+Solução mais elegante, nome de arquivo, divisão interna ou preferência do revisor não autorizam redesign. `bounded_amendment` não cria nova tarefa, revisão ou subagente. Redesign exige `plan_invalidating: true`; custo ou ação irreversível isolados exigem autorização, não nova decomposição.
+
+## Envelope de autonomia
+
+A decisão automática segue esta ordem:
+
+```text
+decisão aprovada do responsável
+-> padrão existente no repositório
+-> stack e dependências já usadas
+-> documentação oficial
+-> opção reversível de menor risco
+```
+
+O agente registra a decisão e continua. Só interrompe por credencial externa indispensável, novo custo, ação destrutiva/irreversível, mudança material de escopo/contrato/design ou impossibilidade real comprovada. `USER_ACTIONS.md` antecipa essas dependências e permite continuar com fixture, fake ou sandbox até o plano limite.
+
+## Specs atuais, deltas e encerramento
+
+A fonte atual vive em:
+
+```text
+docs/bianchini/current/specs/
+```
+
+Cada ciclo vive em `docs/bianchini/changes/<version>/`. Arquivos em `spec-deltas/` contêm o contrato completo esperado após a mudança, não instruções de edição ambíguas. Durante planejamento e execução, `current/specs` permanece congelado.
+
+Depois de release `ready`, homologação aceita, revisão final aprovada e entrega pronta:
+
+```bash
+bm.py cycle-close --state <PROJECT_STATE.md> --root <repo>
+```
+
+O comando verifica snapshot e árvore limpa, sincroniza os `SD-*`, arquiva a mudança em `docs/bianchini/archive/<version>/`, incrementa `planning_version`, cria estado `idle` e prepara um commit. Symlink, target fora de `current/specs`, source fora da mudança ou conflito de archive bloqueiam sem aceitar fechamento parcial.
 
 ## Política adaptativa
 
@@ -145,7 +230,7 @@ bm.py repo-hygiene check --repo <repo>
 bm.py repo-hygiene migrate --repo <repo>
 ```
 
-`migrate` exige ausência de mudanças alheias, move somente arquivos já rastreados preservando seus bytes para `docs/bianchini/legacy/root-superpowers/`, adiciona o ignore e prepara essas mudanças no índice. `docs/superpowers/` pode permanecer como histórico v1; documentos ativos v2 ficam exclusivamente em `docs/bianchini/<planning_version>/`. `workspace create` executa o check e bloqueia qualquer violação.
+`migrate` exige ausência de mudanças alheias, move somente arquivos já rastreados preservando seus bytes para `docs/bianchini/legacy/root-superpowers/`, adiciona o ignore e prepara essas mudanças no índice. `docs/superpowers/` pode permanecer como histórico v1; mudanças ativas v2 ficam em `docs/bianchini/changes/<planning_version>/` e specs aceitas em `docs/bianchini/current/specs/`. `workspace create` executa o check e bloqueia qualquer violação.
 
 ## Artefatos determinísticos
 
@@ -187,13 +272,13 @@ O ledger é append-only. Logs completos, diffs e screenshots ficam em arquivos a
 
 ## Aprovação única
 
-O pacote contém escopo local, pesquisa da stack, spec, planos, revisão de planejamento e decisões contratuais. Se o escopo existir somente na conversa/URL mutável, materializar `docs/bianchini/vN/inputs/APPROVED_SCOPE.md`.
+O pacote novo contém escopo local, pesquisa, readiness, ações externas, spec da mudança, specs de domínio quando aplicáveis, planos, checker final, specs atuais afetadas e design aprovado aplicável. Se o escopo existir somente na conversa/URL mutável, materializar `docs/bianchini/changes/vN/inputs/APPROVED_SCOPE.md`.
 
 ## Pesquisa e simplificação do planejamento
 
-Todo novo planejamento v2 usa `planning.quality_version: 1`, registra `planning.research_mode` e inclui `STACK_RESEARCH.md`. Selecionar o menor modo suficiente: `repo_only` para stack estabelecida sem integração/decisão sensível nova; `targeted_web` para API, biblioteca, pagamento, autenticação, mobile, infraestrutura ou decisão sensível a versão; `full` somente para garantia Full explícita, auditoria/regulação, arquitetura nova de alto impacto ou várias decisões críticas. `repo_only` inventaria manifests, lockfiles, CI, testes e padrões locais sem exigir URL. Os modos web exigem fontes primárias oficiais, URL e data. Registrar sempre o modo, o motivo e somente decisões aplicadas.
+Todo novo planejamento v2 usa `planning.quality_version: 2`, registra `planning.research_mode` e inclui `STACK_RESEARCH.md`. Selecionar o menor modo suficiente: `repo_only` para stack estabelecida sem integração/decisão sensível nova; `targeted_web` para API, biblioteca, pagamento, autenticação, mobile, infraestrutura ou decisão sensível a versão; `full` somente para garantia Full explícita, auditoria/regulação, arquitetura nova de alto impacto ou várias decisões críticas. `repo_only` inventaria manifests, lockfiles, CI, testes e padrões locais sem exigir URL. Os modos web exigem fontes primárias oficiais, URL e data. Registrar sempre o modo, o motivo e somente decisões aplicadas.
 
-O escopo aprovado define resultados e invariantes, não a decomposição operacional. Preservar 100% dele; simplificar implementação nunca significa retirar requisito. Reescrever planos legados ou externos em slices de entrega autocontidos; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências, execução real do RC e varredura visual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
+O escopo aprovado define resultados e invariantes, não a decomposição operacional. Preservar 100% dele; simplificar implementação nunca significa retirar requisito. Reescrever planos legados ou externos em slices de entrega autocontidos; readiness deve resolver suposições materiais antes deles; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências, execução real do RC e varredura visual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
 
 Antes do snapshot, executar:
 
@@ -205,7 +290,7 @@ O gate exige pesquisa proporcional, unidades completas, comandos reproduzíveis 
 
 `deferred_scope` não é ferramenta de economia. Só pode conter requisito aprovado quando o responsável tiver autorizado explicitamente a divisão antes do planejamento, com `scope_split_approved: true`, autor e horário. Sem essa prova, o audit e o snapshot bloqueiam. “Menor ciclo”, simplicidade, custo ou limite de contexto não constituem autorização.
 
-Estados com `planning.quality_version: 1` também executam esse gate dentro de `snapshot create|verify`; portanto, um pacote novo não consegue contornar a auditoria omitindo o comando explícito.
+Estados com `planning.quality_version: 1` ou `2` também executam esse gate dentro de `snapshot create|verify`; portanto, um pacote novo não consegue contornar a auditoria omitindo o comando explícito.
 
 Criar e verificar o manifesto:
 
@@ -230,7 +315,7 @@ bm.py snapshot verify <state> --root <repo>
 
 | Informação | Fonte |
 |---|---|
-| comportamento | spec aprovada |
+| comportamento atual | `docs/bianchini/current/specs/` + spec da mudança aprovada |
 | estado | `PROJECT_STATE.md` validado |
 | operação | ledger + checkpoint |
 | problema aberto | `KNOWN_ISSUES.md` |

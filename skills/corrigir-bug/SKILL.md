@@ -16,6 +16,8 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), resolva `
 - V1: exigir Superpowers e usar seu systematic debugging/TDD/revisão. Sem ele, `BLOQUEADO`.
 - V2: validar estado e executar `workspace check` antes de qualquer fix. Continuar no mesmo ledger e RC; não criar trilha paralela.
 
+O plano aprovado permanece congelado. Arquivo, comando, ordem interna ou detalhe de implementação diferente não exige redesign. Quando a investigação provar mudança de escopo, contrato público, design aprovado, novo custo, ação irreversível ou impossibilidade real, executar `bm.py change-policy` com o flag factual e tratar como `material_change`; não chamar de bug para contornar aprovação.
+
 ## 1. Intake e risco
 
 Registrar uma frase para cada item:
@@ -120,7 +122,7 @@ Revisar o diff em duas passagens:
 - teste não está acoplado a detalhes internos;
 - logs e artefatos não expõem dados.
 
-Achado crítico/importante exige nova rodada de fix e revisão do delta. Mudança necessária de regra de negócio ou contrato aprovado é bloqueio e pede decisão; não chamar de bug para evitar aprovação.
+Achado crítico/importante exige nova rodada de fix e revisão do delta. Mudança necessária de regra de negócio ou contrato aprovado é `material_change`, invalida somente a área afetada e pede decisão; não redesenhar o plano inteiro nem chamar de bug para evitar aprovação.
 
 ## 7. Reteste e registro
 

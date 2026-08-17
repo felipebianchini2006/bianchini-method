@@ -399,6 +399,15 @@ def stop_evidence(kind: str, proof_id: str) -> dict[str, object]:
             "currency": "BRL",
             "indispensability_proof": proof_id,
         }
+    if kind == "material_change":
+        return {
+            "approved_requirement": "REQ-1",
+            "change_kind": "public_contract",
+            "current_contract": "entrada aceita conforme brief congelado",
+            "required_change": "alterar a entrada pública aprovada",
+            "execution_blocker": "a unidade não pode cumprir ambos os contratos",
+            "evidence_proof_id": proof_id,
+        }
     return {
         "invariant": "gate exige plataforma ausente",
         "attempts": [{"proof_id": proof_id}],
@@ -522,6 +531,33 @@ class CodexOverlayPackageTests(unittest.TestCase):
         self.assertIn("verification.fast", core)
         self.assertIn("verification.plan", core)
         self.assertIn("verification.release", core)
+
+    def test_codex_preserves_frozen_plan_and_autonomy_envelope(self) -> None:
+        core = (OVERLAY / "references/EXECUTION_CORE_CODEX.md").read_text(
+            encoding="utf-8"
+        )
+        convergence = (OVERLAY / "references/CODEX_CONVERGENCE.md").read_text(
+            encoding="utf-8"
+        )
+        reviewer = (OVERLAY / "references/plan-reviewer-codex.md").read_text(
+            encoding="utf-8"
+        )
+        skill = (OVERLAY / "SKILL.md").read_text(encoding="utf-8")
+        for expected in (
+            "implementation_detail",
+            "bounded_amendment",
+            "material_change",
+            "bm.py change-policy",
+            "plano aprovado permanece congelado",
+            "opção reversível de menor risco",
+            "USER_ACTIONS.md",
+            "cycle-close",
+        ):
+            self.assertIn(expected, core)
+        self.assertIn("material_change", convergence)
+        self.assertIn("não autoriza nova decomposição", convergence)
+        self.assertIn("mudança material comprovada", reviewer)
+        self.assertIn("cinco categorias de parada", skill)
 
     def test_codex_activation_policy_is_explicit_and_base_implicit_is_disabled(
         self,
@@ -1340,6 +1376,7 @@ class ReviewGuardScenarios(unittest.TestCase):
                     "essential_external_credential",
                     "destructive_action",
                     "new_cost",
+                    "material_change",
                     "real_impossibility",
                 }
             )

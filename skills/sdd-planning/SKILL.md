@@ -7,204 +7,221 @@ description: Use somente com invocação explícita de /sdd-planning, ou para co
 
 **Anuncie:** "Planejando com Bianchini Method <v1 legado|v2 standalone>."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md) e [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md). Resolva o caminho absoluto de [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py) uma vez.
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md) e [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md). Resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py) uma vez.
 
-## 1. Rotear
+## 1. Rotear e preservar compatibilidade
 
-1. Ler regras do repositório e `PROJECT_STATE.md`, se existir.
-2. Com estado, executar `bm.py route <state>`; sem estado, executar `bm.py route --repo <repo> --new-project`.
-3. Se v1, exigir Superpowers e entregar o planejamento ao fluxo legado. Sem Superpowers, declarar `BLOQUEADO`; não criar documentos v2.
-4. Se a rota for `v2-new`, iniciar v2 pelo template e validar com `bm.py validate-state`.
-5. Se a rota for `v2-standalone` com `planning_status: idle`, iniciar o próximo ciclo sem Superpowers: manter a `planning_version` reservada, materializar o novo escopo aprovado e trocar para `in_progress` antes de produzir spec/planos.
-6. Se versão ambígua/inválida, bloquear sem inferir migração.
+1. Ler regras do repositório e `PROJECT_STATE.md`, quando existir.
+2. Executar `bm.py route` com estado; sem estado, usar `--new-project`.
+3. V1 exige Superpowers e permanece integralmente no legado. Sem ele, `BLOQUEADO`.
+4. V2 `planning_status: idle` inicia o próximo ciclo standalone. Não chamar `writing-plans`, brainstorming ou outro fluxo legado.
+5. Migração v1 somente com autorização explícita; preservar `docs/superpowers/` como histórico.
+6. Novo ciclo usa `planning.quality_version: 2`. Ciclo v2 antigo já aprovado continua no contrato em que nasceu; não migrar durante execução.
 
-Exceção: se o responsável pedir explicitamente a migração do projeto atual, executar `route --migrate-to-v2`, nunca inferir essa decisão. Preservar `docs/superpowers/` como histórico e criar estado bootstrap v2 com `planning_status: in_progress` e `plans: []`. Não editar conteúdo livre de `AGENTS.md`/`CLAUDE.md`; sem bloco `bianchini-method` delimitado, apenas relatar uma sugestão. O próximo planejamento deve substituir o bootstrap antes de `pending_approval`.
+Executar `bm.py repo-hygiene check`. Com migração autorizada, usar `repo-hygiene migrate`. Esta skill somente planeja; não cria código de produção.
 
-Um estado v2 `idle` criado automaticamente por `executar-plano` após a conclusão real do último ciclo legado já é migrado e autorizado. Não chamar `writing-plans`, brainstorming ou qualquer skill Superpowers; iniciar diretamente este fluxo standalone. Não renumerar para `v2`: `planning_version: v1` identifica o primeiro planejamento feito pelo método v2.
+## 2. Criar a raiz da mudança
 
-Executar `bm.py repo-hygiene check --repo <repo>`. Se houver `.superpowers/` rastreado e a migração estiver autorizada, executar `repo-hygiene migrate`; caso contrário, bloquear. A raiz deve conter `/.superpowers/` no `.gitignore`; documentos persistentes pertencem a `docs/bianchini/`, nunca a `.superpowers/`.
+Usar:
 
-Esta skill somente planeja. Não criar código, scaffolding, migração ou dependência de produção.
+```text
+docs/bianchini/current/specs/          # comportamento atual aceito
+docs/bianchini/changes/<version>/      # mudança em planejamento
+docs/bianchini/archive/<version>/      # ciclo encerrado
+```
 
-## 2. Ler fontes uma vez
+No primeiro ciclo, usar `v1`. Materializar o escopo em:
 
-Ordem: decisão recente do responsável, escopo aprovado, plano mestre, spec/ADR, design, documentação, código/testes/histórico.
+```text
+docs/bianchini/changes/<version>/inputs/APPROVED_SCOPE.md
+```
 
-- Materializar escopo conversacional ou URL mutável em `docs/bianchini/<planning_version>/inputs/APPROVED_SCOPE.md`.
-- Registrar no `PLANNING_REVIEW.md` apenas fatos, conflitos, premissas, riscos e ponteiros.
-- Não reabrir decisão aprovada nem copiar documentos inteiros.
+Preservar 100% dos resultados, invariantes e restrições aprovados. Planos nunca dependem de `inputs/`, `docs/superpowers/` ou “PLANO Task N” durante execução.
 
-### Cartografia opcional do repositório
+## 3. Resolver design antes do plano
 
-Somente quando o repositório for existente e desconhecido, tiver múltiplas aplicações ou linguagens, legado relevante ou fluxos afetados pouco claros, delegar o mapeamento ao contrato [`../_shared/agents/repo-cartographer.md`](../_shared/agents/repo-cartographer.md). Não usar em projeto novo ou pequeno. Passar ao subagente apenas o caminho do contrato, a raiz do repositório, o escopo e o caminho de saída `.superpowers/bianchini/cartography/<hash-do-HEAD>-<digest-do-escopo>.md`, onde o digest é o SHA-256 do escopo aprovado; não copiar o conteúdo do contrato para o prompt. Reutilizar o mapa somente quando `HEAD` e digest coincidirem com o nome do arquivo; `HEAD` diferente invalida o cache e escopo diferente gera outro arquivo. Retorno do subagente: apenas o caminho do mapa e as áreas não analisadas.
+Classificar a mudança visual:
 
-## 3. Pesquisar a stack
+- sem interface: `design_required: false`;
+- pequena mudança que preserva tokens, componentes e interação existentes: `design_required: false` e seguir o padrão do repositório;
+- delta visual com decisão nova, interface nova, redesign ou fluxo visual material: exigir `/design-projeto` antes de continuar.
 
-Ler [`references/stack-research.md`](references/stack-research.md). Antes de decidir arquitetura:
+Somente usar arquivo sob `docs/design` quando existir `DESIGN_MANIFEST.json` com `status: approved`, hashes válidos e o mesmo escopo:
 
-1. inventariar stack, versões, manifests, lockfiles, CI, testes, deploy e padrões já usados;
-2. selecionar e registrar o menor `planning.research_mode` suficiente: `repo_only`, `targeted_web` ou `full`;
-3. pesquisar fontes primárias oficiais somente quando o modo exigir;
-4. comparar recomendação, compatibilidade com o projeto e custo de adoção;
-5. escolher o menor fluxo robusto e registrar o impacto de cada decisão.
+```bash
+python3 <bm.py> design-audit verify --root <repo> --scope <scope> --manifest <manifest>
+```
 
-Salvar `docs/bianchini/<planning_version>/STACK_RESEARCH.md` com modo, motivo e seções exigidas pelo gate. `repo_only` não exige URL externa; `targeted_web` e `full` exigem fontes oficiais e data de acesso. Incluir o arquivo no pacote aprovado. Pesquisa não autoriza upgrade, dependência, refatoração ou ampliação de escopo.
+Arquivos soltos, screenshots antigos e protótipos sem manifesto são ignorados. Design existente usa [`references/design-import.md`](references/design-import.md).
 
-## 4. Simplificar sem reduzir escopo
+## 4. Ler e pesquisar uma vez
 
-Preservar 100% dos resultados, invariantes e restrições do escopo aprovado. Tratar somente sua decomposição como não normativa. A spec do ciclo deve ser autocontida; planos não podem mandar o executor abrir `inputs/`, `docs/superpowers/`, plano legado ou “PLANO Task N”.
+Ordem: decisão recente do responsável, escopo, specs atuais, design válido, documentação, código, testes e histórico.
 
-Fazer uma passagem explícita antes de escrever os planos:
+Cartografia deixa de ser opcional quando o brownfield tiver múltiplas aplicações/linguagens, legado relevante ou mais de um contrato afetado. Nesses casos, usar [`../_shared/agents/repo-cartographer.md`](../_shared/agents/repo-cartographer.md). Não usar em projeto novo ou pequeno. Salvar em `.superpowers/bianchini/cartography/<hash-do-HEAD>-<digest-do-escopo>.md`; `HEAD` diferente invalida o cache e escopo diferente gera outro arquivo. Projeto novo ou leitura localizada não recebe cartografia artificial.
 
-- criar cobertura explícita de cada requisito aprovado em spec e plano;
-- fundir baseline, setup, lint e docs na primeira entrega que os utiliza;
-- distribuir unitários, integração/contrato, E2E, regressão e mutação nos três estágios de verificação; não criar tarefa por camada de teste;
-- manter regressão ampla, E2E crítico, evidências exigidas e build em `verification.release`; manter execução real e exploração visual em `homologar-sistema`;
-- remover camadas, abstrações e tarefas sem critério de aceite próprio;
-- preferir contratos públicos e slices verticais a tarefas por arquivo ou tecnologia.
+Ler [`references/stack-research.md`](references/stack-research.md) e criar `STACK_RESEARCH.md` com o menor modo suficiente:
 
-Nunca mover requisito aprovado para `deferred_scope` a fim de satisfazer orçamento. Seguir os limites e a recomendação retornados por `planning-audit`; eles são tetos, nunca metas ou mínimos. Lean continua tipicamente pequeno e sem mínimo artificial. Acima de Full, manter o escopo e justificar `indivisible`; otimizar ponteiros e execução, não retirar entregas.
+- `repo_only`: stack local conhecida;
+- `targeted_web`: API, biblioteca, pagamento, autenticação, mobile, infraestrutura ou versão sensível;
+- `full`: auditoria/regulação ou várias decisões críticas.
 
-Usar `split` somente quando o responsável tiver autorizado explicitamente a divisão antes do planejamento. Registrar `scope_split_approved: true`, autor e horário. Sem autorização, deixar `deferred_scope: []`; se o escopo não couber, escalar o perfil. Não interpretar “seja simples”, “evite overengineering” ou o próprio orçamento como autorização para adiar requisito.
+Modos web usam fontes primárias oficiais. Pesquisa não autoriza upgrade, refatoração ou ampliação de escopo.
 
-## 5. Classificar garantia
+## 5. Gate de prontidão
 
-Escolher `lean`, `standard` ou `full` pelo maior entre risco e complexidade do escopo completo:
+Antes da spec e dos planos, criar:
 
-- `lean`: baixo risco agregado, integração isolada e pacote pequeno;
-- `standard`: risco médio/alto ou crítico localizado, múltiplos perfis/plataformas ou integração coordenada;
-- `full`: pedido explícito, auditoria/regulação, capacidade acima de Standard ou múltiplos subsistemas críticos interdependentes.
+```text
+docs/bianchini/changes/<version>/READINESS.md
+docs/bianchini/changes/<version>/USER_ACTIONS.md
+```
 
-Uma unidade crítica isolada usa `strict`, `per_task`, RED/GREEN e gates críticos, elevando o projeto no máximo para Standard. Não promover todo o projeto a Full por uma única unidade.
+`READINESS.md` contém um objeto JSON cercado por bloco `json` com:
 
-Executar `bm.py policy` para cada plano. A auditoria arquitetural é manual e report-only: não a executar automaticamente por perfil ou risco. Definir `architecture_audit: disabled|optional|required` conforme decisão explícita do responsável. Se ele contratar o relatório no pacote (`required`), incluir o arquivo no manifesto quando existir; candidatos de melhoria não bloqueiam aprovação.
+```text
+D-001  decisão travada
+A-001  suposição confirmada ou limitada
+P-001  pitfall com prevenção, recuperação e verificação
+U-001  ação externa, plano limite e fallback
+S-001  spike encerrado com evidência
+DS-001 superfície visual ligada ao manifesto
+SD-001 spec de domínio que será sincronizada
+```
 
-## 6. Criar spec central
+Também registrar `scope_digest`, `repository_revision` igual ao `HEAD` atual (`new-project` sem repositório), `design_required` e mapa de impacto: aplicações, módulos, contratos, dados e plataformas. Commit novo antes da aprovação invalida o readiness.
 
-Caminho v2:
+Regras:
 
-`docs/bianchini/<planning_version>/specs/YYYY-MM-DD-<sistema>-system-design.md`
+- suposição alta/crítica exige evidência e fallback quando limitada;
+- pitfall alto/crítico exige prevenção, recuperação e verificação;
+- spike pendente ou falho bloqueia;
+- ação externa deve dizer quando é necessária e se existe fallback;
+- cada item declara `destinations`; o ID deve aparecer nesses arquivos;
+- decisões e superfícies visuais aparecem na spec e em ao menos um plano;
+- `USER_ACTIONS.md` é uma visão humana das entradas `U-*`, não nova fonte de verdade.
 
-Incluir somente:
+Não criar uma tarefa por pitfall. O pitfall restringe a entrega e seus gates.
 
-- objetivo, limites e não objetivos;
-- arquitetura e contratos públicos;
-- entidades, estados, invariantes e permissões;
-- jornadas e critérios de aceite;
-- segurança/dados/migração/concorrência aplicáveis;
-- plataformas e integrações;
-- seams de teste observáveis, jornadas E2E críticas e regras materiais candidatas a mutação seletiva;
-- manual/PDF somente se contratado;
-- decisões e bloqueios.
+## 6. Criar spec da mudança e próximas specs atuais
 
-Aplicar as decisões do `STACK_RESEARCH.md` na spec; não copiar o relatório nem adicionar prática sem relação com o escopo.
+Criar uma spec central autocontida:
 
-Design visual existente usa [`references/design-import.md`](references/design-import.md). Full usa [`references/full-assurance.md`](references/full-assurance.md). Abrir cada referência apenas quando aplicável.
+```text
+docs/bianchini/changes/<version>/specs/<sistema>-change.md
+```
+
+Incluir objetivo, limites, arquitetura, contratos públicos, entidades, estados, invariantes, permissões, jornadas, segurança, dados, concorrência, integrações, plataformas, seams e referências `D/A/P/U/DS/SD`.
+
+Para cada domínio alterado, criar o contrato completo esperado após a entrega:
+
+```text
+docs/bianchini/changes/<version>/spec-deltas/<dominio>.md
+```
+
+Cada `SD-*` aponta `source` para esse arquivo e `target` para `docs/bianchini/current/specs/<dominio>.md`. Se o target já existir, incluí-lo no pacote para congelar a base. Não editar `current/specs` durante planejamento ou execução.
 
 ## 7. Criar planos por entregas reais
 
 Caminho:
 
-`docs/bianchini/<planning_version>/plans/P<NN>-<entrega>.md`
-
-Não há mínimo ou alvo de tarefas. Um plano pode ter uma ou duas tarefas quando essas são as entregas reais. Separar somente quando uma unidade puder ser rejeitada ou verificada independentemente.
-
-Cabeçalho:
-
-```yaml
-plan_id: P01
-method_version: 2
-risk: low | medium | high | critical
-execution: grouped | slice | strict
-review: plan_gate | per_slice | per_task
-depends_on: []
-spec_refs: [<caminho#seção>]
+```text
+docs/bianchini/changes/<version>/plans/P<NN>-<entrega>.md
 ```
 
-Cada tarefa/slice/grupo declara:
+Não há mínimo ou alvo de tarefas. Separar somente entregas rejeitáveis ou verificáveis de forma independente.
+
+Cada unidade declara:
 
 ```markdown
 ### Tarefa N — <resultado observável>
 
 **Execution:** grouped | slice | strict
 **Review:** plan_gate | per_slice | per_task
-**Change:** <categoria factual usada por bm.py policy>
-**Test seams:** <interfaces públicas verificadas>
+**Change:** <categoria factual para bm.py policy>
+**Readiness refs:** D-001, P-001, U-001, SD-001
+**Test seams:** <interfaces públicas>
 **Spec refs:** <seções exatas>
 **Files:** <caminhos>
-**Contract:** <entradas, saídas, invariantes>
-**Verification:** <comando e resultado esperado>
+**Contract:** <entradas, saídas e invariantes>
+**Verification:** <comando e resultado>
 **Done when:** <evidência objetiva>
 ```
 
-### Política de decomposição
+Política:
 
-- `grouped`: reunir mudanças baixas no mesmo seam; uma revisão no gate do plano.
-- `slice`: cada slice entrega comportamento vertical; revisão por slice.
-- `strict`: uma tarefa por unidade crítica, RED/GREEN e revisão independente.
-- Setup/config/docs pertencem à primeira unidade que os usa.
-- Não usar `TBD`, “tratar erros”, tarefas horizontais ou abstração futura.
-- Unitários, integração/contrato, E2E, regressão e mutação entram em `Verification` e nos gates; não criar tarefa por camada de teste, por arquivo de teste ou por ferramenta.
+- `grouped`: mudanças baixas no mesmo seam, uma revisão no gate;
+- `slice`: entrega vertical e revisão por slice;
+- `strict`: unidade crítica, RED/GREEN e revisão independente;
+- setup/config/docs entram na primeira entrega que os usa;
+- não criar tarefa por camada de teste, arquivo, ferramenta, decisão ou documento;
+- não usar `TBD`, “tratar erros” ou abstração futura.
 
-## 8. Definir verificação
+## 8. Definir garantia e verificação
 
-Descobrir comandos nativos do repositório e preencher:
+Escolher `lean`, `standard` ou `full` pelo maior risco/capacidade. Unidade crítica isolada usa `strict` sem promover todo o projeto a Full. Auditoria arquitetural é manual e report-only; não a executar automaticamente.
 
-- `verification.fast`: unitários focados quando houver lógica, integração/contrato focada quando uma fronteira mudar e regressão relacionada. E2E focado só quando for o menor seam público; nunca a suíte completa ou mutação;
-- `verification.plan`: suítes afetadas, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva conforme `bm.py policy`;
-- `verification.release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E de todas as jornadas críticas, regressão completa configurada, build do RC e evidência de mutação vigente quando obrigatória.
+Executar `bm.py policy` para cada plano. Distribuir testes:
 
-Executar `bm.py policy` com a categoria `Change` real. Para `mutation_policy.mode: selective`, usar apenas ferramenta já presente ou explicitamente aprovada. Para `required_selective`, declarar antes da aprovação o comando, os seams materiais e a alternativa determinística caso a stack não tenha ferramenta madura. Nunca deixar instalação de mutation testing para a execução.
+- `verification.fast`: unitários, integração/contrato e regressão focados;
+- `verification.plan`: suítes afetadas, regressão do plano, E2E crítico e mutação seletiva;
+- `verification.release`: suítes completas configuradas, contratos, E2E crítico, regressão, mutação exigida e build.
 
-Não usar score global de mutação, cobertura total ou quantidade mínima de testes como critério. E2E cobre jornadas críticas, não cada tela. Gate indispensável indisponível é bloqueio, nunca `passed` presumido.
+Não usar cobertura ou mutation score global. Gate indispensável indisponível é bloqueio.
 
-## 9. Criar estado e pacote
+## 9. Checker semântico com uma correção máxima
 
-Criar `PROJECT_STATE.md` em JSON conforme o template, usando:
+Criar `PLANNING_REVIEW.md` com objeto JSON:
 
-- `planning_version: v1` no primeiro ciclo;
-- `planning.quality_version: 1`, `planning.research_mode` e caminho local de `STACK_RESEARCH.md`;
-- `planning_status: pending_approval`;
-- `execution_policy: adaptive`;
-- `assurance_profile: lean|standard|full`;
-- `architecture_audit: disabled|optional|required`;
-- `manual_pdf: scope` por padrão;
-- `telemetry.enabled: false` por padrão; habilitar somente por decisão explícita;
-- política adaptativa em cada plano;
-- três estágios de `verification`.
-- `complexity_review: within_budget|split|indivisible` coerente com perfil e escopo; `split` exige autorização explícita registrada.
+```json
+{"verdict":"passed|changes_requested|blocked","findings":[]}
+```
 
-Em `idle`, escopo/spec/revisão ainda são nulos e `plans: []`; ao receber o novo escopo aprovado, trocar para `in_progress` e preencher as fontes locais. Durante bootstrap explícito de migração, `plans: []` também é permitido em `in_progress` com aprovação pending. Antes de gerar snapshot ou pedir aprovação, criar os planos reais e remover o estado bootstrap.
+Cada finding possui `id`, `severity`, `summary` e `evidence`. O CLI liga a passagem aos digests do pacote e do próprio relatório; uma segunda passagem exige mudança factual e um relatório novo.
 
-Depois:
+Fluxo fechado:
 
-1. validar estado com `bm.py validate-state`;
-2. executar `bm.py planning-audit <state> --root <repo> --strict` e corrigir todos os erros;
-3. criar manifesto com `bm.py snapshot create`;
-4. gravar o digest retornado em `approval.package.manifest_digest`;
-5. validar estado novamente e verificar snapshot;
-6. pedir uma única aprovação do digest e de todos os planos.
+```text
+checker 1
+  -> passed: congelar
+  -> changes_requested: uma correção
+  -> blocked: parar
+checker 2
+  -> passed ou blocked
+```
 
-Não aprovar em nome do responsável. Se ele reduzir o conjunto, regenerar pacote inteiro; não existe aprovação parcial.
+Registrar pelo CLI:
 
-Quando o responsável aprovar:
+```bash
+python3 <bm.py> planning-check record --state <state> --root <repo> --report <review>
+```
 
-1. registrar `planning_status: approved`, `approval.status: approved`, responsável, horário e planos;
-2. validar estado e executar `snapshot verify` novamente;
-3. adicionar somente os arquivos do pacote, `PROJECT_STATE.md` e o manifesto; se o manifesto estiver ignorado, usar inclusão explícita apenas para ele;
-4. criar commit local atômico `plan: approve <planning_version> package <digest-curto>`;
-5. confirmar `git status --porcelain` vazio.
+Terceira revisão é proibida. Não usar o checker para redesenhar por preferência, reabrir decisão aprovada ou criar trabalho futuro.
 
-Não incluir mudanças alheias no commit, não fazer push e não criar worktree antes dele. Se já houver mudanças externas que impeçam árvore limpa, declarar `BLOQUEADO` e pedir ao responsável para commitá-las, guardá-las ou removê-las.
+## 10. Estado, auditoria e aprovação única
 
-## 10. Revisar planejamento
+Criar o estado conforme [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md), com:
 
-Passagem Spec: cobertura de 100% do escopo aprovado, decisões de pesquisa, não objetivos autorizados, contratos, seams, dependências e plataformas.
+- `quality_version: 2`;
+- `readiness`, `user_actions`, `checker`, `change_root`, `current_specs` e design válido quando aplicável;
+- `complexity_review` proporcional;
+- pacote contendo escopo, pesquisa, readiness, ações, spec, spec-deltas quando aplicáveis, planos, revisão, specs atuais existentes e todos os arquivos de design.
 
-Passagem Qualidade: simplicidade sem redução de escopo, perfil proporcional, gates executáveis, ausência de placeholders/referências legadas e custo proporcional.
+Nunca usar `deferred_scope` para caber no orçamento. `split` exige `scope_split_approved: true`, responsável e horário.
 
-Salvar `PLANNING_REVIEW.md`. Corrigir achados antes do manifesto final.
+Executar:
+
+```bash
+python3 <bm.py> validate-state <state>
+python3 <bm.py> planning-audit <state> --root <repo> --strict
+python3 <bm.py> snapshot create <state> --root <repo>
+python3 <bm.py> snapshot verify <state> --root <repo>
+```
+
+Depois pedir uma única aprovação do digest e de todos os planos. Não aprovar em nome do responsável.
+
+Na aprovação, atualizar estado, verificar novamente, adicionar somente pacote/estado/manifesto e criar commit local atômico. Confirmar `git status --porcelain` vazio. Não fazer push nem iniciar implementação.
 
 ## Saída
 
-Informar rota v1/v2, perfil, arquitetura auditada ou opcional, spec, planos, estado validado, digest e bloqueios. Antes da aprovação, encerrar pedindo a decisão única; quando ela chegar, concluir o commit local do pacote sem implementar.
+Informar rota, versão da mudança, design, readiness, suposições/pitfalls, ações externas, specs atuais/deltas, perfil, planos, duas passagens máximas do checker, digest e bloqueios.
