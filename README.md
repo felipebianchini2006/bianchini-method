@@ -1,8 +1,8 @@
-# Bianchini Method v3.1 — Context Efficiency
+# Bianchini Method v3.2 — Self Update
 
-`v3.1` é a versão do pacote. `method_version` permanece `2` para preservar compatibilidade dos projetos standalone existentes.
+`v3.2` é a versão do pacote. `method_version` permanece `2` para preservar compatibilidade dos projetos standalone existentes.
 
-Sistema de oito skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
+Sistema de nove skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
 
 | Situação | Fluxo |
 |---|---|
@@ -119,6 +119,7 @@ Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: ren
 - `status-projeto`: estado, gates, bloqueios e próximo passo, sem mutação.
 - `corrigir-bug`: causa raiz, regressão adequada ao seam, fix mínimo e reteste.
 - `homologar-sistema`: confirma unitários/integração/regressão/E2E/mutação do release, executa o RC real por perfil/plataforma, faz varredura visual e decide o aceite.
+- `update-bm`: verifica a versão oficial e atualiza a instalação local com backup e rollback; invocação exclusivamente manual.
 
 ### Contratos internos de subagentes
 
@@ -136,7 +137,7 @@ O CLI usa somente a biblioteca padrão Python e fornece:
 validate-state  route  legacy-transition  design-audit  planning-audit  planning-check
 change-policy  cycle-close  snapshot  policy  workspace(create|check|locate|resume)
 repo-hygiene(check|migrate)  task-brief  report  review-package
-checkpoint  proof-map  spec-diff  mutation-evidence  telemetry  status
+checkpoint  proof-map  spec-diff  mutation-evidence  update-bm  telemetry  status
 ```
 
 Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é bloqueada.
@@ -181,7 +182,14 @@ cp -R skills/. ~/.codex/skills/
 # Claude Code: troque ~/.codex por ~/.claude
 ```
 
-Nenhuma instalação ou sincronização é executada automaticamente.
+Após esta instalação, verifique ou atualize explicitamente com:
+
+```bash
+python3 ~/.codex/skills/_shared/scripts/bm.py update-bm --check
+python3 ~/.codex/skills/_shared/scripts/bm.py update-bm
+```
+
+No Claude Code, troque `~/.codex` por `~/.claude`. Também é possível usar `/update-bm`. Nenhuma sincronização ocorre sem invocação explícita.
 
 ## Uso
 
@@ -194,6 +202,7 @@ Nenhuma instalação ou sincronização é executada automaticamente.
 /status-projeto
 /corrigir-bug <sintoma>
 /homologar-sistema
+/update-bm
 ```
 
 ## Overlay Codex

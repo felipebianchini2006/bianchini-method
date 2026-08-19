@@ -223,6 +223,14 @@ class SelfUpdateScenarios(unittest.TestCase):
             git(seed, "remote", "add", "origin", str(remote))
             git(seed, "push", "-u", "origin", "main")
             git(root, "clone", "--branch", "main", str(remote), str(local))
+            official = "https://github.com/felipebianchini2006/bianchini-method.git"
+            git(local, "remote", "set-url", "origin", official)
+            git(
+                local,
+                "config",
+                f"url.file://{remote.resolve()}/.insteadOf",
+                official,
+            )
 
             write_installation(seed / "skills", "3.2.0", "new")
             git(seed, "add", "skills")
@@ -241,6 +249,27 @@ class SelfUpdateScenarios(unittest.TestCase):
             self.assertEqual(git(local, "rev-parse", "HEAD"), expected_head)
             self.assertEqual((local / "skills/_shared/VERSION").read_text().strip(), "3.2.0")
             self.assertEqual(len(calls), 1)
+
+    def test_git_checkout_rejects_non_official_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "repo"
+            root.mkdir(parents=True)
+            git(root, "init", "-b", "main")
+            git(root, "config", "user.name", "BM Test")
+            git(root, "config", "user.email", "test@example.invalid")
+            write_installation(root / "skills", "3.1.0", "local")
+            git(root, "add", "skills")
+            git(root, "commit", "-m", "base")
+            git(root, "remote", "add", "origin", "https://github.com/example/fake.git")
+            fetch, _ = fetcher("3.2.0")
+
+            with self.assertRaisesRegex(UpdateError, "repositório oficial"):
+                update_bianchini_method(
+                    skills_root=root / "skills",
+                    fetch_bytes=fetch,
+                )
+
+            self.assertEqual((root / "skills/_shared/VERSION").read_text().strip(), "3.1.0")
 
     def test_dirty_git_checkout_blocks_before_fetch_or_merge(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.0 - Self Update seguro
+
+- adiciona `/update-bm` e `bm.py update-bm` com consulta explícita da versão oficial;
+- atualiza instalações copiadas substituindo somente diretórios gerenciados e preservando skills alheias;
+- cria backup persistente e executa rollback quando uma substituição falha;
+- bloqueia archive com path traversal, symlink, arquivo especial, entrada duplicada ou versão divergente;
+- em checkout Git, exige origem oficial, `main` limpa e fast-forward de `origin/main`;
+- nunca faz downgrade e oferece `--check` sem alteração de arquivos.
+
 ## 3.1.0 - Context Efficiency determinística
 
 - exige `Change` e `Readiness refs` em cada unidade de novos planejamentos quality v2, validando existência, destino e cobertura no readiness;

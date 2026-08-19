@@ -315,6 +315,10 @@ bm.py snapshot verify <state> --root <repo>
 
 Unidades de novos planos `quality_version: 2` declaram `Change` e `Readiness refs`; o audit valida categoria, existência, destino e cobertura. `task-brief --hydrate-context`, `spec-diff` e `mutation-evidence verify` geram projeções reproduzíveis sem criar nova fonte de verdade. Contratos, comandos e formatos estão em [`CONTEXT_EFFICIENCY.md`](CONTEXT_EFFICIENCY.md).
 
+## Atualização do método
+
+`/update-bm` é exclusivamente manual e executa `bm.py update-bm`. A versão local vive em `_shared/VERSION`; a fonte remota é a `main` oficial. Instalação copiada preserva diretórios alheios, cria backup e substitui somente as skills gerenciadas. Checkout Git exige origem oficial, `main`, árvore limpa e fast-forward. Versão local igual ou superior nunca é substituída. Falha de rede, archive inseguro, divergência de versão ou erro de escrita bloqueia sem declarar atualização.
+
 ## Fontes de verdade e segurança
 
 | Informação | Fonte |

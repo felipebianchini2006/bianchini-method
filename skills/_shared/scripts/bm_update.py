@@ -140,6 +140,31 @@ def _git_root(skills_root: Path) -> Path | None:
     return root if expected == skills_root.resolve() else None
 
 
+def _normalized_github_repository(remote_url: str) -> str | None:
+    value = remote_url.strip()
+    patterns = (
+        r"https://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$",
+        r"git@github\.com:([^/]+/[^/]+?)(?:\.git)?$",
+        r"ssh://git@github\.com/([^/]+/[^/]+?)(?:\.git)?/?$",
+    )
+    for pattern in patterns:
+        match = re.fullmatch(pattern, value, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).removesuffix(".git").lower()
+    return None
+
+
+def _verify_official_origin(repo: Path, repository: str) -> None:
+    remote = _run_git(repo, "config", "--get", "remote.origin.url").stdout.strip()
+    normalized = _normalized_github_repository(remote)
+    if normalized != repository.lower():
+        raise UpdateError(
+            "origin não aponta para o repositório oficial "
+            f"{repository}: {remote or '<ausente>'}",
+            3,
+        )
+
+
 def _base_result(
     *,
     installed: str,
@@ -190,6 +215,7 @@ def _update_git_checkout(
             "checkout Git possui alterações locais; commit ou guarde antes de atualizar",
             3,
         )
+    _verify_official_origin(repo, repository)
     _run_git(repo, "fetch", "origin", branch)
     remote_version_result = _run_git(
         repo,
@@ -241,8 +267,12 @@ def _extract_archive(content: bytes, destination: Path) -> Path:
         members = archive.getmembers()
         if not members:
             raise UpdateError("archive de atualização vazio")
+        seen: set[PurePosixPath] = set()
         for member in members:
             relative = _safe_member_path(member.name)
+            if relative in seen:
+                raise UpdateError(f"arquivo duplicado no pacote: {member.name}")
+            seen.add(relative)
             if member.issym() or member.islnk() or member.isdev() or member.isfifo():
                 raise UpdateError(f"arquivo inseguro no pacote: {member.name}")
             if not (member.isdir() or member.isfile()):

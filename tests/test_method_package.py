@@ -26,6 +26,7 @@ SKILL_NAMES = (
     "status-projeto",
     "corrigir-bug",
     "homologar-sistema",
+    "update-bm",
 )
 SKILLS = {name: ROOT / "skills" / name / "SKILL.md" for name in SKILL_NAMES}
 
@@ -135,7 +136,7 @@ class PackageIntegrityTests(unittest.TestCase):
                 self.assertEqual(metadata.get("name"), name)
                 self.assertIn("Use ", metadata.get("description", ""))
                 self.assertLessEqual(len(read(path).splitlines()), 250)
-                if name == "executar-direto":
+                if name in {"executar-direto", "update-bm"}:
                     self.assertEqual(metadata.get("disable-model-invocation"), "true")
 
     def test_relative_links_resolve(self) -> None:
@@ -191,6 +192,7 @@ class PackageIntegrityTests(unittest.TestCase):
             "PlanningQualityScenarios",
             "PlanningStabilityScenarios",
             "ContextEfficiencyScenarios",
+            "SelfUpdateScenarios",
             "AdaptivePolicyScenarios",
             "WorkspaceAndArtifactScenarios",
             "BehavioralProjectScenarios",
@@ -4312,6 +4314,9 @@ class SkillBehaviorContracts(unittest.TestCase):
                         description,
                         "Use quando o usuário solicitar a implementação estruturada de um projeto pequeno ou de uma entrega coesa sem planejamento SDD completo.",
                     )
+                    self.assertEqual(metadata["disable-model-invocation"], "true")
+                elif name == "update-bm":
+                    self.assertIn("somente com invocação explícita", description)
                     self.assertEqual(metadata["disable-model-invocation"], "true")
                 else:
                     self.assertTrue(
