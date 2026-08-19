@@ -150,7 +150,7 @@ proof_map = '''def write_proof_map(
         "mutation_evidence": mutation_sources,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(proof, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    output.write_text(json.dumps(proof, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
     return {"proof_map": str(output), **proof}
 '''
 replace_pattern_once(
