@@ -11,8 +11,10 @@ old_replace_once = '''def replace_once(text: str, old: str, new: str, label: str
     return text.replace(old, new, 1)
 '''
 new_replace_once = r'''def replace_once(text: str, old: str, new: str, label: str) -> str:
+    decode_newlines = "\\n" in old
     old = old.replace("\\n", "\n")
-    new = new.replace("\\n", "\n")
+    if decode_newlines:
+        new = new.replace("\\n", "\n")
     count = text.count(old)
     if count != 1:
         raise RuntimeError(f"{label}: esperado 1 ocorrência, encontrado {count}")
