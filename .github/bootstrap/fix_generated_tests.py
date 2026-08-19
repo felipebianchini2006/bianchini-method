@@ -12,4 +12,5 @@ new = '''    def make_mutation_project(self, root: Path, report: dict[str, objec
 '''
 if content.count(old) != 1:
     raise SystemExit(f'Fixture de mutação esperado uma vez, encontrado {content.count(old)}.')
-path.write_text(content.replace(old, new, 1), encoding='utf-8')
+updated = content.replace(old, new, 1).rstrip() + '\n'
+path.write_text(updated, encoding='utf-8')
