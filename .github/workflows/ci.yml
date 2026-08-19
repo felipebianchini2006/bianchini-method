@@ -1,51 +1,29 @@
-name: Apply Context Efficiency Review
+name: CI
 
 on:
   push:
     branches:
-      - feat/context-efficiency-v3.1
+      - main
   pull_request:
     branches:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  review:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout feature branch
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
-      - name: RED review regressions
-        shell: bash
-        run: |
-          set +e
-          cd tests
-          python3 -m unittest test_context_efficiency_review.ContextEfficiencyReviewScenarios -v \
-            > /tmp/context-review-red.log 2>&1
-          status=$?
-          cat /tmp/context-review-red.log
-          if [ "$status" -eq 0 ]; then
-            echo 'Os testes adversariais passaram antes do patch do CLI.' >&2
-            exit 1
-          fi
-          echo 'RED adversarial confirmado.'
-
-      - name: Apply reviewed CLI patch
-        run: python3 .github/review/apply_review_fixes.py
-
-      - name: Validate syntax
-        shell: bash
+      - name: Validate Python syntax
         run: |
           python3 -m py_compile \
             skills/_shared/scripts/bm.py \
@@ -54,29 +32,15 @@ jobs:
             skills/_shared/scripts/bm_spec_diff.py \
             skills/_shared/scripts/bm_mutation.py \
             tests/test_method_package.py \
+            tests/test_context_efficiency.py \
             tests/test_context_efficiency_review.py
 
-      - name: GREEN review regressions
-        run: |
-          cd tests
-          python3 -m unittest test_context_efficiency_review.ContextEfficiencyReviewScenarios -v
+      - name: Run complete sharded suite
+        run: python3 scripts/run_test_shards.py
 
-      - name: Full validation
-        shell: bash
+      - name: Validate CLI entrypoints
         run: |
-          git diff --check
-          python3 scripts/run_test_shards.py
           python3 scripts/bm.py --help > /tmp/bm-help.txt
-          grep -q 'spec-diff' /tmp/bm-help.txt
-          grep -q 'mutation-evidence' /tmp/bm-help.txt
-          python3 scripts/bm.py proof-map --help | grep -q 'mutation-evidence'
-
-      - name: Commit reviewed implementation
-        shell: bash
-        run: |
-          rm -rf .github/review
-          git config user.name 'Bianchini Method CI'
-          git config user.email '53955955+felipebianchini2006@users.noreply.github.com'
-          git add -A
-          git commit -m 'fix: harden context efficiency review findings [skip ci]'
-          git push origin HEAD:"${GITHUB_HEAD_REF:-feat/context-efficiency-v3.1}"
+          grep -q "spec-diff" /tmp/bm-help.txt
+          grep -q "mutation-evidence" /tmp/bm-help.txt
+          python3 scripts/bm.py proof-map --help | grep -q "mutation-evidence"
