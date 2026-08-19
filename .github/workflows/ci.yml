@@ -1,56 +1,62 @@
-name: CI
+name: Apply and Verify Update BM v3.2
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  test:
+  apply-and-verify:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout feature branch
         uses: actions/checkout@v4
-
-      - name: Publish temporary branch snapshot
-        uses: actions/upload-artifact@v4
         with:
-          name: update-bm-branch-source
-          path: |
-            .
-            !.git/**
-          include-hidden-files: true
-          retention-days: 1
+          ref: feat/update-bm-self-update
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
-      - name: Validate Python syntax
+      - name: Apply deterministic integration
+        run: python3 scripts/apply_update_bm_v32.py
+
+      - name: Validate syntax and diff
         run: |
+          git diff --check
           python3 -m py_compile \
             skills/_shared/scripts/bm.py \
-            skills/_shared/scripts/bm_feature_support.py \
-            skills/_shared/scripts/bm_context.py \
-            skills/_shared/scripts/bm_spec_diff.py \
-            skills/_shared/scripts/bm_mutation.py \
+            skills/_shared/scripts/bm_update.py \
             tests/test_method_package.py \
-            tests/test_context_efficiency.py \
-            tests/test_context_efficiency_review.py
+            tests/test_self_update.py \
+            scripts/run_test_shards.py
 
-      - name: Run complete sharded suite
+      - name: Run focused GREEN suite
+        run: |
+          cd tests
+          python3 -m unittest test_self_update.SelfUpdateScenarios -v
+
+      - name: Run complete suite
         run: python3 scripts/run_test_shards.py
 
-      - name: Validate CLI entrypoints
+      - name: Validate CLI
         run: |
           python3 scripts/bm.py --help > /tmp/bm-help.txt
-          grep -q "spec-diff" /tmp/bm-help.txt
-          grep -q "mutation-evidence" /tmp/bm-help.txt
-          python3 scripts/bm.py proof-map --help | grep -q "mutation-evidence"
+          grep -q "update-bm" /tmp/bm-help.txt
+          python3 scripts/bm.py update-bm --help | grep -q -- "--check"
+          test "$(cat skills/_shared/VERSION)" = "3.2.0"
+
+      - name: Commit verified implementation
+        run: |
+          rm -f scripts/apply_update_bm_v32.py
+          rm -f .github/workflows/apply-update-bm-v32.yml
+          git config user.name "Bianchini Method CI"
+          git config user.email "53955955+felipebianchini2006@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add safe self-update command [skip ci]"
+          git push origin HEAD:feat/update-bm-self-update
