@@ -14,6 +14,11 @@ UNIT_HEADING = re.compile(
     r"(?m)^###\s+(?:Tarefa|Task|Slice|Grupo|Group)\s+[^\n]+$",
     re.IGNORECASE,
 )
+FIX_ROUNDS_BY_PROFILE = {
+    "lean": 2,
+    "standard": 3,
+    "full": 5,
+}
 
 
 def sha256_bytes(content: bytes) -> str:
