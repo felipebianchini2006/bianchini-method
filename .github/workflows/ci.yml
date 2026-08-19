@@ -46,6 +46,9 @@ jobs:
           fi
           echo 'RED confirmado.'
 
+      - name: Normalize bootstrap
+        run: python3 .github/bootstrap/normalize_apply_impl.py
+
       - name: Apply implementation
         run: python3 .github/bootstrap/apply_impl.py
 
