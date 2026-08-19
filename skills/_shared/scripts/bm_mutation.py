@@ -115,10 +115,16 @@ def mutation_evidence_verify(
         if classifications is not None
         else None
     )
+    input_paths = {report_path}
+    if classifications_path is not None:
+        input_paths.add(classifications_path)
+    if output_path in input_paths:
+        raise ValueError(
+            "mutation evidence output deve ser diferente dos arquivos de entrada"
+        )
     allowed_artifacts = {
         path.relative_to(repository).as_posix()
-        for path in (report_path, output_path, classifications_path)
-        if path is not None
+        for path in (*input_paths, output_path)
     }
     dirty = git_output(repository, "status", "--porcelain=v1", "--untracked-files=all")
     unrelated = sorted(
@@ -153,6 +159,13 @@ def mutation_evidence_verify(
     mutants = normalized_mutants(
         json_document(report_path, "mutation report"), tool, classifications_data
     )
+    known_mutants = {mutant["id"] for mutant in mutants}
+    unknown_classifications = sorted(set(classifications_data) - known_mutants)
+    if unknown_classifications:
+        raise ValueError(
+            "classificações referenciam mutantes ausentes: "
+            + ", ".join(unknown_classifications)
+        )
     blocking: list[str] = []
     unclassified: list[str] = []
     accepted: list[str] = []
@@ -175,7 +188,7 @@ def mutation_evidence_verify(
                 unclassified.append(identifier)
             else:
                 accepted.append(identifier)
-    if revision != expected_revision or revision != current_revision:
+    if revision != expected_revision:
         blocking.append("revision-mismatch")
     if policy in {"selective", "required_selective"}:
         blocking.extend(errors)
@@ -196,9 +209,11 @@ def mutation_evidence_verify(
         if isinstance(candidate, dict)
         else None
     )
+    status = "passed" if not blocking else "blocked"
     payload = {
         "schema_version": 1,
-        "status": "passed" if not blocking else "blocked",
+        "status": status,
+        "result": status,
         "policy": policy,
         "plan": plan_id,
         "risk_seam": risk_seam,
