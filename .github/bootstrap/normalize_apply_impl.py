@@ -48,6 +48,16 @@ normalized = normalized.replace(
     r'new_write_task_brief + "\n\ndef write_report("',
     1,
 )
+normalized = normalized.replace(
+    'mutation_evidence.add_argument("--command", required=True)',
+    'mutation_evidence.add_argument("--command", dest="mutation_command", required=True)',
+    1,
+)
+normalized = normalized.replace(
+    '                    command=args.command,\n                    report=args.report,',
+    '                    command=args.mutation_command,\n                    report=args.report,',
+    1,
+)
 if normalized == content:
     raise SystemExit('Nenhum ajuste de bootstrap foi aplicado.')
 path.write_text(normalized, encoding='utf-8')
