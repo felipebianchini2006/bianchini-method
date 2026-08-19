@@ -1,4 +1,4 @@
-name: Bootstrap Context Efficiency
+name: Apply Context Efficiency Review
 
 on:
   push:
@@ -12,10 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  implement:
-    if: >-
-      github.event_name == 'pull_request' ||
-      github.event.head_commit.message == 'chore: bootstrap context efficiency implementation'
+  review:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout feature branch
@@ -29,31 +26,23 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Apply tests first
-        run: python3 .github/bootstrap/apply_tests.py
-
-      - name: RED
+      - name: RED review regressions
         shell: bash
         run: |
           set +e
           cd tests
-          python3 -m unittest test_method_package.ContextEfficiencyScenarios -v > /tmp/context-red.log 2>&1
+          python3 -m unittest test_context_efficiency_review.ContextEfficiencyReviewScenarios -v \
+            > /tmp/context-review-red.log 2>&1
           status=$?
-          cat /tmp/context-red.log
+          cat /tmp/context-review-red.log
           if [ "$status" -eq 0 ]; then
-            echo 'Os testes novos passaram antes da implementação.' >&2
+            echo 'Os testes adversariais passaram antes do patch do CLI.' >&2
             exit 1
           fi
-          echo 'RED confirmado.'
+          echo 'RED adversarial confirmado.'
 
-      - name: Fix generated test fixture
-        run: python3 .github/bootstrap/fix_generated_tests.py
-
-      - name: Normalize bootstrap
-        run: python3 .github/bootstrap/normalize_apply_impl.py
-
-      - name: Apply implementation
-        run: python3 .github/bootstrap/apply_impl.py
+      - name: Apply reviewed CLI patch
+        run: python3 .github/review/apply_review_fixes.py
 
       - name: Validate syntax
         shell: bash
@@ -64,12 +53,13 @@ jobs:
             skills/_shared/scripts/bm_context.py \
             skills/_shared/scripts/bm_spec_diff.py \
             skills/_shared/scripts/bm_mutation.py \
-            tests/test_method_package.py
+            tests/test_method_package.py \
+            tests/test_context_efficiency_review.py
 
-      - name: GREEN
+      - name: GREEN review regressions
         run: |
           cd tests
-          python3 -m unittest test_method_package.ContextEfficiencyScenarios -v
+          python3 -m unittest test_context_efficiency_review.ContextEfficiencyReviewScenarios -v
 
       - name: Full validation
         shell: bash
@@ -79,13 +69,14 @@ jobs:
           python3 scripts/bm.py --help > /tmp/bm-help.txt
           grep -q 'spec-diff' /tmp/bm-help.txt
           grep -q 'mutation-evidence' /tmp/bm-help.txt
+          python3 scripts/bm.py proof-map --help | grep -q 'mutation-evidence'
 
-      - name: Commit implementation
+      - name: Commit reviewed implementation
         shell: bash
         run: |
-          rm -rf .github/bootstrap
+          rm -rf .github/review
           git config user.name 'Bianchini Method CI'
           git config user.email '53955955+felipebianchini2006@users.noreply.github.com'
           git add -A
-          git commit -m 'feat: add deterministic context efficiency tools [skip ci]'
+          git commit -m 'fix: harden context efficiency review findings [skip ci]'
           git push origin HEAD:"${GITHUB_HEAD_REF:-feat/context-efficiency-v3.1}"
