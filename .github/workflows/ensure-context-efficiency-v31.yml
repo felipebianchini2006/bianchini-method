@@ -1,0 +1,77 @@
+name: Ensure Context Efficiency v3.1
+
+on:
+  push:
+    branches:
+      - feat/context-efficiency-v3.1
+
+permissions:
+  contents: write
+
+jobs:
+  ensure:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/context-efficiency-v3.1
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Ensure integration is applied
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f scripts/apply_context_efficiency_v31.py ]; then
+            python3 scripts/apply_context_efficiency_v31.py
+          fi
+          grep -q "quality_v2_unit_contract_errors" skills/_shared/scripts/bm.py
+          grep -q "mutation-evidence" skills/_shared/scripts/bm.py
+          grep -q "Context Efficiency" README.md
+
+      - name: Run complete sharded suite
+        run: python3 scripts/run_test_shards.py
+
+      - name: Validate CLI commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/bm.py --help
+          python3 scripts/bm.py task-brief --help
+          python3 scripts/bm.py spec-diff --help
+          python3 scripts/bm.py mutation-evidence --help
+
+      - name: Remove one-time assets
+        shell: bash
+        run: |
+          rm -f scripts/apply_context_efficiency_v31.py
+          rm -f .github/workflows/apply-context-efficiency-v31.yml
+          rm -f .github/workflows/apply-context-efficiency-v31-trigger.yml
+          rm -f .github/workflows/finalize-context-efficiency-v31.yml
+          rm -f .github/workflows/ensure-context-efficiency-v31.yml
+
+      - name: Commit clean verified tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: finalize context efficiency v3.1"
+          fi
+
+      - name: Fast-forward feature branch and main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge-base --is-ancestor origin/main HEAD
+          git push origin HEAD:feat/context-efficiency-v3.1
+          git push origin HEAD:main
