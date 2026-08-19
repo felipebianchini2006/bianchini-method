@@ -1,3 +1,4 @@
+# integration-trigger: 2
 name: Apply Update BM v3.2 from Main
 
 on:
