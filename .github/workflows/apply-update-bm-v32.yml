@@ -1,0 +1,66 @@
+name: Apply Update BM v3.2
+
+on:
+  push:
+    branches:
+      - feat/update-bm-self-update
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/update-bm-self-update
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Apply deterministic CLI integration
+        run: python3 scripts/apply_update_bm_v32.py
+
+      - name: Remove one-time integration files
+        run: |
+          rm scripts/apply_update_bm_v32.py
+          rm .github/workflows/apply-update-bm-v32.yml
+
+      - name: Validate syntax and diff
+        run: |
+          git diff --check
+          python3 -m py_compile \
+            skills/_shared/scripts/bm.py \
+            skills/_shared/scripts/bm_update.py \
+            tests/test_method_package.py \
+            tests/test_self_update.py \
+            scripts/run_test_shards.py
+
+      - name: Run focused GREEN suite
+        run: |
+          cd tests
+          python3 -m unittest test_self_update.SelfUpdateScenarios -v
+
+      - name: Run complete suite
+        run: python3 scripts/run_test_shards.py
+
+      - name: Validate CLI
+        run: |
+          python3 scripts/bm.py --help > /tmp/bm-help.txt
+          grep -q "update-bm" /tmp/bm-help.txt
+          python3 scripts/bm.py update-bm --help | grep -q -- "--check"
+          test "$(cat skills/_shared/VERSION)" = "3.2.0"
+
+      - name: Commit verified implementation
+        run: |
+          git config user.name "Bianchini Method CI"
+          git config user.email "53955955+felipebianchini2006@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add safe self-update command [skip ci]"
+          git push origin HEAD:feat/update-bm-self-update
