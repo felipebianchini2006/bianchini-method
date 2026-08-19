@@ -30,6 +30,11 @@ from bm_context import (
 from bm_feature_support import FIX_ROUNDS_BY_PROFILE
 from bm_mutation import mutation_evidence_verify
 from bm_spec_diff import spec_diff
+from bm_update import (
+    UpdateError as BMUpdateError,
+    render_update_result,
+    update_bianchini_method,
+)
 
 
 EXIT_INVALID = 2
@@ -4555,6 +4560,18 @@ def parser() -> argparse.ArgumentParser:
     direct.add_argument("--evidence", action="append", default=[])
     direct.add_argument("--waive-verification", action="append", default=[])
 
+    updater = commands.add_parser("update-bm")
+    updater.add_argument("--check", action="store_true")
+    updater.add_argument(
+        "--skills-root",
+        type=Path,
+        default=_SCRIPT_DIR.parents[1],
+    )
+    updater.add_argument("--timeout", type=float, default=15.0)
+    updater.add_argument(
+        "--format", choices=["text", "json"], default="text"
+    )
+
     summary = commands.add_parser("status")
     summary.add_argument("state", type=Path)
     summary.add_argument("--root", type=Path)
@@ -4827,6 +4844,19 @@ def main() -> int:
                         args.waive_verification,
                     )
                 )
+        elif args.command == "update-bm":
+            try:
+                update_result = update_bianchini_method(
+                    skills_root=args.skills_root,
+                    check_only=args.check,
+                    timeout=args.timeout,
+                )
+            except BMUpdateError as error:
+                raise BMError(str(error), error.exit_code) from error
+            if args.format == "json":
+                emit(update_result)
+            else:
+                print(render_update_result(update_result), end="")
         elif args.command == "status":
             summary_value = state_summary(args.state, args.root)
             if args.format == "text":

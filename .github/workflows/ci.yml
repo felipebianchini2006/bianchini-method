@@ -31,9 +31,11 @@ jobs:
             skills/_shared/scripts/bm_context.py \
             skills/_shared/scripts/bm_spec_diff.py \
             skills/_shared/scripts/bm_mutation.py \
+            skills/_shared/scripts/bm_update.py \
             tests/test_method_package.py \
             tests/test_context_efficiency.py \
-            tests/test_context_efficiency_review.py
+            tests/test_context_efficiency_review.py \
+            tests/test_self_update.py
 
       - name: Run complete sharded suite
         run: python3 scripts/run_test_shards.py
@@ -43,4 +45,7 @@ jobs:
           python3 scripts/bm.py --help > /tmp/bm-help.txt
           grep -q "spec-diff" /tmp/bm-help.txt
           grep -q "mutation-evidence" /tmp/bm-help.txt
+          grep -q "update-bm" /tmp/bm-help.txt
           python3 scripts/bm.py proof-map --help | grep -q "mutation-evidence"
+          python3 scripts/bm.py update-bm --help | grep -q -- "--check"
+          test "$(cat skills/_shared/VERSION)" = "3.2.0"

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Atualizar Bianchini Method"
+  short_description: "Verifica e atualiza a instalação local"
+  default_prompt: "Use $update-bm somente quando o usuário pedir explicitamente para verificar ou atualizar o Bianchini Method."
+policy:
+  allow_implicit_invocation: false
