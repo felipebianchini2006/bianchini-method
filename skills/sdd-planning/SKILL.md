@@ -157,6 +157,8 @@ Política:
 - não criar tarefa por camada de teste, arquivo, ferramenta, decisão ou documento;
 - não usar `TBD`, “tratar erros” ou abstração futura.
 
+Para `planning.quality_version: 2`, `planning-audit` também exige `Change` e `Readiness refs` em cada unidade e valida as referências contra `READINESS.md` e seus `destinations`. A validação é executável; não basta mencionar os campos apenas na instrução da skill.
+
 ## 8. Definir garantia e verificação
 
 Escolher `lean`, `standard` ou `full` pelo maior risco/capacidade. Unidade crítica isolada usa `strict` sem promover todo o projeto a Full. Auditoria arquitetural é manual e report-only; não a executar automaticamente.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.1.0 - Context Efficiency determinística
+
+- exige `Change` e `Readiness refs` em cada unidade de novos planejamentos quality v2, validando existência, destino e cobertura no readiness;
+- adiciona contexto hidratado opcional ao `task-brief`, limitado à unidade, specs referenciadas, readiness aplicável, gates rápidos e final do ledger;
+- adiciona `spec-diff` como projeção ADDED/MODIFIED/REMOVED vinculada aos digests das specs completas;
+- adiciona `mutation-evidence verify` para normalizar relatórios, classificar survivors e vincular a prova ao HEAD ou fingerprint do RC;
+- preserva `quality_version: 1`, specs completas, aprovação única e ausência de score global de mutação;
+- adiciona CI versionada para executar todos os shards e validar o CLI.
+
 ## 3.0.0 - Planning Stability e design independente
 
 - adiciona `/design-projeto` para gerar protótipo HTML estático, tokens, contrato e manifesto visual antes do SDD, sem depender do Claude;

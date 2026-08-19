@@ -311,6 +311,10 @@ bm.py snapshot verify <state> --root <repo>
 - homologação lê critérios, gates e resumos, inventaria a superfície do RC e abre detalhes somente para executar jornadas, investigar falha ou validar divergência;
 - referências opcionais são carregadas na fase indicada.
 
+## Eficiência de contexto derivada
+
+Unidades de novos planos `quality_version: 2` declaram `Change` e `Readiness refs`; o audit valida categoria, existência, destino e cobertura. `task-brief --hydrate-context`, `spec-diff` e `mutation-evidence verify` geram projeções reproduzíveis sem criar nova fonte de verdade. Contratos, comandos e formatos estão em [`CONTEXT_EFFICIENCY.md`](CONTEXT_EFFICIENCY.md).
+
 ## Fontes de verdade e segurança
 
 | Informação | Fonte |

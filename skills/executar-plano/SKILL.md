@@ -49,6 +49,8 @@ Gerar pelo CLI:
 
 Retomada começa com `workspace resume`, checkpoint e final do ledger. Não reler planos concluídos nem reconstruir estado pela conversa.
 
+Quando o plano usar `quality_version: 2`, preferir `task-brief --hydrate-context --state <PROJECT_STATE.md> --root <repo>` para carregar somente readiness, seções de spec, gates rápidos e final do ledger da unidade. A projeção permanece em `.superpowers/` e nunca substitui os artefatos aprovados.
+
 ## 4. Autonomia e plano congelado
 
 O plano aprovado é imutável. Antes de pedir decisão, seguir:
@@ -115,6 +117,8 @@ Na unidade, executar somente `verification.fast`:
 Na execução da unidade, não executar E2E completo ou mutação por unidade. Não criar tarefa/subagente por camada de teste.
 
 No gate do plano, executar suítes afetadas, regressão do plano, E2E crítico e mutação seletiva exigida. No release, executar os comandos completos aprovados. Não perseguir cobertura ou mutation score global.
+
+Quando `bm.py policy` retornar `selective` ou `required_selective`, validar o relatório final com `mutation-evidence verify`. A evidência deve apontar o mesmo HEAD ou fingerprint do RC, classificar todos os survivors e permanecer vigente após a última alteração no seam.
 
 ## 7. Revisão e convergência
 

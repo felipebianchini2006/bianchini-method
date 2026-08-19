@@ -17,6 +17,21 @@ from pathlib import Path
 from typing import Any
 
 
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+from bm_context import (
+    QUALITY_V2_UNIT_FIELDS,
+    hydrate_task_context,
+    mutation_mode_for_change,
+    validate_quality_v2_plan,
+)
+from bm_feature_support import FIX_ROUNDS_BY_PROFILE
+from bm_mutation import mutation_evidence_verify
+from bm_spec_diff import spec_diff
+
+
 EXIT_INVALID = 2
 EXIT_BLOCKED = 3
 EXIT_UNSAFE_WORKSPACE = 4
@@ -2402,6 +2417,7 @@ def planning_audit(
     unit_count = 0
     plan_words: list[int] = []
     execution_unit_words: list[int] = []
+    plan_contents: dict[str, str] = {}
     for plan in state["plans"]:
         path, content = planning_file(root, plan["path"], f"plan {plan['id']}")
         if enforced and (path is None or not content):
@@ -2409,6 +2425,7 @@ def planning_audit(
             continue
         if not content:
             continue
+        plan_contents[plan["path"]] = content
         plan_words.append(word_count(content))
         matches = list(PLANNING_UNIT.finditer(content))
         unit_count += len(matches)
@@ -2424,7 +2441,10 @@ def planning_audit(
             end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
             section = content[match.start():end]
             execution_unit_words.append(word_count(section))
-            for field in UNIT_FIELDS:
+            required_fields = (
+                (*UNIT_FIELDS, *QUALITY_V2_UNIT_FIELDS) if quality_v2 else UNIT_FIELDS
+            )
+            for field in required_fields:
                 if not re.search(rf"(?mi)^\*\*{re.escape(field)}:\*\*\s*\S", section):
                     errors.append(
                         f"plano {plan['id']} / {match.group(0).strip()}: campo {field} ausente"
@@ -2446,6 +2466,18 @@ def planning_audit(
         )
         errors.extend(readiness_errors)
         warnings.extend(readiness_warnings)
+        readiness_value = state["planning"].get("readiness")
+        readiness_path, _ = planning_file(root, readiness_value, "planning.readiness")
+        if readiness_path is not None and readiness_path.is_file():
+            readiness_value_document = readiness_document(readiness_path)
+            for plan_path_value, plan_content in plan_contents.items():
+                errors.extend(
+                    validate_quality_v2_plan(
+                        plan_path_value,
+                        plan_content,
+                        readiness_value_document,
+                    )
+                )
         checker = state["planning"].get("checker")
         if require_checker:
             if not isinstance(checker, dict):
@@ -2659,20 +2691,13 @@ def policy(
     for finding in structural_findings:
         if finding not in STRUCTURAL_FINDING_CLASSES:
             raise BMError(f"classe estrutural desconhecida: {finding}")
-    max_rounds = {"lean": 2, "standard": 3, "full": 5}[profile]
+    max_rounds = FIX_ROUNDS_BY_PROFILE[profile]
     manual_required = manual_pdf in {"quick_start", "full"} or (
         manual_pdf == "scope" and manual_in_scope
     )
     change_kind = change.strip().lower().replace("_", "-")
     visual_validation = change_kind == "visual"
-    if risk == "low" or change_kind in PURE_NON_LOGIC_CHANGES:
-        mutation_mode = "not_required"
-    elif risk in {"high", "critical"}:
-        mutation_mode = "required_selective"
-    elif change_kind in MUTATION_RELEVANT_CHANGES:
-        mutation_mode = "selective"
-    else:
-        mutation_mode = "not_required"
+    mutation_mode = mutation_mode_for_change(risk, change_kind)
     effective_round = max(round_number, seam_round or 0)
     hypothesis_invalidated = bool(structural_findings) or consecutive_seam_findings >= 2
     return {
@@ -2958,7 +2983,7 @@ def workspace_check(cwd: Path) -> dict[str, Any]:
 def extract_task(plan: Path, task: str) -> str:
     content = plan.read_text(encoding="utf-8")
     pattern = re.compile(
-        rf"(?ms)^###\s+(?:Tarefa|Task)\s+{re.escape(task)}\b.*?(?=^###\s+(?:Tarefa|Task)\s+\S+|\Z)"
+        rf"(?ms)^###\s+(?:Tarefa|Task|Slice)\s+{re.escape(task)}\b.*?(?=^###\s+(?:Tarefa|Task|Slice)\s+\S+|\Z)"
     )
     match = pattern.search(content)
     if not match:
@@ -3008,7 +3033,13 @@ def write_task_brief(
     tasks: str | None,
     group: str | None,
     output: Path,
+    state_path: Path | None = None,
+    root: Path | None = None,
+    hydrate_context: bool = False,
+    ledger_tail_lines: int = 40,
 ) -> dict[str, Any]:
+    if ledger_tail_lines < 0:
+        raise BMError("--ledger-tail-lines não pode ser negativo")
     if group:
         labels = [group]
         sections = [extract_group(plan, group)]
@@ -3037,16 +3068,33 @@ def write_task_brief(
         f"- Unit `{label}` SHA-256: `{digest}`"
         for label, digest in zip(labels, unit_hashes)
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
+    content = (
         f"# Task Brief {title}\n\n- Plan: `{plan}`\n"
         f"- Plan SHA-256: `{source_hash}`\n"
         f"- Kind: `{kind}`\n"
         f"- Group ID: `{group_id or 'n/a'}`\n"
         f"- Group SHA-256: `{group_digest}`\n{metadata}\n\n"
-        + "\n".join(sections),
-        encoding="utf-8",
+        + "\n".join(sections)
     )
+    context_metadata: dict[str, Any] | None = None
+    if hydrate_context:
+        if state_path is None or root is None:
+            raise BMError("--hydrate-context exige --state e --root")
+        state = validate_state(state_path)
+        try:
+            context, context_metadata = hydrate_task_context(
+                root=root,
+                state=state,
+                plan_path=plan,
+                labels=labels,
+                sections=sections,
+                ledger_tail_lines=ledger_tail_lines,
+            )
+        except ValueError as error:
+            raise BMError(str(error)) from error
+        content = content.rstrip() + "\n\n" + context
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(content.rstrip() + "\n", encoding="utf-8")
     return {
         "brief": str(output),
         "plan_digest": source_hash,
@@ -3055,6 +3103,8 @@ def write_task_brief(
         "group_digest": group_digest,
         "tasks": labels,
         "unit_digests": unit_hashes,
+        "hydrated": hydrate_context,
+        "context_digest": context_metadata.get("context_digest") if context_metadata else None,
     }
 
 
@@ -3150,9 +3200,17 @@ def write_checkpoint(state: Path, ledger: Path, cwd: Path, output: Path) -> dict
     return {"checkpoint": str(output), "digest": file_digest(output)}
 
 
-def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict[str, Any]:
+def write_proof_map(
+    state_path: Path,
+    evidence_path: Path,
+    output: Path,
+    mutation_evidence_paths: list[Path] | None = None,
+) -> dict[str, Any]:
     state = validate_state(state_path)
-    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise BMError(f"evidência inválida: {error}") from error
     if not isinstance(evidence, list) or not all(isinstance(item, dict) for item in evidence):
         raise BMError("evidência deve ser uma lista JSON de objetos")
     candidate = state.get("release", {}).get("candidate")
@@ -3161,6 +3219,42 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
     fingerprint = {
         key: candidate[key] for key in ("id", "revision", "build", "checksum")
     }
+    mutation_sources: list[str] = []
+    for mutation_path in mutation_evidence_paths or []:
+        if not mutation_path.is_file():
+            raise BMError(f"evidência de mutação ausente: {mutation_path}")
+        try:
+            mutation = json.loads(mutation_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise BMError(
+                f"evidência de mutação inválida na linha {error.lineno}: {mutation_path}"
+            ) from error
+        if not isinstance(mutation, dict) or mutation.get("schema_version") != 1:
+            raise BMError(f"evidência de mutação inválida: {mutation_path}")
+        mutation_candidate = mutation.get("candidate")
+        command = mutation.get("command")
+        result = mutation.get("result", mutation.get("status"))
+        if not isinstance(mutation_candidate, dict):
+            raise BMError(
+                f"evidência de mutação não está vinculada a um RC: {mutation_path}"
+            )
+        if not isinstance(command, str) or not command.strip():
+            raise BMError(f"evidência de mutação sem command: {mutation_path}")
+        if result not in {"passed", "blocked"}:
+            raise BMError(f"evidência de mutação sem resultado válido: {mutation_path}")
+        evidence.append(
+            {
+                "type": "mutation",
+                "command": command,
+                "result": result,
+                "evidence": str(mutation_path),
+                "rc": mutation_candidate.get("id"),
+                "revision": mutation_candidate.get("revision"),
+                "build": mutation_candidate.get("build"),
+                "checksum": mutation_candidate.get("checksum"),
+            }
+        )
+        mutation_sources.append(str(mutation_path))
     by_command = {item.get("command"): item for item in evidence if item.get("command")}
     rows: list[dict[str, Any]] = []
     gaps: list[str] = []
@@ -3182,6 +3276,7 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
             {
                 "command": command,
                 "proven": proven,
+                "source_type": item.get("type") if item else None,
                 "candidate": evidence_fingerprint,
                 "evidence": item.get("evidence") if item else None,
             }
@@ -3200,6 +3295,7 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
         "automated_proven": len(rows) - len(gaps),
         "automation_gaps": gaps,
         "manual_gaps": manual_gaps,
+        "mutation_evidence": mutation_sources,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(proof, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -4334,7 +4430,32 @@ def parser() -> argparse.ArgumentParser:
     brief_selector.add_argument("--task")
     brief_selector.add_argument("--tasks")
     brief_selector.add_argument("--group")
+    brief.add_argument("--state", type=Path)
+    brief.add_argument("--root", type=Path)
+    brief.add_argument("--hydrate-context", action="store_true")
+    brief.add_argument("--ledger-tail-lines", type=int, default=40)
     brief.add_argument("--output", type=Path, required=True)
+
+    spec_delta = commands.add_parser("spec-diff")
+    spec_delta.add_argument("--root", type=Path, required=True)
+    spec_delta.add_argument("--base", type=Path, required=True)
+    spec_delta.add_argument("--target", type=Path, required=True)
+    spec_delta.add_argument("--output", type=Path, required=True)
+
+    mutation_evidence = commands.add_parser("mutation-evidence")
+    mutation_evidence.add_argument("action", choices=["verify"])
+    mutation_evidence.add_argument("--state", type=Path, required=True)
+    mutation_evidence.add_argument("--root", type=Path, required=True)
+    mutation_evidence.add_argument("--plan", required=True)
+    mutation_evidence.add_argument("--risk-seam", required=True)
+    mutation_evidence.add_argument(
+        "--tool", choices=["normalized", "stryker"], required=True
+    )
+    mutation_evidence.add_argument("--command", dest="mutation_command", required=True)
+    mutation_evidence.add_argument("--report", type=Path, required=True)
+    mutation_evidence.add_argument("--revision", required=True)
+    mutation_evidence.add_argument("--classifications", type=Path)
+    mutation_evidence.add_argument("--output", type=Path, required=True)
 
     report = commands.add_parser("report")
     report.add_argument("--brief", type=Path, required=True)
@@ -4357,6 +4478,9 @@ def parser() -> argparse.ArgumentParser:
     proof = commands.add_parser("proof-map")
     proof.add_argument("--state", type=Path, required=True)
     proof.add_argument("--evidence", type=Path, required=True)
+    proof.add_argument(
+        "--mutation-evidence", action="append", type=Path, default=[]
+    )
     proof.add_argument("--output", type=Path, required=True)
 
     telemetry = commands.add_parser("telemetry")
@@ -4549,7 +4673,54 @@ def main() -> int:
                     )
                 )
         elif args.command == "task-brief":
-            emit(write_task_brief(args.plan, args.task, args.tasks, args.group, args.output))
+            emit(
+                write_task_brief(
+                    args.plan,
+                    args.task,
+                    args.tasks,
+                    args.group,
+                    args.output,
+                    args.state,
+                    args.root,
+                    args.hydrate_context,
+                    args.ledger_tail_lines,
+                )
+            )
+        elif args.command == "spec-diff":
+            try:
+                emit(
+                    spec_diff(
+                        root=args.root,
+                        base=args.base,
+                        target=args.target,
+                        output=args.output,
+                    )
+                )
+            except ValueError as error:
+                raise BMError(str(error)) from error
+        elif args.command == "mutation-evidence":
+            try:
+                mutation_result = mutation_evidence_verify(
+                    root=args.root,
+                    state=validate_state(args.state),
+                    plan_id=args.plan,
+                    risk_seam=args.risk_seam,
+                    tool=args.tool,
+                    command=args.mutation_command,
+                    report=args.report,
+                    output=args.output,
+                    revision=args.revision,
+                    classifications=args.classifications,
+                )
+            except ValueError as error:
+                raise BMError(str(error)) from error
+            if mutation_result["status"] != "passed":
+                raise BMError(
+                    "BLOQUEADO: mutation evidence bloqueada; consulte "
+                    + mutation_result["output"],
+                    EXIT_BLOCKED,
+                )
+            emit(mutation_result)
         elif args.command == "report":
             emit(write_report(args.brief, args.output))
         elif args.command == "review-package":
@@ -4557,7 +4728,14 @@ def main() -> int:
         elif args.command == "checkpoint":
             emit(write_checkpoint(args.state, args.ledger, args.cwd, args.output))
         elif args.command == "proof-map":
-            emit(write_proof_map(args.state, args.evidence, args.output))
+            emit(
+                write_proof_map(
+                    args.state,
+                    args.evidence,
+                    args.output,
+                    args.mutation_evidence,
+                )
+            )
         elif args.command == "telemetry":
             if args.action == "record":
                 metrics = {key: getattr(args, key) for key in TELEMETRY_METRICS}
