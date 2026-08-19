@@ -27,6 +27,7 @@ from bm_context import (
     mutation_mode_for_change,
     validate_quality_v2_plan,
 )
+from bm_feature_support import FIX_ROUNDS_BY_PROFILE
 from bm_mutation import mutation_evidence_verify
 from bm_spec_diff import spec_diff
 
@@ -2690,7 +2691,7 @@ def policy(
     for finding in structural_findings:
         if finding not in STRUCTURAL_FINDING_CLASSES:
             raise BMError(f"classe estrutural desconhecida: {finding}")
-    max_rounds = {"lean": 2, "standard": 3, "full": 5}[profile]
+    max_rounds = FIX_ROUNDS_BY_PROFILE[profile]
     manual_required = manual_pdf in {"quick_start", "full"} or (
         manual_pdf == "scope" and manual_in_scope
     )
@@ -3199,9 +3200,17 @@ def write_checkpoint(state: Path, ledger: Path, cwd: Path, output: Path) -> dict
     return {"checkpoint": str(output), "digest": file_digest(output)}
 
 
-def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict[str, Any]:
+def write_proof_map(
+    state_path: Path,
+    evidence_path: Path,
+    output: Path,
+    mutation_evidence_paths: list[Path] | None = None,
+) -> dict[str, Any]:
     state = validate_state(state_path)
-    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise BMError(f"evidência inválida: {error}") from error
     if not isinstance(evidence, list) or not all(isinstance(item, dict) for item in evidence):
         raise BMError("evidência deve ser uma lista JSON de objetos")
     candidate = state.get("release", {}).get("candidate")
@@ -3210,6 +3219,42 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
     fingerprint = {
         key: candidate[key] for key in ("id", "revision", "build", "checksum")
     }
+    mutation_sources: list[str] = []
+    for mutation_path in mutation_evidence_paths or []:
+        if not mutation_path.is_file():
+            raise BMError(f"evidência de mutação ausente: {mutation_path}")
+        try:
+            mutation = json.loads(mutation_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise BMError(
+                f"evidência de mutação inválida na linha {error.lineno}: {mutation_path}"
+            ) from error
+        if not isinstance(mutation, dict) or mutation.get("schema_version") != 1:
+            raise BMError(f"evidência de mutação inválida: {mutation_path}")
+        mutation_candidate = mutation.get("candidate")
+        command = mutation.get("command")
+        result = mutation.get("result", mutation.get("status"))
+        if not isinstance(mutation_candidate, dict):
+            raise BMError(
+                f"evidência de mutação não está vinculada a um RC: {mutation_path}"
+            )
+        if not isinstance(command, str) or not command.strip():
+            raise BMError(f"evidência de mutação sem command: {mutation_path}")
+        if result not in {"passed", "blocked"}:
+            raise BMError(f"evidência de mutação sem resultado válido: {mutation_path}")
+        evidence.append(
+            {
+                "type": "mutation",
+                "command": command,
+                "result": result,
+                "evidence": str(mutation_path),
+                "rc": mutation_candidate.get("id"),
+                "revision": mutation_candidate.get("revision"),
+                "build": mutation_candidate.get("build"),
+                "checksum": mutation_candidate.get("checksum"),
+            }
+        )
+        mutation_sources.append(str(mutation_path))
     by_command = {item.get("command"): item for item in evidence if item.get("command")}
     rows: list[dict[str, Any]] = []
     gaps: list[str] = []
@@ -3231,6 +3276,7 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
             {
                 "command": command,
                 "proven": proven,
+                "source_type": item.get("type") if item else None,
                 "candidate": evidence_fingerprint,
                 "evidence": item.get("evidence") if item else None,
             }
@@ -3249,6 +3295,7 @@ def write_proof_map(state_path: Path, evidence_path: Path, output: Path) -> dict
         "automated_proven": len(rows) - len(gaps),
         "automation_gaps": gaps,
         "manual_gaps": manual_gaps,
+        "mutation_evidence": mutation_sources,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(proof, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -4431,6 +4478,9 @@ def parser() -> argparse.ArgumentParser:
     proof = commands.add_parser("proof-map")
     proof.add_argument("--state", type=Path, required=True)
     proof.add_argument("--evidence", type=Path, required=True)
+    proof.add_argument(
+        "--mutation-evidence", action="append", type=Path, default=[]
+    )
     proof.add_argument("--output", type=Path, required=True)
 
     telemetry = commands.add_parser("telemetry")
@@ -4678,7 +4728,14 @@ def main() -> int:
         elif args.command == "checkpoint":
             emit(write_checkpoint(args.state, args.ledger, args.cwd, args.output))
         elif args.command == "proof-map":
-            emit(write_proof_map(args.state, args.evidence, args.output))
+            emit(
+                write_proof_map(
+                    args.state,
+                    args.evidence,
+                    args.output,
+                    args.mutation_evidence,
+                )
+            )
         elif args.command == "telemetry":
             if args.action == "record":
                 metrics = {key: getattr(args, key) for key in TELEMETRY_METRICS}

@@ -26,6 +26,10 @@ SHARDS = (
     "SkillBehaviorContracts",
 )
 
+REVIEW_SHARDS = (
+    "ContextEfficiencyReviewScenarios",
+)
+
 CODEX_SHARDS = (
     "CodexOverlayPackageTests",
     "ReviewGuardScenarios",
@@ -45,6 +49,22 @@ def main() -> int:
         )
         if completed.returncode != 0:
             return completed.returncode
+    for shard in REVIEW_SHARDS:
+        print(f"\n=== {shard} ===", file=sys.stderr, flush=True)
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "unittest",
+                f"test_context_efficiency_review.{shard}",
+                "-v",
+            ],
+            cwd=TESTS,
+            env=environment,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return completed.returncode
     for shard in CODEX_SHARDS:
         print(f"\n=== {shard} ===", file=sys.stderr, flush=True)
         completed = subprocess.run(
@@ -55,7 +75,8 @@ def main() -> int:
         )
         if completed.returncode != 0:
             return completed.returncode
-    print(f"\n{len(SHARDS) + len(CODEX_SHARDS)} shards aprovados.", file=sys.stderr)
+    total = len(SHARDS) + len(REVIEW_SHARDS) + len(CODEX_SHARDS)
+    print(f"\n{total} shards aprovados.", file=sys.stderr)
     return 0
 
 
