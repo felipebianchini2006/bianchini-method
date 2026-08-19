@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from bm_feature_support import (
+    FIX_ROUNDS_BY_PROFILE,
     confined_path,
     field_value,
     json_document,
@@ -178,6 +179,8 @@ def resolve_spec_ref(root: Path, change_root: Path, raw: str) -> tuple[str, str]
     path_value, separator, anchor = raw.strip().partition("#")
     if not path_value:
         raise ValueError(f"spec ref inválida: {raw!r}")
+    if not separator or not anchor.strip():
+        raise ValueError(f"spec ref hidratada exige seção #anchor: {raw}")
     candidate = Path(path_value)
     value = candidate if candidate.parts[:1] == ("docs",) else change_root / candidate
     target = confined_path(root, value, "spec ref")
@@ -185,10 +188,10 @@ def resolve_spec_ref(root: Path, change_root: Path, raw: str) -> tuple[str, str]
         raise ValueError(f"spec ref ausente: {raw}")
     content = target.read_text(encoding="utf-8")
     relative = target.relative_to(root.resolve()).as_posix()
+    normalized_anchor = anchor.strip()
     return (
-        (f"{relative}#{anchor}", extract_markdown_section(content, anchor, relative))
-        if separator
-        else (relative, content.strip())
+        f"{relative}#{normalized_anchor}",
+        extract_markdown_section(content, normalized_anchor, relative),
     )
 
 
@@ -239,18 +242,23 @@ def hydrate_task_context(
     if isinstance(plan.get("ledger"), str) and plan["ledger"]:
         ledger = confined_path(base, plan["ledger"], "plan.ledger")
         if ledger.is_file():
-            ledger_tail = ledger.read_text(encoding="utf-8").splitlines()[-ledger_tail_lines:]
+            ledger_lines = ledger.read_text(encoding="utf-8").splitlines()
+            ledger_tail = [] if ledger_tail_lines == 0 else ledger_lines[-ledger_tail_lines:]
     active = state.get("active_execution")
     active_for_plan = active if isinstance(active, dict) and active.get("plan_id") == plan.get("id") else None
+    profile = state.get("assurance_profile")
     metadata = {
         "schema_version": 1,
         "planning_version": state.get("planning_version"),
         "package_digest": state.get("approval", {}).get("package", {}).get("manifest_digest"),
         "plan_id": plan.get("id"),
         "plan_path": plan_relative,
+        "profile": profile,
         "risk": plan.get("risk"),
         "execution": plan.get("execution"),
         "review": plan.get("review"),
+        "test_seams": plan.get("test_seams", []),
+        "max_fix_rounds": FIX_ROUNDS_BY_PROFILE.get(str(profile)),
         "units": labels,
         "changes": changes,
         "readiness_refs": selected_refs,
