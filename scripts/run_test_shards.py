@@ -17,6 +17,7 @@ SHARDS = (
     "SnapshotScenarios",
     "PlanningQualityScenarios",
     "PlanningStabilityScenarios",
+    "ContextEfficiencyScenarios",
     "AdaptivePolicyScenarios",
     "WorkspaceAndArtifactScenarios",
     "BehavioralProjectScenarios",

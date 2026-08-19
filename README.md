@@ -1,6 +1,6 @@
-# Bianchini Method v3.0 — Planning Stability
+# Bianchini Method v3.1 — Context Efficiency
 
-`v3.0` é a versão do pacote. `method_version` permanece `2` para preservar compatibilidade dos projetos standalone existentes.
+`v3.1` é a versão do pacote. `method_version` permanece `2` para preservar compatibilidade dos projetos standalone existentes.
 
 Sistema de oito skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
 
@@ -136,7 +136,7 @@ O CLI usa somente a biblioteca padrão Python e fornece:
 validate-state  route  legacy-transition  design-audit  planning-audit  planning-check
 change-policy  cycle-close  snapshot  policy  workspace(create|check|locate|resume)
 repo-hygiene(check|migrate)  task-brief  report  review-package
-checkpoint  proof-map  telemetry  status
+checkpoint  proof-map  spec-diff  mutation-evidence  telemetry  status
 ```
 
 Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é bloqueada.
@@ -146,6 +146,17 @@ Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é b
 Novos planejamentos incluem `STACK_RESEARCH.md` em modo `repo_only`, `targeted_web` ou `full`. `planning-audit --strict` retorna os limites vigentes, bloqueia evidência insuficiente, placeholders, comandos em prosa e planos dependentes de fontes legadas. Lean permanece tipicamente pequeno e sem mínimo; Standard e Full absorvem escopos/risco maiores sem retirar requisitos aprovados. Qualquer `deferred_scope` exige autorização explícita registrada do responsável. O snapshot reaplica o gate automaticamente.
 
 `/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; mudanças ativas ficam em `docs/bianchini/changes/<planning_version>/`; specs aceitas ficam em `docs/bianchini/current/specs/`.
+
+## Eficiência de contexto
+
+A v3.1 mantém as fontes completas e adiciona projeções determinísticas para reduzir leitura ativa:
+
+- `planning-audit` exige `Change` e `Readiness refs` nas unidades quality v2;
+- `task-brief --hydrate-context` reúne somente readiness, specs, gates e ledger aplicáveis;
+- `spec-diff` deriva ADDED, MODIFIED e REMOVED entre specs completas;
+- `mutation-evidence verify` vincula relatório, seam, plano e revisão do código sem usar score global.
+
+Detalhes: [`skills/_shared/CONTEXT_EFFICIENCY.md`](skills/_shared/CONTEXT_EFFICIENCY.md).
 
 ## Homologação e manual
 

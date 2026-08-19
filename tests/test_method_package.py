@@ -155,7 +155,8 @@ class PackageIntegrityTests(unittest.TestCase):
         self.assertEqual(root_schema.read_bytes(), packaged.read_bytes())
 
     def test_cli_has_no_third_party_imports(self) -> None:
-        content = read(ROOT / "skills" / "_shared" / "scripts" / "bm.py")
+        scripts = ROOT / "skills" / "_shared" / "scripts"
+        content = "\n".join(read(path) for path in sorted(scripts.glob("bm*.py")))
         for dependency in ("yaml", "jsonschema", "click", "pydantic"):
             self.assertNotRegex(content, rf"(?m)^(?:from|import)\s+{dependency}\b")
 
@@ -188,6 +189,8 @@ class PackageIntegrityTests(unittest.TestCase):
             "RoutingAndStateScenarios",
             "SnapshotScenarios",
             "PlanningQualityScenarios",
+            "PlanningStabilityScenarios",
+            "ContextEfficiencyScenarios",
             "AdaptivePolicyScenarios",
             "WorkspaceAndArtifactScenarios",
             "BehavioralProjectScenarios",
@@ -1817,6 +1820,11 @@ class PlanningStabilityScenarios(unittest.TestCase):
             )
             delta_path = "docs/bianchini/changes/v1/spec-deltas/system.md"
             state["approval"]["package"]["files"].remove(delta_path)
+            plan_path = root / state["plans"][0]["path"]
+            plan_path.write_text(
+                read(plan_path).replace(", SD-001", ""),
+                encoding="utf-8",
+            )
             state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
             self.pass_checker(state_path, root)
             state = json.loads(read(state_path))
@@ -4337,3 +4345,320 @@ class SkillBehaviorContracts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+class ContextEfficiencyScenarios(unittest.TestCase):
+    def make_v2_project(self, root: Path, *, initialize_git: bool = False) -> Path:
+        builder = PlanningStabilityScenarios(methodName="runTest")
+        return builder.make_project(root, initialize_git=initialize_git)
+
+    def test_quality_v2_requires_change_and_readiness_refs(self) -> None:
+        cases = (
+            ("**Change:** state-machine\n", "campo Change ausente"),
+            (
+                "**Readiness refs:** D-001, A-001, P-001, U-001, SD-001\n",
+                "campo Readiness refs ausente",
+            ),
+        )
+        for removed, expected in cases:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                state_path = self.make_v2_project(root)
+                state = json.loads(read(state_path))
+                plan = root / state["plans"][0]["path"]
+                plan.write_text(read(plan).replace(removed, ""), encoding="utf-8")
+                result = cli(
+                    "planning-check",
+                    "record",
+                    "--state",
+                    str(state_path),
+                    "--root",
+                    str(root),
+                    "--report",
+                    str(root / state["planning"]["review"]),
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(expected, result.stderr)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_v2_project(root)
+            state = json.loads(read(state_path))
+            plan = root / state["plans"][0]["path"]
+            plan.write_text(
+                read(plan).replace("**Change:** state-machine", "**Change:** talvez-refatorar"),
+                encoding="utf-8",
+            )
+            result = cli(
+                "planning-check",
+                "record",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--report",
+                str(root / state["planning"]["review"]),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("Change inválido", result.stderr)
+
+    def test_readiness_ref_must_exist_and_target_the_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_v2_project(root)
+            state = json.loads(read(state_path))
+            plan = root / state["plans"][0]["path"]
+            plan.write_text(
+                read(plan).replace(
+                    "D-001, A-001, P-001, U-001, SD-001",
+                    "D-001, A-001, P-001, U-001, SD-999",
+                ),
+                encoding="utf-8",
+            )
+            result = cli(
+                "planning-check",
+                "record",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--report",
+                str(root / state["planning"]["review"]),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("readiness ref inexistente SD-999", result.stderr)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_v2_project(root)
+            state = json.loads(read(state_path))
+            readiness_path = root / state["planning"]["readiness"]
+            match = re.search(r"```json\s*(.*?)\s*```", read(readiness_path), re.DOTALL)
+            self.assertIsNotNone(match)
+            readiness = json.loads(match.group(1))
+            readiness["decisions"][0]["destinations"] = [state["planning"]["spec"]]
+            readiness_path.write_text(
+                "# Planning Readiness\n\n```json\n"
+                + json.dumps(readiness, ensure_ascii=False, indent=2)
+                + "\n```\n",
+                encoding="utf-8",
+            )
+            result = cli(
+                "planning-check",
+                "record",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--report",
+                str(root / state["planning"]["review"]),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("D-001 não declara este plano em destinations", result.stderr)
+
+    def test_hydrated_task_brief_contains_bounded_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path = self.make_v2_project(root)
+            state = json.loads(read(state_path))
+            plan = root / state["plans"][0]["path"]
+            ledger = root / state["plans"][0]["ledger"]
+            ledger.parent.mkdir(parents=True, exist_ok=True)
+            ledger.write_text("linha antiga\ncheckpoint atual\npróxima ação\n", encoding="utf-8")
+            output = root / ".superpowers/bianchini/context/P01-S1.md"
+            result = cli_json(
+                "task-brief",
+                "--plan",
+                str(plan),
+                "--task",
+                "1",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--hydrate-context",
+                "--ledger-tail-lines",
+                "2",
+                "--output",
+                str(output),
+            )
+            text = read(output)
+            self.assertTrue(result["hydrated"])
+            self.assertRegex(result["context_digest"], r"^[0-9a-f]{64}$")
+            self.assertIn("D-001", text)
+            self.assertIn("P-001", text)
+            self.assertIn("## Contratos", text)
+            self.assertIn("### Verification.fast", text)
+            self.assertNotIn("linha antiga", text)
+            self.assertIn("checkpoint atual", text)
+            self.assertIn("próxima ação", text)
+
+    def test_spec_diff_generates_added_modified_and_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = root / "docs/current/auth.md"
+            target = root / "docs/changes/auth.md"
+            output = root / "artifacts/auth-diff.md"
+            base.parent.mkdir(parents=True)
+            target.parent.mkdir(parents=True)
+            base.write_text(
+                "# Auth\n\n## AUTH-001: Sessão\n\nExpira em 24 horas.\n\n"
+                "## AUTH-002: Usuário legado\n\nLogin por nome de usuário.\n",
+                encoding="utf-8",
+            )
+            target.write_text(
+                "# Auth\n\n## AUTH-001: Sessão\n\nExpira conforme a organização.\n\n"
+                "## AUTH-003: Bloqueio\n\nBloqueia após tentativas inválidas.\n",
+                encoding="utf-8",
+            )
+            result = cli_json(
+                "spec-diff",
+                "--root",
+                str(root),
+                "--base",
+                str(base),
+                "--target",
+                str(target),
+                "--output",
+                str(output),
+            )
+            self.assertEqual(result["added"], ["AUTH-003"])
+            self.assertEqual(result["modified"], ["AUTH-001"])
+            self.assertEqual(result["removed"], ["AUTH-002"])
+            self.assertRegex(result["base_digest"], r"^[0-9a-f]{64}$")
+            text = read(output)
+            self.assertIn("## ADDED", text)
+            self.assertIn("## MODIFIED", text)
+            self.assertIn("## REMOVED", text)
+            self.assertIn("spec target completa permanece a fonte de verdade", text)
+
+    def test_spec_diff_rejects_duplicate_requirement_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = root / "base.md"
+            target = root / "target.md"
+            output = root / "diff.md"
+            base.write_text(
+                "## AUTH-001: Um\n\nA.\n\n## AUTH-001: Dois\n\nB.\n",
+                encoding="utf-8",
+            )
+            target.write_text("## AUTH-001: Um\n\nA.\n", encoding="utf-8")
+            result = cli(
+                "spec-diff",
+                "--root",
+                str(root),
+                "--base",
+                str(base),
+                "--target",
+                str(target),
+                "--output",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("ID duplicado", result.stderr)
+            self.assertFalse(output.exists())
+
+    def make_mutation_project(self, root: Path, report: dict[str, object]) -> tuple[Path, str]:
+        root.rmdir()
+        state_path = self.make_v2_project(root, initialize_git=True)
+        report_path = root / "artifacts/mutation/report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        git(root, "add", ".")
+        git(root, "commit", "-m", "test: prepare mutation evidence fixture")
+        return state_path, git(root, "rev-parse", "HEAD")
+
+    def test_mutation_evidence_accepts_classified_survivor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            state_path, revision = self.make_mutation_project(
+                root,
+                {
+                    "schema_version": 1,
+                    "mutants": [
+                        {"id": "M1", "status": "killed"},
+                        {
+                            "id": "M2",
+                            "status": "survived",
+                            "classification": "equivalent",
+                            "justification": "Operadores produzem o mesmo resultado para o domínio aprovado.",
+                        },
+                    ],
+                },
+            )
+            result = cli_json(
+                "mutation-evidence",
+                "verify",
+                "--state",
+                str(state_path),
+                "--root",
+                str(root),
+                "--plan",
+                "P01",
+                "--risk-seam",
+                "session-state",
+                "--tool",
+                "normalized",
+                "--command",
+                "python3 mutation_runner.py",
+                "--report",
+                "artifacts/mutation/report.json",
+                "--revision",
+                revision,
+                "--output",
+                "artifacts/bianchini/v1/mutation/P01-session.json",
+            )
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["policy"], "selective")
+            self.assertEqual(result["mutants"]["killed"], 1)
+            self.assertEqual(result["mutants"]["accepted_survivors"], 1)
+
+    def test_mutation_evidence_blocks_unclassified_or_stale_results(self) -> None:
+        scenarios = (
+            (
+                {
+                    "schema_version": 1,
+                    "mutants": [{"id": "M1", "status": "survived"}],
+                },
+                None,
+                "M1",
+            ),
+            (
+                {
+                    "schema_version": 1,
+                    "mutants": [{"id": "M1", "status": "killed"}],
+                },
+                "0" * 40,
+                "revision-mismatch",
+            ),
+        )
+        for report, forced_revision, expected in scenarios:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                state_path, revision = self.make_mutation_project(root, report)
+                output = root / "artifacts/bianchini/v1/mutation/P01-session.json"
+                result = cli(
+                    "mutation-evidence",
+                    "verify",
+                    "--state",
+                    str(state_path),
+                    "--root",
+                    str(root),
+                    "--plan",
+                    "P01",
+                    "--risk-seam",
+                    "session-state",
+                    "--tool",
+                    "normalized",
+                    "--command",
+                    "python3 mutation_runner.py",
+                    "--report",
+                    "artifacts/mutation/report.json",
+                    "--revision",
+                    forced_revision or revision,
+                    "--output",
+                    str(output.relative_to(root)),
+                )
+                self.assertEqual(result.returncode, 3)
+                self.assertIn("mutation evidence bloqueada", result.stderr)
+                payload = json.loads(read(output))
+                self.assertEqual(payload["status"], "blocked")
+                self.assertIn(expected, payload["blocking_mutants"] or payload["unclassified_survivors"])
