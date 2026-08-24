@@ -95,6 +95,31 @@ TRANSITIONS: dict[str, dict[str, set[str]]] = {
     "completed": {},
     "stopped": {},
 }
+VERIFICATION_TEST_ROOTS = {
+    "test",
+    "tests",
+    "fixtures",
+    "integrationTest",
+    "e2e",
+    "__tests__",
+    "spec",
+    "specs",
+}
+VERIFICATION_TEST_SOURCE_SETS = {
+    "test",
+    "testFixtures",
+    "androidTest",
+    "integrationTest",
+    "commonTest",
+    "jvmTest",
+    "jsTest",
+    "iosTest",
+    "nativeTest",
+    "e2e",
+    "spec",
+    "specs",
+    "testResources",
+}
 PROOF_FIELDS = (
     "approved_requirement",
     "material_impact",
@@ -1074,6 +1099,145 @@ def line_touched(
     return False
 
 
+def verification_path_allowed(path: str) -> bool:
+    """Return whether a committed path can belong to a verification-only delta."""
+    pure = PurePosixPath(path)
+    if pure.is_absolute() or ".." in pure.parts or "." in pure.parts:
+        return False
+    if pure.parts and pure.parts[0] in {"docs", "artifacts"}:
+        return True
+    source_sets = [
+        pure.parts[index + 1]
+        for index, part in enumerate(pure.parts[:-1])
+        if part == "src"
+    ]
+    if source_sets and any(
+        source_set not in VERIFICATION_TEST_SOURCE_SETS
+        for source_set in source_sets
+    ):
+        return False
+    if any(source_set in VERIFICATION_TEST_SOURCE_SETS for source_set in source_sets):
+        return True
+    if any(part in VERIFICATION_TEST_ROOTS for part in pure.parts):
+        return True
+    name = pure.name
+    if name.lower().endswith((".md", ".mdx", ".rst", ".adoc", ".asciidoc")):
+        return True
+    return False
+
+
+def verification_changed_paths(root: Path, base: str, head: str) -> list[str]:
+    """List both sides of renames so production code cannot be hidden as a test rename."""
+    result = git(
+        root,
+        "-c",
+        "core.quotePath=false",
+        "diff",
+        "--name-only",
+        "--no-renames",
+        "-z",
+        base,
+        head,
+        "--",
+    )
+    if result.returncode != 0:
+        raise GuardError("não foi possível calcular paths do delta de verification")
+    paths = sorted({item for item in result.stdout.split("\0") if item})
+    for path in paths:
+        relative_repo_path(root, path, "verification diff path")
+    return paths
+
+
+def ensure_verification_delta_only(root: Path, base: str, head: str) -> None:
+    paths = verification_changed_paths(root, base, head)
+    if not paths:
+        raise GuardError("verification exige delta não vazio")
+    production = [path for path in paths if not verification_path_allowed(path)]
+    if production:
+        rendered = ", ".join(production[:8])
+        suffix = " ..." if len(production) > 8 else ""
+        raise GuardError(
+            "verification proibida: diff altera código de produção "
+            f"({rendered}{suffix}); use somente testes, docs ou artifacts"
+        )
+
+
+def ensure_clean_implementation_review(state: dict[str, Any]) -> None:
+    if state.get("delta_submissions") != 1:
+        raise GuardError(
+            "verification exige revisão limpa após o único delta implementation"
+        )
+    if open_blockers(state):
+        raise GuardError("verification exige revisão limpa sem blockers abertos")
+    events = state.get("events")
+    if not isinstance(events, list):
+        raise GuardError("verification exige histórico da revisão implementation")
+    submissions = [
+        (index, event)
+        for index, event in enumerate(events)
+        if isinstance(event, dict) and event.get("action") == "delta_submitted"
+    ]
+    if len(submissions) != 1 or submissions[0][1].get("kind") != "implementation":
+        raise GuardError(
+            "verification exige revisão limpa após o único delta implementation"
+        )
+    submission_index, submission = submissions[0]
+    reviews = [
+        (index, event)
+        for index, event in enumerate(events)
+        if isinstance(event, dict) and event.get("action") == "review_frozen"
+    ]
+    if not reviews or reviews[-1][0] <= submission_index:
+        raise GuardError("verification exige revisão limpa após implementation")
+    submitted_head = submission.get("head")
+    if submitted_head and state.get("last_review_head") != submitted_head:
+        raise GuardError("verification exige HEAD da revisão implementation congelado")
+
+
+def ensure_pending_verification_state(
+    state: dict[str, Any], pending: dict[str, Any]
+) -> None:
+    if state.get("delta_submissions") != 1 or open_blockers(state):
+        raise GuardError("pending verification exige revisão implementation limpa")
+    events = state.get("events")
+    if not isinstance(events, list):
+        raise GuardError("pending verification exige histórico válido")
+    submissions = [
+        (index, event)
+        for index, event in enumerate(events)
+        if isinstance(event, dict) and event.get("action") == "delta_submitted"
+    ]
+    if len(submissions) != 2 or [
+        event.get("kind") for _, event in submissions
+    ] != ["implementation", "verification"]:
+        raise GuardError(
+            "pending verification exige implementation revisado e verification único"
+        )
+    implementation_index, implementation = submissions[0]
+    verification_index, verification = submissions[1]
+    reviewed_between = any(
+        implementation_index < index < verification_index
+        and isinstance(event, dict)
+        and event.get("action") == "review_frozen"
+        for index, event in enumerate(events)
+    )
+    if not reviewed_between:
+        raise GuardError("pending verification exige revisão limpa após implementation")
+    last_review_head = state.get("last_review_head")
+    if implementation.get("head") != last_review_head:
+        raise GuardError("pending verification diverge do HEAD implementation revisado")
+    for field in ("base", "head"):
+        if verification.get(field) != pending.get(field):
+            raise GuardError("pending verification diverge do evento submetido")
+    if pending.get("base") != last_review_head:
+        raise GuardError("pending verification deve partir do último HEAD revisado")
+    if any(
+        isinstance(event, dict) and event.get("action") == "review_frozen"
+        for event in events[verification_index + 1 :]
+    ):
+        raise GuardError("pending verification já possui revisão posterior")
+
+
 def validate_delta_regression(
     finding: dict[str, Any],
     state: dict[str, Any],
@@ -1575,14 +1739,18 @@ def validate_state(state: Any, path: Path) -> dict[str, Any]:
             "implementation",
             "fix",
             "redesign",
+            "verification",
         }:
             raise GuardError("awaiting_review exige pending_delta válido")
-        verify_delta(
+        pending_base, pending_head = verify_delta(
             root,
             str(pending.get("base", "")),
             str(pending.get("head", "")),
             state["last_review_head"],
         )
+        if pending.get("kind") == "verification":
+            ensure_pending_verification_state(state, pending)
+            ensure_verification_delta_only(root, pending_base, pending_head)
     elif pending is not None:
         raise GuardError("pending_delta fora de awaiting_review")
     if state["phase"] == "fixing" and state["fix_rounds"] < 1:
@@ -1845,6 +2013,7 @@ def command_submit_delta(args: argparse.Namespace) -> dict[str, Any]:
         "implementation": "review_frozen",
         "fix": "fixing",
         "redesign": "redesigning",
+        "verification": "review_frozen",
     }[args.kind]
     if source != expected:
         raise GuardError(f"submit-delta {args.kind} inválido na fase {source}")
@@ -1853,6 +2022,9 @@ def command_submit_delta(args: argparse.Namespace) -> dict[str, Any]:
             raise GuardError("delta de implementação inicial exige unidade sem blocker")
     root = Path(state["repository_root"])
     base, head = verify_delta(root, args.base, args.head, state["last_review_head"])
+    if args.kind == "verification":
+        ensure_clean_implementation_review(state)
+        ensure_verification_delta_only(root, base, head)
     transition(state, "submit_delta", "awaiting_review")
     state["pending_delta"] = {
         "kind": args.kind,
@@ -2292,7 +2464,9 @@ def parser() -> argparse.ArgumentParser:
     submit = subparsers.add_parser("submit-delta")
     submit.add_argument("--sidecar", required=True)
     submit.add_argument(
-        "--kind", choices=("implementation", "fix", "redesign"), required=True
+        "--kind",
+        choices=("implementation", "fix", "redesign", "verification"),
+        required=True,
     )
     submit.add_argument("--base", required=True)
     submit.add_argument("--head", required=True)

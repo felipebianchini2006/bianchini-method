@@ -34,6 +34,7 @@ Tabela fechada:
 | --- | --- | --- | --- |
 | inexistente | `freeze` | `review_frozen` | primeira revisão válida no `HEAD` atual |
 | `review_frozen` | `submit-delta --kind implementation` | `awaiting_review` | zero blockers; primeira submissão de delta |
+| `review_frozen` | `submit-delta --kind verification` | `awaiting_review` | revisão limpa após o único implementation; delta atual contém somente testes, fixtures, docs ou artifacts |
 | `review_frozen` | `fix` | `fixing` | blocker congelado aberto; menos de dois fix rounds |
 | `fixing` | `submit-delta --kind fix` | `awaiting_review` | commit do fix submetido |
 | `review_frozen` | `redesign` | `redesigning` | blocker estrutural aberto; dois fixes; redesign disponível; seam idêntico |
@@ -51,7 +52,7 @@ A parada é isolada por unidade. `parked`, bloqueio local ou `stopped` de uma un
 
 `freeze` cria sidecar e primeira revisão atomicamente. `review` só executa em `awaiting_review`. Fix ou redesign só executam em `review_frozen`. Dois fixes consecutivos sem `submit-delta --kind fix` e `review` intermediários são inválidos. Renomear unidade ou seam não cria nova identidade nem reseta contador.
 
-`submit-delta --kind implementation` cobre implementação subsequente à primeira revisão, somente quando freeze não deixou blocker e nenhum delta anterior foi submetido. Após fix ou redesign, usar kind correspondente antes de `review`.
+`submit-delta --kind implementation` cobre o único delta de implementação subsequente à primeira revisão, somente quando freeze não deixou blocker e nenhum delta anterior foi submetido. Depois de uma revisão limpa desse implementation, pode existir um único `submit-delta --kind verification`; o guard rejeita esse delta se qualquer path desde `last_review_head` alterar código de produção. Verification aceita somente testes, fixtures, docs ou artifacts e sempre entra em `awaiting_review`; não é atalho para `complete`. Após fix ou redesign, usar kind correspondente antes de `review`.
 
 ## Blocker congelado
 
@@ -181,7 +182,7 @@ python3 <review_guard.py> proof --root <workspace> --planning-version <version> 
 python3 <review_guard.py> freeze --root <workspace> --planning-version <version> --plan <plan> --unit <unit> --unit-identity <unit_sha256_do_task_brief> --task-brief <task-brief.md> --seam <seam> --review-head <HEAD> --findings <findings.json> --required-gate <gate>
 python3 <review_guard.py> fix --sidecar <sidecar.json> --blocker <id> --summary <summary>
 python3 <review_guard.py> redesign --sidecar <sidecar.json> --blocker <id> --seam <seam> --summary <summary>
-python3 <review_guard.py> submit-delta --sidecar <sidecar.json> --kind <implementation|fix|redesign> --base <commit> --head <commit>
+python3 <review_guard.py> submit-delta --sidecar <sidecar.json> --kind <implementation|fix|redesign|verification> --base <commit> --head <commit>
 python3 <review_guard.py> review --sidecar <sidecar.json> --findings <findings.json>
 python3 <review_guard.py> gate --sidecar <sidecar.json> --gate <gate> --proof-id <proof_id>
 python3 <review_guard.py> decision --sidecar <sidecar.json> --kind <internal|local_block> --summary <summary>
@@ -196,6 +197,7 @@ Sequência de convergência:
 ```text
 freeze
 submit-delta --kind implementation -> review  # somente quando houver implementação subsequente elegível
+submit-delta --kind verification -> review    # somente após review limpa do único implementation; testes/fixtures/docs/artifacts
 fix -> submit-delta -> review
 fix -> submit-delta -> review
 redesign -> submit-delta -> review

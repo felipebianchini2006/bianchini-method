@@ -867,6 +867,95 @@ class ReviewGuardScenarios(unittest.TestCase):
             self.assertEqual(reviewed["phase"], "review_frozen")
             self.assertEqual(reviewed["next_action"], "approve")
 
+    def test_verification_delta_is_allowed_once_after_clean_implementation_review(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            base = init_repo(repo)
+            sidecar, _ = freeze(repo, [])
+            implementation = commit_file(
+                repo, "alpha\nimplemented\nremove-me\n", "implementation"
+            )
+            submit_delta(sidecar, "implementation", base, implementation)
+            first_review = review(sidecar, repo, [])
+            self.assertEqual(first_review["phase"], "review_frozen")
+            self.assertEqual(first_review["state"]["delta_submissions"], 1)
+
+            verification = commit_file(
+                repo,
+                "def test_implemented():\n    assert True\n",
+                "verification",
+                "tests/test_app.py",
+            )
+            awaiting = submit_delta(
+                sidecar, "verification", implementation, verification
+            )
+            self.assertEqual(awaiting["phase"], "awaiting_review")
+            self.assertEqual(
+                awaiting["state"]["pending_delta"]["kind"], "verification"
+            )
+            verified = review(sidecar, repo, [])
+            self.assertEqual(verified["phase"], "review_frozen")
+            self.assertEqual(verified["next_action"], "approve")
+            self.assertEqual(verified["state"]["delta_submissions"], 2)
+
+            second_verification = commit_file(
+                repo, "# segunda verificação\n", "second verification", "docs/check.md"
+            )
+            rejected = run_guard(
+                "submit-delta",
+                "--sidecar",
+                str(sidecar),
+                "--kind",
+                "verification",
+                "--base",
+                verification,
+                "--head",
+                second_verification,
+            )
+            self.assertEqual(rejected.returncode, 2)
+            self.assertIn("único delta implementation", rejected.stderr)
+
+    def test_verification_delta_rejects_production_changes_and_hidden_renames(
+        self,
+    ) -> None:
+        for scenario in ("production", "rename"):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                base = init_repo(repo)
+                sidecar, _ = freeze(repo, [])
+                implementation = commit_file(
+                    repo, "alpha\nimplemented\nremove-me\n", "implementation"
+                )
+                submit_delta(sidecar, "implementation", base, implementation)
+                review(sidecar, repo, [])
+
+                if scenario == "production":
+                    head = commit_file(
+                        repo,
+                        "alpha\nproduction-change\nremove-me\n",
+                        "production change",
+                    )
+                else:
+                    (repo / "tests").mkdir()
+                    git(repo, "mv", "app.txt", "tests/app.txt")
+                    git(repo, "commit", "-m", "hide production as test")
+                    head = git(repo, "rev-parse", "HEAD")
+                rejected = run_guard(
+                    "submit-delta",
+                    "--sidecar",
+                    str(sidecar),
+                    "--kind",
+                    "verification",
+                    "--base",
+                    implementation,
+                    "--head",
+                    head,
+                )
+                self.assertEqual(rejected.returncode, 2)
+                self.assertIn("altera código de produção", rejected.stderr)
+
     def test_review_outside_awaiting_review_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
