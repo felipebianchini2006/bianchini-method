@@ -6,7 +6,6 @@ import hashlib
 import importlib.util
 import json
 import os
-import re
 import subprocess
 import tempfile
 import unittest
@@ -450,9 +449,7 @@ class CodexOverlayPackageTests(unittest.TestCase):
         for excluded in ("Fix loop", "Breaker", "Redesign", "Paradas"):
             self.assertNotIn(excluded.casefold(), folded)
 
-    def test_core_requires_canonical_subagents_and_maximum_safe_parallelism(
-        self,
-    ) -> None:
+    def test_core_does_not_pin_subagent_models_or_hierarchy(self) -> None:
         core = (OVERLAY / "references/EXECUTION_CORE_CODEX.md").read_text(
             encoding="utf-8"
         )
@@ -460,56 +457,23 @@ class CodexOverlayPackageTests(unittest.TestCase):
         convergence = (OVERLAY / "references/CODEX_CONVERGENCE.md").read_text(
             encoding="utf-8"
         )
-        for agent, model, effort in (
-            ("/root/luna_max", "gpt-5.6-luna", "max"),
-            ("/root/sol_medium", "gpt-5.6-sol", "medium"),
+        combined = "\n".join((core, skill, convergence))
+        for pinned in (
+            "/root/luna_max",
+            "/root/sol_medium",
+            "gpt-5.6-luna",
+            "gpt-5.6-sol",
+            "reasoning effort `max`",
+            "reasoning effort `medium`",
+            "Orquestração obrigatória de subagentes",
         ):
-            self.assertIn(agent, core)
-            self.assertIn(agent, skill)
-            self.assertRegex(
-                core,
-                rf"{agent}.*task_name={agent.rsplit('/', 1)[-1]}.*modelo `{re.escape(model)}`.*reasoning effort `{effort}`",
-            )
-        for contract in (
-            "fila global de unidades prontas",
-            "ownership explícito e não sobreposto",
-            "nunca fica ocioso enquanto existir",
-            "não interrompem a fila pronta",
-        ):
-            self.assertIn(contract, core)
+            self.assertNotIn(pinned, combined)
+        self.assertIn("Quando o host suportar subagentes", core)
+        self.assertIn("Não fixar nome, modelo, reasoning effort", core)
+        self.assertIn("Sem subagentes, cumprir a mesma responsabilidade inline", core)
         self.assertIn(
             "todo trabalho restante estiver terminal ou estacionado", convergence
         )
-        for luna_pool_rule in (
-            "/root/luna_max/<unit_id>",
-            "até cinco atribuições independentes simultâneas",
-            "até cinco atribuições Luna `max` simultâneas",
-            "Priorizar slots disponíveis para o pool Luna",
-        ):
-            self.assertIn(luna_pool_rule, core)
-        for sol_limit in (
-            "/root/sol_medium/<review_id>",
-            "manter duas atribuições Sol simultâneas",
-            "permitir no máximo três",
-            "acionar o terceiro Sol somente",
-            "nunca usar Sol para implementação",
-            "Não reservar slot para Sol",
-        ):
-            self.assertIn(sol_limit, core)
-        self.assertIn(
-            "pode subir para três revisões críticas ou decisões arquiteturais independentes",
-            convergence,
-        )
-        self.assertIn("preencher o máximo de slots", core)
-        self.assertIn("preenche todos os slots seguros disponíveis", convergence)
-        for capacity_guard in (
-            "Nunca exceder cinco atribuições Luna nem três atribuições Sol",
-            "O coordenador não conta nesses limites",
-            "Não criar atribuição artificial",
-            "dependência satisfeita e ownership não sobreposto",
-        ):
-            self.assertIn(capacity_guard, core)
-        self.assertNotIn("Quando host suportar subagentes", core)
         policy = (OVERLAY / "agents/openai.yaml").read_text(encoding="utf-8")
         for unsupported in ("model:", "reasoning_effort:", "subagents:", "agents:"):
             self.assertNotIn(unsupported, policy)

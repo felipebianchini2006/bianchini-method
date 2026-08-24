@@ -29,35 +29,6 @@ Usar `planning_version` do estado. Branch: `bm/<planning_version>-<plan_id>`. En
 
 Aquecer dependências uma vez no workspace com gerenciador e comandos do projeto. Antes de runtime, respeitar `.mise.toml`, `mise.toml` ou configuração equivalente.
 
-## Orquestração obrigatória de subagentes
-
-Em toda execução de plano, inclusive `$executar-plano-codex all`, usar esta hierarquia:
-
-- `/root/luna_max`: `task_name=luna_max`, modelo `gpt-5.6-luna`, reasoning effort `max`; é o executor principal e lidera implementação, decisões técnicas, testes, gates e unidades de maior risco;
-- workers filhos `/root/luna_max/<unit_id>`: herdam `gpt-5.6-luna` com reasoning effort `max`; o pool Luna executa até cinco atribuições independentes simultâneas, contando o agente canônico e seus filhos;
-- `/root/sol_medium`: `task_name=sol_medium`, modelo `gpt-5.6-sol`, reasoning effort `medium`; é apoio seletivo para segunda opinião em revisão crítica ou decisão arquitetural material;
-- workers filhos `/root/sol_medium/<review_id>`: herdam `gpt-5.6-sol` com reasoning effort `medium`; o pool Sol mantém duas atribuições elegíveis simultâneas e pode subir para três quando existir uma terceira revisão ou decisão crítica independente.
-
-Criar ou reutilizar `/root/luna_max` antes da implementação. Manter até cinco atribuições Luna `max` simultâneas sempre que a fila pronta, os slots, as dependências e o ownership permitirem. Priorizar slots disponíveis para o pool Luna e para o coordenador.
-
-Usar o pool `/root/sol_medium` com parcimônia: manter duas atribuições Sol simultâneas quando houver trabalho elegível e permitir no máximo três; nunca usar Sol para implementação, documentação comum, teste previsível, gate mecânico ou unidade independente rotineira; acionar o terceiro Sol somente para uma terceira revisão crítica ou decisão arquitetural material independente. Liberar cada Sol assim que sua atribuição terminar. Não reservar slot para Sol quando existir unidade executável adequada ao Luna e nenhuma tarefa Sol elegível.
-
-Nunca exceder cinco atribuições Luna nem três atribuições Sol. O coordenador não conta nesses limites. Não criar atribuição artificial para preencher capacidade: cada dispatch exige tarefa pronta, dependência satisfeita e ownership não sobreposto.
-
-Maximizar paralelismo seguro em todos os planos aprovados:
-
-1. construir uma fila global de unidades prontas a partir das dependências dos planos;
-2. distribuir imediatamente unidades independentes entre o pool `/root/luna_max` e o coordenador;
-3. atribuir ownership explícito e não sobreposto de arquivos, seams ou worktrees;
-4. usar worktree distinta por plano e nunca editar o mesmo arquivo concorrentemente;
-5. iniciar revisão, gates, documentação ou próxima unidade independente assim que suas entradas estiverem prontas, sem esperar trabalho não relacionado;
-6. quando um subagente concluir, entregar imediatamente a próxima unidade pronta;
-7. manter implementação e revisão crítica do mesmo delta em agentes diferentes quando houver capacidade, usando Sol somente pelos critérios seletivos acima.
-
-Em cada ciclo de scheduling, preencher o máximo de slots oferecidos pelo host com trabalho pronto e seguro. Se houver menos slots que o limite combinado dos pools, priorizar o caminho crítico, depois unidades Luna independentes e depois revisões Sol elegíveis. Nunca deixar slot ocioso quando existir tarefa pronta sem conflito.
-
-O coordenador nunca fica ocioso enquanto existir unidade, gate, checkpoint ou entrega executável. Falha local, limite de contexto, duração, orçamento interno ou agente indisponível não interrompem a fila pronta: registrar checkpoint, reatribuir ou seguir trabalho independente. Não fazer polling inútil nem repetir operação sem nova evidência.
-
 ## Execução recuperável
 
 No ledger do plano, registrar digest aprovado, base revision, workspace, branch, modo e perfil.
@@ -76,7 +47,7 @@ Retomada começa com `workspace resume`. Ler checkpoint, estado, unidade atual e
 
 Antes da unidade, executar `bm.py policy` com perfil, risco e `Change` declarado no brief; planos antigos sem `Change` usam `behavioral` somente por compatibilidade. Confirmar coincidência com `execution` aprovado. Divergência pode aumentar garantia automaticamente; redução exige novo pacote aprovado.
 
-Em cada dispatch, passar ao subagente somente brief, relatório, ownership e contexto estritamente necessário. O coordenador mantém a fila global, integra resultados e executa em paralelo outra unidade independente.
+Quando o host suportar subagentes e seu uso for apropriado, passar ao implementador somente brief, relatório, ownership e contexto estritamente necessário. Não fixar nome, modelo, reasoning effort, hierarquia ou quantidade de subagentes: usar os padrões atuais do host. Sem subagentes, cumprir a mesma responsabilidade inline.
 
 ## Autonomia e plano congelado
 
