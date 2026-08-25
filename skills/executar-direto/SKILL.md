@@ -11,7 +11,9 @@ Use somente por invocação explícita de `/executar-direto`. Leia [`../_shared/
 
 Planos, specs e decisões já existentes em `.bianchini/` são documentação e rastreio. Use-os como contexto confiável, sem exigir novo planejamento para executar a tarefa solicitada.
 
-O quick usa zero subagentes, não carrega o catálogo interno de agentes e faz uma única auto-revisão final. A intenção é manter baixo overhead sem reduzir os guards do risco real.
+Quick normal e quick protegido podem usar subagentes quando o host suportar e houver frentes independentes que reduzam o tempo ou aumentem a qualidade. Use somente os contratos internos relevantes, com ownership fechado, contexto mínimo e saída esperada. Não fixe nome, modelo, reasoning effort, hierarquia, quantidade ou paralelismo; use os padrões atuais do host. Sem subagentes, cumpra a mesma responsabilidade inline.
+
+O executor principal integra os resultados, resolve conflitos e mantém uma única revisão final do quick. Uma revisão independente pode rodar em paralelo quando o risco justificar. Não criar subagente por arquivo, camada de teste ou gate mecânico.
 
 ## 1. Confirmar que é uma entrega coesa
 
@@ -109,6 +111,8 @@ Trabalhe continuamente, com o menor diff correto:
 - fronteira externa: contrato local e sandbox quando necessário;
 - visual: browser/viewport e evidência comparável;
 - mudança mecânica: checks focados e regressão proporcional.
+
+Quando houver trabalho independente, despache em paralelo pesquisa localizada, implementação com ownership separado ou revisão especializada. Não terceirize a decisão de aceite, a integração do diff, os checkpoints nem a conclusão do quick.
 
 Use `bm.py direct checkpoint` para registrar arquivo alterado, comando, resultado e evidência estruturada. Evidência de comando `passed` exige `exit_code: 0`; browser, screenshot ou manual exige referência reproduzível. Toda evidência fica vinculada ao digest do brief e ao fingerprint da árvore.
 

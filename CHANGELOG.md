@@ -2,6 +2,13 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 0.4.4 — Subagentes adaptativos na execução direta
+
+- permite subagentes em quick normal e protegido quando existirem frentes independentes;
+- preserva o executor principal como responsável por integração, evidência e conclusão;
+- usa os padrões atuais do host sem fixar modelo, quantidade, hierarquia ou paralelismo;
+- proíbe decomposição artificial por arquivo, camada de teste ou gate mecânico.
+
 ## 0.4.3 — Execução direta sem replanejamento automático
 
 - torna a invocação explícita de `/executar-direto` uma decisão definitiva de roteamento;

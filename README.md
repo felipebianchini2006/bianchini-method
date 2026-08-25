@@ -146,6 +146,8 @@ Quicks ficam versionados em `.bianchini/quick/Qxxx-*` e atualizam a DocViva ao t
 
 Quando `/executar-direto` é invocado, score e risco nunca redirecionam para `/sdd-planning`. O conteúdo de `.bianchini/` continua servindo como documentação e rastreio da execução.
 
+Quick normal e protegido podem usar subagentes em frentes independentes para reduzir tempo ou aumentar qualidade. O executor principal mantém ownership da integração, evidência e conclusão; o método não fixa modelo, quantidade ou paralelismo e não cria agentes por camada de teste.
+
 ## Debug persistente
 
 ```text

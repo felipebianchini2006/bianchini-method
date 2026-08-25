@@ -261,7 +261,7 @@ O breaker epistêmico é contado por `risk_seam`, não pelo nome da tarefa: reno
 - `implementation-worker` recebe contrato, brief, modelo necessário e caminho do relatório; não propõe refatoração fora do plano.
 - `plan-reviewer`: uma revisão no gate em `grouped`, uma por slice em `slice` e independente por tarefa em `strict`. Retorna contagem por severidade e caminho do arquivo de saída da revisão.
 - `security-reviewer` roda somente em risco alto ou crítico sensível, em passagem somente leitura. Não roda em tarefa comum e devolve findings ao fix loop existente.
-- Quick usa zero subagentes e não carrega esse catálogo.
+- Quick normal e protegido podem usar subagentes quando houver trabalho independente com ganho real de tempo ou qualidade. Carregar somente os contratos relevantes, definir ownership e saída esperada e usar os padrões atuais do host, sem fixar nome, modelo, reasoning effort, hierarquia, quantidade ou paralelismo. O executor principal integra e comprova o resultado; sem subagentes, cumpre a mesma responsabilidade inline. Não criar agente por arquivo, camada de teste ou gate mecânico.
 
 ## Quick
 
@@ -292,6 +292,8 @@ bm.py direct classify --repo <repo> \
 Pagamento e webhook não escalam pela palavra. Quick protegido exige guards aplicáveis: documentação oficial, origem de verdade, idempotência, autenticidade, deduplicação, replay/ordem, timeout incerto, persistência, reconciliação, rollback, sandbox e checkpoint de produção. Cobrança real, refund, operação paga, ativação externa ou efeito irreversível exige autoridade explícita no momento do efeito.
 
 A invocação explícita de `/executar-direto` é definitiva para a tarefa atual. Score, hazard ou complexidade não acionam `/sdd-planning`. A documentação existente em `.bianchini/` serve como fonte de contexto e rastreio; ausência de resposta obtível ou de autoridade externa pode bloquear, mas não replanejar automaticamente.
+
+Tanto o quick normal quanto o protegido podem paralelizar pesquisa localizada, implementação com ownership separado e revisão especializada. O uso é adaptativo: subagentes entram quando aceleram frentes realmente independentes e nunca alteram o roteamento escolhido.
 
 `direct start` inicializa o workspace 0.4 em projeto novo e persiste `BRIEF.md`,
 `PROGRESS.md` e `RESULT.md` em `.bianchini/quick/Qxxx-*`; score, overrides e digest

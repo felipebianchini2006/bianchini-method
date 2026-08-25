@@ -2100,13 +2100,17 @@ class AgentContractScenarios(unittest.TestCase):
                 for forbidden in ("vibe", "personalidade", "emoji", "🧠", "🎯"):
                     self.assertNotIn(forbidden, content.lower())
 
-    def test_direct_mode_keeps_zero_subagents_and_no_catalog(self) -> None:
+    def test_direct_mode_allows_adaptive_subagents_without_changing_route(self) -> None:
         direct = read(SKILLS["executar-direto"])
-        self.assertIn("zero subagentes", direct)
-        self.assertIn("não carrega o catálogo interno de agentes", direct)
+        self.assertIn("Quick normal e quick protegido podem usar subagentes", direct)
+        self.assertIn("frentes independentes", direct)
+        self.assertIn("Não fixe nome, modelo, reasoning effort", direct)
+        self.assertIn("Sem subagentes, cumpra a mesma responsabilidade inline", direct)
+        self.assertIn("Não criar subagente por arquivo, camada de teste ou gate mecânico", direct)
         self.assertIn("nunca aciona `/sdd-planning`", direct)
         self.assertNotIn("encaminhe para `/sdd-planning`", direct)
         self.assertNotIn("`7–10`: `/sdd-planning`", direct)
+        self.assertNotIn("zero subagentes", direct)
 
     def test_architecture_audit_requires_explicit_invocation(self) -> None:
         metadata = frontmatter(read(SKILLS["auditar-arquitetura"]))

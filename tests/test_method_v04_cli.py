@@ -421,7 +421,7 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertRegex(result["id"], r"^Q001-")
             self.assertEqual(
                 (installed / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-                "0.4.3",
+                "0.4.4",
             )
             self.assertTrue((repo / ".bianchini/STATE.md").is_file())
             self.assertFalse((repo / ".superpowers").exists())
@@ -1492,10 +1492,10 @@ class MethodV04Scenarios(unittest.TestCase):
     def test_version_files_use_zero_four_lineage(self) -> None:
         self.assertEqual(
             (ROOT / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-            "0.4.3",
+            "0.4.4",
         )
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.3"', workflow)
+        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.4"', workflow)
         root_schema = (ROOT / "schemas/state-v04.schema.json").read_bytes()
         packaged_schema = (
             ROOT / "skills/_shared/schemas/state-v04.schema.json"
