@@ -434,75 +434,6 @@ def semantic_errors(state: dict[str, Any]) -> list[str]:
     return errors
 
 
-def has_superpowers(path: Path | None) -> bool:
-    if not path or not path.is_dir():
-        return False
-    candidates = (path / "skills", path)
-    required = (
-        "brainstorming",
-        "writing-plans",
-        "subagent-driven-development",
-        "systematic-debugging",
-        "verification-before-completion",
-    )
-    return any(
-        all((candidate / skill / "SKILL.md").is_file() for skill in required)
-        for candidate in candidates
-    )
-
-
-def route_project(
-    state_path: Path | None,
-    superpowers_path: Path | None,
-    repo: Path,
-    new_project: bool,
-    migrate_to_v2: bool,
-) -> dict[str, Any]:
-    if migrate_to_v2:
-        legacy_detected = (repo / "docs" / "superpowers").exists()
-        if state_path is not None and state_path.is_file():
-            state = load_state(state_path, repo)
-            if state.get("method_version") == 2:
-                validate_state(state_path)
-                return {"route": "v2-standalone", "superpowers_required": False}
-            if state.get("method_version") != 1:
-                raise BMError(
-                    "BLOQUEADO: somente estado v1 pode receber migração explícita para v2",
-                    EXIT_BLOCKED,
-                )
-            legacy_detected = True
-        return {
-            "route": "v2-migration",
-            "legacy_detected": legacy_detected,
-            "superpowers_required": False,
-        }
-    if state_path is None or not state_path.is_file():
-        legacy = (repo / "docs" / "superpowers").exists()
-        if legacy:
-            if not has_superpowers(superpowers_path):
-                raise BMError(
-                    "BLOQUEADO: artefatos v1 detectados e Superpowers indisponível",
-                    EXIT_BLOCKED,
-                )
-            return {"route": "v1-superpowers-provisional", "superpowers": str(superpowers_path)}
-        if new_project:
-            return {"route": "v2-new", "superpowers_required": False}
-        raise BMError("BLOQUEADO: estado ausente; confirme se o projeto é novo", EXIT_BLOCKED)
-    state = load_state(state_path, repo)
-    version = state.get("method_version")
-    if version == 1:
-        available = has_superpowers(superpowers_path)
-        if not available:
-            raise BMError(
-                "BLOQUEADO: projeto v1 exige Superpowers disponível; nenhuma migração automática",
-                EXIT_BLOCKED,
-            )
-        return {"route": "v1-superpowers", "superpowers": str(superpowers_path)}
-    if version == 2 and state.get("method_mode") == "standalone-adaptive":
-        validate_state(state_path)
-        return {"route": "v2-standalone", "superpowers_required": False}
-    raise BMError("BLOQUEADO: versão do método ausente, inválida ou não suportada", EXIT_BLOCKED)
-
 
 def file_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -638,30 +569,14 @@ def path_under_root(root: Path, value: Path, label: str) -> Path:
 
 
 ROOT_SUPERPOWERS_IGNORE = "/.superpowers/"
-ROOT_SUPERPOWERS_ARCHIVE = "docs/bianchini/legacy/root-superpowers"
 DIRECT_SCRATCH_ROOT = ".superpowers/bianchini/direct"
-LEGACY_STATE_ARCHIVE = "docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md"
+
+
 def idle_next_action(planning_version: str) -> str:
     return (
         "Aguardar novo escopo; então executar /sdd-planning para iniciar o ciclo "
         f"{planning_version} standalone."
     )
-LEGACY_COMPLETED_STATUSES = {
-    "completed",
-    "done",
-    "delivered",
-    "accepted",
-    "concluido",
-}
-LEGACY_BLOCKING_STATUSES = {
-    "in_progress",
-    "pending",
-    "active",
-    "blocked",
-    "em_andamento",
-}
-
-
 DESIGN_MANIFEST_REQUIRED = (
     "schema_version",
     "status",
@@ -828,18 +743,6 @@ def has_versioned_superpowers_ignore(root: Path) -> bool:
     return bool(patterns & {"/.superpowers/", ".superpowers/", "/.superpowers"})
 
 
-def ensure_versioned_superpowers_ignore(root: Path) -> bool:
-    if has_versioned_superpowers_ignore(root):
-        return False
-    gitignore = root / ".gitignore"
-    content = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
-    if content and not content.endswith("\n"):
-        content += "\n"
-    content += "\n# Artefatos locais de execução do Bianchini Method/Superpowers\n"
-    content += ROOT_SUPERPOWERS_IGNORE + "\n"
-    gitignore.write_text(content.lstrip("\n"), encoding="utf-8")
-    return True
-
 
 def path_uses_symlink(root: Path, target: Path) -> bool:
     current = root.resolve()
@@ -850,201 +753,28 @@ def path_uses_symlink(root: Path, target: Path) -> bool:
     return False
 
 
-def repository_hygiene(
-    repo: Path,
-    migrate: bool,
-    destination: str = ROOT_SUPERPOWERS_ARCHIVE,
-) -> dict[str, Any]:
+
+def repository_hygiene(repo: Path) -> dict[str, Any]:
     root = repo.resolve()
     top = Path(run_git(["rev-parse", "--show-toplevel"], root)).resolve()
     if top != root:
         raise BMError(f"--repo deve apontar para a raiz Git: {top}")
     tracked = tracked_root_superpowers(root)
-    ignored = has_versioned_superpowers_ignore(root)
-    if not migrate:
-        problems: list[str] = []
-        if tracked:
-            problems.append(
-                f"{len(tracked)} arquivo(s) de .superpowers ainda rastreado(s)"
-            )
-        if not ignored:
-            problems.append(f"{ROOT_SUPERPOWERS_IGNORE} ausente do .gitignore")
-        if problems:
-            raise BMError(
-                "BLOQUEADO: higiene do repositório: " + "; ".join(problems),
-                EXIT_BLOCKED,
-            )
-        return {
-            "valid": True,
-            "tracked_root_artifacts": [],
-            "ignore_rule": ROOT_SUPERPOWERS_IGNORE,
-        }
-
-    status = run_git(["status", "--porcelain=v1", "--untracked-files=all"], root)
-    unrelated: list[str] = []
-    for line in status.splitlines():
-        path = line[3:].split(" -> ")[-1]
-        if path != ".superpowers" and not path.startswith(".superpowers/"):
-            unrelated.append(path)
-    if unrelated:
+    problems: list[str] = []
+    if tracked:
+        problems.append(f"{len(tracked)} arquivo(s) de .superpowers ainda rastreado(s)")
+    if not has_versioned_superpowers_ignore(root):
+        problems.append(f"{ROOT_SUPERPOWERS_IGNORE} ausente do .gitignore")
+    if problems:
         raise BMError(
-            "BLOQUEADO: migração de higiene exige ausência de mudanças alheias: "
-            + ", ".join(sorted(unrelated)),
+            "BLOQUEADO: higiene do repositório: " + "; ".join(problems),
             EXIT_BLOCKED,
         )
-
-    archive_root = confined_path(root, destination, "destino da higiene")
-    if archive_root == root or ".superpowers" in archive_root.relative_to(root).parts:
-        raise BMError("destino da higiene deve ficar fora de .superpowers")
-    migration_plan: list[dict[str, Any]] = []
-    target_names: set[str] = set()
-    for source_name in tracked:
-        source_relative = Path(source_name)
-        if not source_relative.parts or source_relative.parts[0] != ".superpowers":
-            raise BMError(f"caminho Git inesperado: {source_name}")
-        source_lexical = root / source_relative
-        source = confined_path(root, source_name, "artefato raiz")
-        if path_uses_symlink(root, source_lexical) or not source.is_file():
-            raise BMError(f"artefato rastreado ausente ou não regular: {source_name}")
-        relative_tail = Path(*source_relative.parts[1:])
-        target_relative = Path(destination) / relative_tail
-        target_lexical = root / target_relative
-        target = confined_path(root, target_relative.as_posix(), "arquivo histórico")
-        if target_relative.as_posix() in target_names:
-            raise BMError(
-                f"BLOQUEADO: destinos históricos duplicados: {target_relative}",
-                EXIT_BLOCKED,
-            )
-        target_names.add(target_relative.as_posix())
-        if path_uses_symlink(root, target_lexical):
-            raise BMError(
-                f"BLOQUEADO: destino histórico atravessa symlink: {target_relative}",
-                EXIT_BLOCKED,
-            )
-        target_exists = target.exists()
-        if target_exists:
-            if (
-                target.is_symlink()
-                or not target.is_file()
-                or target.read_bytes() != source.read_bytes()
-                or (target.stat().st_mode & 0o111) != (source.stat().st_mode & 0o111)
-            ):
-                raise BMError(
-                    f"BLOQUEADO: destino histórico já existe com conteúdo diferente: {target_relative}",
-                    EXIT_BLOCKED,
-                )
-        missing_parents: list[Path] = []
-        parent = target.parent
-        while parent != root and not parent.exists():
-            missing_parents.append(parent)
-            parent = parent.parent
-        migration_plan.append(
-            {
-                "source_name": source_name,
-                "source": source,
-                "source_bytes": source.read_bytes(),
-                "source_mode": source.stat().st_mode,
-                "target_relative": target_relative,
-                "target": target,
-                "target_exists": target_exists,
-                "missing_parents": missing_parents,
-            }
-        )
-
-    gitignore = root / ".gitignore"
-    if (
-        gitignore.is_symlink()
-        or path_uses_symlink(root, gitignore)
-        or (gitignore.exists() and not gitignore.is_file())
-    ):
-        raise BMError(
-            "BLOQUEADO: .gitignore deve ser arquivo regular dentro do repositório",
-            EXIT_BLOCKED,
-        )
-    original_gitignore = gitignore.read_bytes() if gitignore.exists() else None
-    applied: list[dict[str, Any]] = []
-    ignore_added = False
-    try:
-        for item in migration_plan:
-            source = item["source"]
-            target = item["target"]
-            if item["target_exists"]:
-                source.unlink()
-            else:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                source.replace(target)
-            applied.append(item)
-        ignore_added = ensure_versioned_superpowers_ignore(root)
-        run_git(["add", "--", ".gitignore"], root)
-        if tracked:
-            run_git(["add", "-u", "--", ".superpowers"], root)
-            run_git(["add", "--", destination], root)
-        remaining = tracked_root_superpowers(root)
-        if remaining:
-            raise BMError(
-                "migração não removeu todos os artefatos raiz: " + ", ".join(remaining)
-            )
-        repository_hygiene(root, False)
-    except Exception as error:
-        restored: list[str] = []
-        rollback_errors: list[str] = []
-        for item in reversed(applied):
-            try:
-                source = item["source"]
-                target = item["target"]
-                source.parent.mkdir(parents=True, exist_ok=True)
-                if item["target_exists"]:
-                    source.write_bytes(item["source_bytes"])
-                    source.chmod(item["source_mode"])
-                elif target.exists():
-                    target.replace(source)
-                restored.append(item["source_name"])
-            except OSError as rollback_error:
-                rollback_errors.append(f"{item['source_name']}: {rollback_error}")
-        try:
-            if original_gitignore is None:
-                if gitignore.exists():
-                    gitignore.unlink()
-            else:
-                gitignore.write_bytes(original_gitignore)
-            subprocess.run(
-                ["git", "reset", "-q", "HEAD", "--", ".gitignore", ".superpowers", destination],
-                cwd=root,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-        except OSError as rollback_error:
-            rollback_errors.append(f".gitignore/index: {rollback_error}")
-        created_parents = {
-            parent for item in migration_plan for parent in item["missing_parents"]
-        }
-        for parent in sorted(created_parents, key=lambda value: len(value.parts), reverse=True):
-            try:
-                parent.rmdir()
-            except OSError:
-                pass
-        detail = f"restaurados: {', '.join(sorted(restored)) or 'nenhum movimento aplicado'}"
-        if rollback_errors:
-            detail += "; falhas de rollback: " + ", ".join(rollback_errors)
-        raise BMError(
-            f"BLOQUEADO: falha durante aplicação da higiene; {detail}; causa: {error}",
-            EXIT_BLOCKED,
-        ) from error
-
-    moved = [
-        {"from": item["source_name"], "to": item["target_relative"].as_posix()}
-        for item in migration_plan
-    ]
     return {
         "valid": True,
-        "moved": moved,
-        "ignore_added": ignore_added,
+        "tracked_root_artifacts": [],
         "ignore_rule": ROOT_SUPERPOWERS_IGNORE,
-        "archive_root": archive_root.relative_to(root).as_posix(),
-        "staged": True,
     }
-
 
 def idle_v2_state(
     planning_version: str = "v1",
@@ -1138,181 +868,6 @@ def legacy_status_values(text: str) -> list[str]:
     )
     return [normalize_legacy_status(value) for value in values if value.strip()]
 
-
-def legacy_completion_marker(text: str) -> dict[str, Any] | None:
-    statuses = legacy_status_values(text)
-    blocking = sorted(set(statuses) & LEGACY_BLOCKING_STATUSES)
-    if blocking:
-        raise BMError(
-            "BLOQUEADO: estado legado ainda está " + ", ".join(blocking),
-            EXIT_BLOCKED,
-        )
-    completed = sorted(set(statuses) & LEGACY_COMPLETED_STATUSES)
-    if completed:
-        return {"source": "legacy_state", "statuses": completed}
-    return None
-
-
-def validate_completion_proof(root: Path, proof: Path | None) -> dict[str, str]:
-    if proof is None:
-        raise BMError(
-            "BLOQUEADO: estado legado sem marcador objetivo de conclusão; informe --completion-proof <arquivo>",
-            EXIT_BLOCKED,
-        )
-    candidate = proof if proof.is_absolute() else root / proof
-    lexical = candidate.absolute()
-    resolved = candidate.resolve()
-    try:
-        relative = resolved.relative_to(root)
-        lexical.relative_to(root)
-    except ValueError as error:
-        raise BMError("BLOQUEADO: completion proof deve ficar dentro do repositório", EXIT_BLOCKED) from error
-    if candidate.is_symlink() or path_uses_symlink(root, lexical) or not resolved.is_file():
-        raise BMError("BLOQUEADO: completion proof deve ser arquivo regular sem symlink", EXIT_BLOCKED)
-    relative_name = relative.as_posix()
-    try:
-        tracked = run_git(["ls-files", "--error-unmatch", "--", relative_name], root)
-        run_git(["cat-file", "-e", f"HEAD:{relative_name}"], root)
-    except BMError as error:
-        raise BMError(
-            "BLOQUEADO: completion proof deve estar rastreado e commitado no HEAD",
-            EXIT_BLOCKED,
-        ) from error
-    if tracked != relative_name:
-        raise BMError(
-            "BLOQUEADO: completion proof deve estar rastreado e commitado no HEAD",
-            EXIT_BLOCKED,
-        )
-    proof_text = resolved.read_text(encoding="utf-8")
-    evidence = re.search(
-        r"(?i)\b(gates?|verification|verifica[cç][aã]o|delivery|entrega|accept(?:ed|ance)?|aceite)\b",
-        proof_text,
-    )
-    outcome = re.search(
-        r"(?i)\b(passed|completed|done|accepted|approved|conclu[ií]d[oa]|entregue|aprovad[oa])\b",
-        proof_text,
-    )
-    if not evidence or not outcome:
-        raise BMError(
-            "BLOQUEADO: completion proof não registra gates, entrega ou aceite concluído",
-            EXIT_BLOCKED,
-        )
-    return {"path": relative_name, "sha256": file_digest(resolved)}
-
-
-def legacy_transition(
-    repo: Path,
-    state_path: Path,
-    completed: bool,
-    archive: str = LEGACY_STATE_ARCHIVE,
-    completion_proof: Path | None = None,
-) -> dict[str, Any]:
-    root = repo.resolve()
-    top = Path(run_git(["rev-parse", "--show-toplevel"], root)).resolve()
-    if top != root:
-        raise BMError(f"--repo deve apontar para a raiz Git: {top}")
-    candidate = state_path if state_path.is_absolute() else root / state_path
-    resolved_state = candidate.resolve()
-    try:
-        state_relative = resolved_state.relative_to(root)
-    except ValueError as error:
-        raise BMError("estado legado deve ficar dentro do repositório") from error
-    if candidate.is_symlink() or not resolved_state.is_file():
-        raise BMError("estado legado deve ser arquivo regular dentro do repositório")
-
-    current = load_state(resolved_state, root)
-    if current.get("method_version") == 2:
-        validated = validate_state(resolved_state)
-        if validated["planning_status"] != "idle":
-            raise BMError(
-                "BLOQUEADO: projeto já está em v2 com ciclo ativo",
-                EXIT_BLOCKED,
-            )
-        return {
-            "transitioned": False,
-            "already_transitioned": True,
-            "route": "v2-standalone",
-            "planning_status": "idle",
-            "planning_version": validated["planning_version"],
-            "state": state_relative.as_posix(),
-        }
-    if current.get("method_version") != 1:
-        raise BMError("BLOQUEADO: somente estado legado v1 pode transicionar", EXIT_BLOCKED)
-    if not completed:
-        raise BMError(
-            "BLOQUEADO: --completed é obrigatório e só pode ser informado após gates, entrega e encerramento legado",
-            EXIT_BLOCKED,
-        )
-    dirty = run_git(["status", "--porcelain=v1", "--untracked-files=all"], root)
-    if dirty:
-        changed = [line[3:] if len(line) > 3 else line for line in dirty.splitlines()]
-        raise BMError(
-            "BLOQUEADO: transição legado → v2 exige fase concluída commitada e árvore limpa: "
-            + ", ".join(changed[:8]),
-            EXIT_BLOCKED,
-        )
-    try:
-        tracked = run_git(
-            ["ls-files", "--error-unmatch", "--", state_relative.as_posix()], root
-        )
-    except BMError as error:
-        raise BMError(
-            "BLOQUEADO: estado legado deve estar commitado no HEAD", EXIT_BLOCKED
-        ) from error
-    if tracked != state_relative.as_posix():
-        raise BMError("BLOQUEADO: estado legado deve estar commitado no HEAD", EXIT_BLOCKED)
-
-    completion_evidence = legacy_completion_marker(state_text(resolved_state))
-    proof_result: dict[str, str] | None = None
-    if completion_evidence is None:
-        proof_result = validate_completion_proof(root, completion_proof)
-        completion_evidence = {"source": "completion_proof"}
-
-    legacy_bytes = resolved_state.read_bytes()
-    archive_path = confined_path(root, archive, "arquivo histórico do estado legado")
-    if archive_path == resolved_state:
-        raise BMError("arquivo histórico deve ser diferente do estado ativo")
-    if archive_path.exists() and (
-        archive_path.is_symlink()
-        or not archive_path.is_file()
-        or archive_path.read_bytes() != legacy_bytes
-    ):
-        raise BMError(
-            f"BLOQUEADO: arquivo histórico já existe com conteúdo diferente: {archive}",
-            EXIT_BLOCKED,
-        )
-
-    repository_hygiene(root, True)
-    archive_path.parent.mkdir(parents=True, exist_ok=True)
-    if not archive_path.exists():
-        archive_path.write_bytes(legacy_bytes)
-    next_state = idle_v2_state("v1")
-    resolved_state.write_text(
-        json.dumps(next_state, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    validate_state(resolved_state)
-    run_git(
-        ["add", "--", state_relative.as_posix(), archive_path.relative_to(root).as_posix()],
-        root,
-    )
-    repository_hygiene(root, False)
-    staged = run_git(["diff", "--cached", "--name-only"], root).splitlines()
-    result = {
-        "transitioned": True,
-        "already_transitioned": False,
-        "route": "v2-standalone",
-        "planning_status": "idle",
-        "planning_version": "v1",
-        "state": state_relative.as_posix(),
-        "legacy_archive": archive_path.relative_to(root).as_posix(),
-        "staged": sorted(staged),
-        "completion_evidence": completion_evidence,
-        "next_action": next_state["next_action"],
-    }
-    if proof_result is not None:
-        result["completion_proof"] = proof_result
-    return result
 
 
 TELEMETRY_METRICS = (
@@ -2870,7 +2425,7 @@ def committed_package_preflight(
             + ", ".join(changed[:8]),
             EXIT_BLOCKED,
         )
-    repository_hygiene(root, False)
+    repository_hygiene(root)
     resolved_state = (
         state_path.resolve()
         if state_path.is_absolute()
@@ -4373,13 +3928,6 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument("state", type=Path)
     validate.add_argument("--schema", type=Path)
 
-    route = commands.add_parser("route")
-    route.add_argument("state", type=Path, nargs="?")
-    route.add_argument("--superpowers-path", type=Path)
-    route.add_argument("--repo", type=Path, default=Path.cwd())
-    route.add_argument("--new-project", action="store_true")
-    route.add_argument("--migrate-to-v2", action="store_true")
-
     model = commands.add_parser("model")
     model.add_argument("action", choices=["init", "validate"])
     model.add_argument("--repo", type=Path, default=Path.cwd())
@@ -4458,18 +4006,6 @@ def parser() -> argparse.ArgumentParser:
     migrate = commands.add_parser("migrate")
     migrate.add_argument("action", choices=["check", "apply"])
     migrate.add_argument("--repo", type=Path, default=Path.cwd())
-
-    hygiene = commands.add_parser("repo-hygiene")
-    hygiene.add_argument("action", choices=["check", "migrate"])
-    hygiene.add_argument("--repo", type=Path, default=Path.cwd())
-    hygiene.add_argument("--destination", default=ROOT_SUPERPOWERS_ARCHIVE)
-
-    transition = commands.add_parser("legacy-transition")
-    transition.add_argument("--repo", type=Path, default=Path.cwd())
-    transition.add_argument("--state", type=Path, required=True)
-    transition.add_argument("--completed", action="store_true")
-    transition.add_argument("--completion-proof", type=Path)
-    transition.add_argument("--archive", default=LEGACY_STATE_ARCHIVE)
 
     snap = commands.add_parser("snapshot")
     snap.add_argument("action", choices=["create", "verify"])
@@ -4680,16 +4216,6 @@ def main() -> int:
     try:
         if args.command == "validate-state":
             emit({"valid": True, "method_version": validate_state(args.state, args.schema)["method_version"]})
-        elif args.command == "route":
-            emit(
-                route_project(
-                    args.state,
-                    args.superpowers_path,
-                    args.repo,
-                    args.new_project,
-                    args.migrate_to_v2,
-                )
-            )
         elif args.command == "model":
             if args.action == "init":
                 initialized = v04.init_workspace(args.repo)
@@ -4810,24 +4336,6 @@ def main() -> int:
                         args.reason,
                     )
                 )
-        elif args.command == "repo-hygiene":
-            emit(
-                repository_hygiene(
-                    args.repo,
-                    args.action == "migrate",
-                    args.destination,
-                )
-            )
-        elif args.command == "legacy-transition":
-            emit(
-                legacy_transition(
-                    args.repo,
-                args.state,
-                args.completed,
-                args.archive,
-                args.completion_proof,
-            )
-            )
         elif args.command == "snapshot":
             emit(snapshot(args.state, args.root, args.action == "verify"))
         elif args.command == "planning-audit":

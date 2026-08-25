@@ -2,6 +2,13 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 0.4.2 — Aposentadoria dos adaptadores antigos
+
+- remove da interface pública `route`, `legacy-transition` e `repo-hygiene`;
+- torna `/migrar-bianchini` e `bm migrate` o único caminho de entrada para artefatos anteriores reconhecidos;
+- substitui os cenários antigos de roteamento por regressões que exigem rejeição sem escrita parcial;
+- mantém `.planning/` fora de qualquer leitura, conversão, cópia, movimento ou remoção.
+
 ## 0.4.1 — Entrada 0.4 sem fallback legado
 
 - inicializa `.bianchini` automaticamente no primeiro quick ou debug de projeto novo;

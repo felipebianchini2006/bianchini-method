@@ -326,6 +326,8 @@ bm.py migrate check --repo <repo>
 bm.py migrate apply --repo <repo>
 ```
 
+Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` estão aposentados e devem ser rejeitados pela CLI sem criar ou alterar workspace.
+
 `check` é somente leitura. `apply` exige projeto `idle`/concluído e Git limpo, usa mapa origem→destino, SHA-256, staging transacional e rollback. Reconhece somente documentação anterior do Bianchini em `docs/living`, `docs/bianchini`, `artifacts/bianchini`, documentos Bianchini identificáveis em `docs/design` e resultados em `.superpowers/bianchini/direct`.
 
 Colisão, formato desconhecido, symlink externo, path traversal, checksum divergente ou ciclo ativo bloqueiam. A origem só é removida após verificar o destino. O manifesto fica em `.bianchini/archive/import-AAAA-MM-DD/`. `.planning/` permanece byte a byte intocado.

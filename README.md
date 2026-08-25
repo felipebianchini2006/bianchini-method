@@ -261,6 +261,8 @@ python3 ~/.codex/skills/_shared/scripts/bm.py update-bm
 
 A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal.
 
+Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem parte da interface `0.4`. Artefatos anteriores reconhecidos entram somente por `/migrar-bianchini` ou `bm.py migrate`.
+
 ## Uso
 
 ```text

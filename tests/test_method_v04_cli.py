@@ -365,6 +365,24 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertFalse((repo / ".superpowers").exists())
             self.assertFalse((repo / "docs/living").exists())
 
+    def test_legacy_adapter_commands_are_not_public(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            commands = (
+                ("route", "--repo", str(repo), "--new-project"),
+                ("legacy-transition", "--repo", str(repo)),
+                ("repo-hygiene", "check", "--repo", str(repo)),
+            )
+            for command in commands:
+                with self.subTest(command=command[0]):
+                    result = cli(*command)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn("invalid choice", result.stderr)
+            self.assertFalse((repo / ".bianchini").exists())
+            self.assertFalse((repo / ".superpowers").exists())
+            self.assertFalse((repo / "docs/living").exists())
+
     def test_clean_installed_package_starts_only_v04_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
@@ -403,7 +421,7 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertRegex(result["id"], r"^Q001-")
             self.assertEqual(
                 (installed / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-                "0.4.1",
+                "0.4.2",
             )
             self.assertTrue((repo / ".bianchini/STATE.md").is_file())
             self.assertFalse((repo / ".superpowers").exists())
@@ -1425,10 +1443,10 @@ class MethodV04Scenarios(unittest.TestCase):
     def test_version_files_use_zero_four_lineage(self) -> None:
         self.assertEqual(
             (ROOT / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-            "0.4.1",
+            "0.4.2",
         )
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.1"', workflow)
+        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.2"', workflow)
         root_schema = (ROOT / "schemas/state-v04.schema.json").read_bytes()
         packaged_schema = (
             ROOT / "skills/_shared/schemas/state-v04.schema.json"

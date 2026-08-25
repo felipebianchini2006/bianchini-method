@@ -189,7 +189,7 @@ class PackageIntegrityTests(unittest.TestCase):
         runner = read(ROOT / "scripts/run_test_shards.py")
         for class_name in (
             "PackageIntegrityTests",
-            "RoutingAndStateScenarios",
+            "StateValidationScenarios",
             "SnapshotScenarios",
             "PlanningQualityScenarios",
             "PlanningStabilityScenarios",
@@ -207,28 +207,8 @@ class PackageIntegrityTests(unittest.TestCase):
         self.assertIn("scripts/run_test_shards.py", read(ROOT / "README.md"))
 
 
-class RoutingAndStateScenarios(unittest.TestCase):
-    def test_new_project_without_state_bootstraps_v2(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            result = cli_json("route", "--repo", temp, "--new-project")
-            self.assertEqual(result["route"], "v2-new")
-            self.assertFalse(result["superpowers_required"])
 
-    def test_explicit_migration_overrides_provisional_v1_route(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            (root / "docs/superpowers/plans").mkdir(parents=True)
-            result = cli_json(
-                "route",
-                "--repo",
-                str(root),
-                "--new-project",
-                "--migrate-to-v2",
-            )
-            self.assertEqual(result["route"], "v2-migration")
-            self.assertTrue(result["legacy_detected"])
-            self.assertFalse(result["superpowers_required"])
-
+class StateValidationScenarios(unittest.TestCase):
     def test_in_progress_bootstrap_allows_zero_plans_only_until_review(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -250,97 +230,6 @@ class RoutingAndStateScenarios(unittest.TestCase):
             invalid = cli("validate-state", str(state_path))
             self.assertEqual(invalid.returncode, 2)
             self.assertIn("ao menos um plano", invalid.stderr)
-
-    def test_idle_state_is_valid_only_without_scope_plan_or_approval(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            repo = Path(temp) / "repo"
-            init_repo(repo)
-            state_path = repo / "docs/living/PROJECT_STATE.md"
-            state_path.parent.mkdir(parents=True)
-            state_path.write_text("method_version: 1\nstatus: completed\n", encoding="utf-8")
-            git(repo, "add", "docs/living/PROJECT_STATE.md")
-            git(repo, "commit", "-m", "complete legacy phase")
-
-            transitioned = cli_json(
-                "legacy-transition",
-                "--repo",
-                str(repo),
-                "--state",
-                "docs/living/PROJECT_STATE.md",
-                "--completed",
-            )
-            self.assertTrue(transitioned["transitioned"])
-            valid = cli("validate-state", str(state_path))
-            self.assertEqual(valid.returncode, 0, valid.stderr)
-
-            state = json.loads(read(state_path))
-            state["approval"]["package"]["files"] = ["docs/old-plan.md"]
-            state["release"]["homologation"] = "accepted"
-            state_path.write_text(json.dumps(state), encoding="utf-8")
-            invalid = cli("validate-state", str(state_path))
-            self.assertEqual(invalid.returncode, 2)
-            self.assertIn("idle exige lista vazia", invalid.stderr)
-            self.assertIn("idle exige release reinicializado", invalid.stderr)
-
-    def test_v1_with_superpowers_uses_legacy_route(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            superpowers = Path(temp) / "superpowers"
-            for skill in (
-                "brainstorming",
-                "writing-plans",
-                "subagent-driven-development",
-                "systematic-debugging",
-                "verification-before-completion",
-            ):
-                marker = superpowers / "skills" / skill / "SKILL.md"
-                marker.parent.mkdir(parents=True, exist_ok=True)
-                marker.write_text(f"# {skill}\n", encoding="utf-8")
-            result = cli_json(
-                "route",
-                str(FIXTURES / "project-state-v1.md"),
-                "--superpowers-path",
-                str(superpowers),
-            )
-            self.assertEqual(result["route"], "v1-superpowers")
-
-    def test_v1_rejects_unrelated_directory_as_superpowers(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            result = cli(
-                "route",
-                str(FIXTURES / "project-state-v1.md"),
-                "--superpowers-path",
-                temp,
-            )
-            self.assertEqual(result.returncode, 3)
-
-    def test_v1_without_superpowers_blocks(self) -> None:
-        result = cli("route", str(FIXTURES / "project-state-v1.md"))
-        self.assertEqual(result.returncode, 3)
-        self.assertIn("exige Superpowers", result.stderr)
-
-    def test_v2_without_superpowers_is_standalone(self) -> None:
-        result = cli_json("route", str(FIXTURES / "project-state-v2.json"))
-        self.assertEqual(result["route"], "v2-standalone")
-        self.assertFalse(result["superpowers_required"])
-
-    def test_corrupted_v2_json_never_falls_back_to_legacy(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            state = root / "PROJECT_STATE.md"
-            state.write_text('{"method_version": 2, BROKEN', encoding="utf-8")
-            result = cli("route", str(state), "--repo", str(root))
-            self.assertEqual(result.returncode, 3)
-            self.assertIn("PROJECT_STATE inválido", result.stderr)
-            self.assertNotIn("Superpowers indisponível", result.stderr)
-
-    def test_unknown_state_without_legacy_evidence_is_blocked(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            state = root / "PROJECT_STATE.md"
-            state.write_text("# arquivo desconhecido\nstatus geral indefinido\n", encoding="utf-8")
-            result = cli("route", str(state), "--repo", str(root))
-            self.assertEqual(result.returncode, 3)
-            self.assertIn("não foi possível determinar method_version com segurança", result.stderr)
 
     def test_v2_state_validates_and_status_is_structured(self) -> None:
         validated = cli_json("validate-state", str(FIXTURES / "project-state-v2.json"))
@@ -375,35 +264,6 @@ class RoutingAndStateScenarios(unittest.TestCase):
             path.write_text(json.dumps(state), encoding="utf-8")
             result = cli("validate-state", str(path))
             self.assertEqual(result.returncode, 0)
-
-    def test_v1_without_method_version_uses_legacy_route(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            base = Path(temp)
-            root = base / "project"
-            root.mkdir()
-            state = root / "PROJECT_STATE.md"
-            state.write_text("# Estado legado\nstatus: em_andamento\n", encoding="utf-8")
-            (root / "docs" / "superpowers" / "v3").mkdir(parents=True)
-            superpowers = root / "superpowers"
-            for skill in (
-                "brainstorming",
-                "writing-plans",
-                "subagent-driven-development",
-                "systematic-debugging",
-                "verification-before-completion",
-            ):
-                marker = superpowers / "skills" / skill / "SKILL.md"
-                marker.parent.mkdir(parents=True, exist_ok=True)
-                marker.write_text(f"# {skill}\n", encoding="utf-8")
-            result = cli_json(
-                "route",
-                str(state),
-                "--repo",
-                str(root),
-                "--superpowers-path",
-                str(superpowers),
-            )
-            self.assertEqual(result["route"], "v1-superpowers")
 
     def test_approved_state_rejects_planned_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1994,31 +1854,6 @@ class AdaptivePolicyScenarios(unittest.TestCase):
 
 
 class BehavioralProjectScenarios(unittest.TestCase):
-    def test_real_v1_fixture_without_marker_stays_on_superpowers(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            project = root / "project"
-            shutil.copytree(PROJECT_FIXTURES / "v1-real", project)
-            superpowers = root / "superpowers"
-            for skill in (
-                "brainstorming",
-                "writing-plans",
-                "subagent-driven-development",
-                "systematic-debugging",
-                "verification-before-completion",
-            ):
-                marker = superpowers / "skills" / skill / "SKILL.md"
-                marker.parent.mkdir(parents=True, exist_ok=True)
-                marker.write_text(f"# {skill}\n", encoding="utf-8")
-            route = cli_json(
-                "route",
-                str(project / "docs/living/PROJECT_STATE.md"),
-                "--repo",
-                str(project),
-                "--superpowers-path",
-                str(superpowers),
-            )
-            self.assertEqual(route["route"], "v1-superpowers")
 
     def test_real_low_risk_project_runs_snapshot_group_status_and_telemetry(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

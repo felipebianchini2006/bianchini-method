@@ -14,7 +14,7 @@ TESTS = ROOT / "tests"
 SHARDS = (
     "MethodV04Scenarios",
     "PackageIntegrityTests",
-    "RoutingAndStateScenarios",
+    "StateValidationScenarios",
     "SnapshotScenarios",
     "PlanningQualityScenarios",
     "PlanningStabilityScenarios",
