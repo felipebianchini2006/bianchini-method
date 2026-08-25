@@ -1,145 +1,132 @@
 ---
 name: executar-direto
-description: Use quando o usuário solicitar a implementação estruturada de um projeto pequeno ou de uma entrega coesa sem planejamento SDD completo.
-disable-model-invocation: true
+description: Use para executar uma entrega coesa como quick normal ou protegido, com score determinístico, evidência final e documentação em `.bianchini/quick`.
 ---
 
 # Executar Direto
 
-**Anuncie:** "Executando diretamente com brief compacto, branch isolada e verificação proporcional ao risco."
+**Anuncie:** "Classificando e executando este quick com Bianchini Method 0.4."
 
-Use esta skill somente por invocação explícita de `/executar-direto`. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py` pelo mesmo contrato. É proibido invocar Superpowers automaticamente, instalar Agency Agents ou acionar outra metodologia.
+Use somente por invocação explícita de `/executar-direto`. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Não acione outra metodologia.
 
-## Quando usar
+O quick usa zero subagentes, não carrega o catálogo interno de agentes e faz uma única auto-revisão final. A intenção é manter baixo overhead sem reduzir os guards do risco real.
 
-A execução direta é adequada quando existe um único objetivo coeso, com critérios de aceite claros, impacto localizado, uma sequência curta que pode ser implementada e verificada na sessão e risco baixo ou médio. Ela pode atravessar vários arquivos do mesmo fluxo, mas não pode esconder subsistemas independentes. Uma integração externa simples só permanece direta quando reutiliza padrão comprovado no repositório.
+## 1. Confirmar que é uma entrega coesa
 
-Escalone antes de alterar código quando houver qualquer um destes sinais:
+Leia regras, `.bianchini/STATE.md` quando existir, manifests, CI, Git e apenas os arquivos ligados ao objetivo. Registre objetivo, estado atual factual, não objetivos, aceite, seams e comandos reais de verificação.
 
-- autenticação, pagamento ou webhook novos;
-- multi-tenant, RLS, migração de dados ou infraestrutura sensível;
-- secrets/IAM, concorrência relevante ou sincronização offline;
-- geolocalização crítica, operação destrutiva ou arquitetura nova;
-- diferenças substanciais entre plataformas;
-- regra de negócio ambígua;
-- risco alto/crítico ou mais de um subsistema independente.
+Não use `.planning/`. Se existir documentação anterior do Bianchini e o quick depender dela, pare e use `/migrar-bianchini`.
 
-No escalonamento, preserve o trabalho válido, pare antes do risco alto e gere apenas o handoff compacto em `RESULT.md`, com fatos, decisões, arquivos, comandos e bloqueios. Informe `Status: escalado` e use `/sdd-planning` como próximo passo. Não crie spec central, `PLANNING_REVIEW`, planos parciais ou manual PDF.
+## 2. Classificar o risco
 
-## Fluxo
+`risk = scope + external_effect + migration + concurrency + money`.
 
-### 1. Capturar contexto uma vez
+Cada dimensão vale `0`, `1` ou `2`:
 
-Leia uma vez `AGENTS.md`, `CLAUDE.md`, README, manifests, lockfiles, scripts do projeto, CI, `git status`, histórico Git recente e os arquivos diretamente ligados ao objetivo, quando existirem. Leia arquivos adicionais somente para confirmar dependências reais; não faça análise completa do repositório.
+| Dimensão | 0 | 1 | 2 |
+|---|---|---|---|
+| `scope` | localizado | vertical coeso | vários objetivos/domínios |
+| `external_effect` | nenhum | sandbox/reversível | produção/irreversível |
+| `migration` | nenhuma | aditiva/reversível | destrutiva/difícil rollback |
+| `concurrency` | não aplicável | retry/idempotência conhecidos | ordem/escritores sem solução |
+| `money` | não financeiro | sandbox/consulta | estado ou efeito financeiro real |
 
-Com isso, preencha:
-
-- objetivo e estado atual relevante (`--current-state` é obrigatório e deve conter síntese factual da leitura localizada; texto genérico como "a confirmar" é rejeitado);
-- escopo e não objetivos;
-- critérios de aceite;
-- arquivos/interfaces prováveis;
-- risco, tipo de mudança e hazards;
-- comandos de verificação afetados.
-
-Não faça pesquisa ampla nem varra documentação viva inteira quando uma leitura localizada bastar. Não inicie entrevista; pergunte somente quando uma ambiguidade impedir a implementação correta.
-
-### 2. Iniciar ou retomar
-
-Execute `bm.py direct start` antes de editar código:
+Execute antes de editar:
 
 ```bash
-python3 <bm.py> direct start \
-  --repo <repo> \
-  --slug <objetivo-curto> \
-  --objective "<objetivo>" \
-  --scope "<escopo coeso>" \
-  --current-state "<síntese factual do estado atual>" \
-  --acceptance "<critério verificável>" \
-  --verification "<comando afetado>" \
-  --risk low \
-  --change-kind behavioral
+bm.py direct classify --repo <repo> \
+  --scope-score <0..2> \
+  --external-effect-score <0..2> \
+  --migration-score <0..2> \
+  --concurrency-score <0..2> \
+  --money-score <0..2> \
+  [--multiple-objectives] \
+  [--destructive-migration] \
+  [--uncontrolled-concurrency] \
+  [--undefined-ownership] \
+  [--ambiguous-financial-rule] \
+  [--new-material-architecture]
 ```
 
-Repita `--acceptance`, `--verification`, `--non-objective`, `--likely-file`, `--hazard` e `--related-change` quando necessário. Use `--subsystems` para declarar a quantidade real de subsistemas independentes.
-Ao preservar trabalho anterior ou escalar, repita também `--command` e `--result-entry` para registrar comandos e fatos já confirmados.
+Roteamento retornado pelo CLI:
 
-O comando:
+- `0–2`: quick normal;
+- `3–6`: quick protegido;
+- `7–10`: `/sdd-planning`.
 
-- bloqueia detached HEAD;
-- bloqueia branch principal suja;
-- bloqueia mudanças não reconhecidas em feature branch;
-- cria `bm/direct/<slug>` quando parte de `main` ou `master` limpas;
-- não cria worktree por padrão; só reutilize uma quando o ambiente ou repositório já a exigir;
-- registra `/.superpowers/` em `.git/info/exclude` sem alterar o `.gitignore` do projeto e confirma que `BRIEF.md`, `PROGRESS.md`, `RESULT.md` e `.state.json` não aparecem no `git status`;
-- cria ou retoma `.superpowers/bianchini/direct/<slug>/BRIEF.md`;
-- mantém `PROGRESS.md`, `RESULT.md` e `.state.json` no mesmo scratch ignorado;
-- calcula um digest de identidade do brief (objetivo, estado atual, escopo, não objetivos, aceite, risco, tipo, hazards, subsistemas e comandos de verificação);
-- não cria `PROJECT_STATE.md`, spec ou árvore `docs/bianchini/`.
+Overrides obrigatórios vencem o total: `scope=2`, migração destrutiva, concorrência não controlada, ownership indefinido, regra financeira ambígua, arquitetura material nova ou várias entregas independentes.
 
-Nunca versionar o scratch. Na retomada, digest igual retoma; digest diferente bloqueia — use um novo slug ou atualize explicitamente o brief com `--update-brief`. Nunca retome uma execução nova sobre um `BRIEF.md` antigo.
+Pagamento e webhook não escalam pela palavra. Eles podem ser quick protegido quando formam um fluxo único, usam arquitetura conhecida e possuem guards completos.
 
-### 3. Implementar continuamente
+Em `direct start`, sinalize `--payment-flow` e/ou `--webhook-flow`. O CLI deriva os guards obrigatórios das dimensões e do tipo de fluxo. Guards são nomes estáveis como `official_docs`, `source_of_truth`, `local_contract`, `authenticity`, `deduplication`, `replay_order`, `idempotency`, `timeout_recovery`, `persistence`, `reconciliation`, `rollback` e `sandbox`.
 
-Use zero subagentes, zero revisor por microtarefa, zero task brief por alteração e zero review package por passo. Trabalhe em uma sequência contínua e mantenha o menor diff correto.
+## 3. Iniciar ou retomar
 
-- Bug, regra de negócio, cálculo, transformação, parser, permissão ou máquina de estados: aplicar RED/GREEN no seam afetado.
-- Mudança visual: validar no browser e registrar screenshot ou regressão visual quando o ambiente permitir.
-- Mudança mecânica ou comportamental simples: executar checks focados e depois a regressão proporcional.
-- Descobrir comandos no próprio repositório; não inventar comandos nem criar adapter por linguagem.
-- Não criar abstração para antecipar escopo inexistente.
-- Não instalar coverage, mutation testing, framework E2E, analisador arquitetural ou ferramenta externa de qualidade por padrão.
+Execute `bm.py direct start` com objetivo, escopo, estado atual, aceite, verificações, cinco scores e overrides retornados por `classify`. O CLI aloca `Qxxx` e persiste:
 
-Após um checkpoint relevante, registre fatos reproduzíveis com evidência estruturada:
-
-```bash
-python3 <bm.py> direct checkpoint \
-  --repo <repo> \
-  --slug <slug> \
-  --checkpoint "<resultado concluído>" \
-  --changed-file <arquivo> \
-  --command "<comando executado>" \
-  --result-entry "<resultado observado>" \
-  --evidence '{"kind": "command", "command": "<comando>", "exit_code": 0, "status": "passed", "summary": "<resumo>"}' \
-  --verification passed \
-  --next-action "<próxima ação única>"
+```text
+.bianchini/quick/Qxxx-slug/
+├── BRIEF.md
+├── PROGRESS.md
+└── RESULT.md
 ```
 
-`--evidence` aceita `kind: command | browser | manual | screenshot`. Evidência de comando exige `command` e `exit_code` (status `passed` só com `exit_code: 0`); browser, screenshot e procedimento manual exigem `evidence` com caminho ou descrição determinística e podem declarar `check_id` para que uma nova tentativa do mesmo check substitua a anterior. Cada evidência é carimbada com o digest do brief e o fingerprint da árvore de trabalho no momento do registro. `--verification passed` sem ao menos uma evidência aprovada é bloqueado. `--update-brief` invalida verificação e evidências anteriores.
+O brief contém score, justificativas, modo, não objetivos, arquivos/interfaces prováveis, guards, comandos e digest. Retomada exige o mesmo digest; mudança de brief invalida evidências anteriores.
 
-Em retomada, execute `bm.py direct status --repo <repo> --slug <slug>` e leia `PROGRESS.md`; não redescubra o projeto inteiro.
+`STATE.md` aponta para o quick ativo sem copiar seu histórico. Branch principal suja, detached HEAD ou mudanças não reconhecidas bloqueiam. Use a branch segura criada/validada pelo CLI.
 
-### 4. Revisar e concluir
+## 4. Guards do quick protegido
 
-Antes de concluir:
+Aplicar somente os guards relevantes, mas nenhum obrigatório pode ficar implícito:
 
-1. comparar o diff com o `BRIEF.md`;
-2. revisar correção, segurança, regressões e simplicidade;
-3. executar testes afetados, typecheck/compilação, lint, build, smoke e verificação visual somente quando aplicáveis e proporcionais;
-4. confirmar que nenhum requisito foi silenciosamente adiado;
-5. registrar limitações e itens encontrados fora de escopo.
+- provedor, ambiente, versão e documentação oficial;
+- origem de verdade e estados duráveis;
+- contrato local de API/webhook;
+- autenticidade, deduplicação, replay e eventos fora de ordem;
+- idempotência de comandos e efeitos financeiros;
+- timeout/retry com resultado externo desconhecido;
+- persistência antes do efeito quando o invariante exigir;
+- reconciliação e recuperação após restart;
+- rollback/compensação;
+- testes locais, de contrato e sandbox;
+- checkpoint antes de efeito real.
 
-Faça uma única auto-revisão final em dois eixos: **Brief**, confirmando todos os critérios de aceite; e **Qualidade**, confirmando correção, simplicidade, compatibilidade, testes e ausência de escopo extra. Um revisor independente só é justificável quando vários módulos relevantes, risco médio significativo, contrato não confirmado ou uma falha exigirem julgamento; risco alto sempre escala.
+Não impor fila ou outbox automaticamente. Use o padrão mais simples já sustentado pela stack e pelo invariante.
 
-Finalize com:
+Cobrança real, refund, operação paga, ativação externa ou outro efeito irreversível exige autoridade explícita no momento da ação. Sandbox aprovado não prova produção.
 
-```bash
-python3 <bm.py> direct finish \
-  --repo <repo> \
-  --slug <slug> \
-  --status completed \
-  --behavior "<comportamento entregue>" \
-  --verification "<comando e resultado>" \
-  --next-action "Revisão humana e entrega local."
-```
+Se um guard revelar ownership ambíguo, regra indefinida ou arquitetura nova, preserve o trabalho válido, finalize como `escalated` e encaminhe para `/sdd-planning`.
 
-`--status completed` usa a evidência estruturada salva nos checkpoints, não frase livre: exige estado `active`, verificação `passed`, cada comando de verificação planejado no brief coberto pela evidência mais recente com `status: passed` e `exit_code: 0` (teste automatizado, typecheck, lint, build, smoke) ou por evidência browser, screenshot ou procedimento manual determinístico, ao menos um comportamento entregue e nenhum bloqueio aberto. Evidência atual `failed`, `blocked` ou `not_run` bloqueia, assim como evidência obsoleta: toda evidência vigente precisa carregar o digest do brief atual e o fingerprint da árvore final do código; qualquer alteração posterior ao registro exige reexecutar as verificações e registrar novo checkpoint. Comando planejado não aplicável só pode ser dispensado explicitamente com `--waive-verification "comando: justificativa"`, registrado nas limitações. O CLI também compara o `git status` com os arquivos registrados: alteração não registrada bloqueia; use checkpoint `--changed-file` ou aceite explicitamente com `--accept-unrecorded "caminho: justificativa"`. `--status blocked` e `--status escalated` exigem motivo via `--blocker` ou `--limitation`.
+## 5. Implementar e comprovar
 
-Use `blocked` quando faltar autoridade ou condição externa; use `escalated` se a execução revelar complexidade estrutural. Ambos podem registrar verificações incompletas, mas nunca declarar conclusão. As únicas transições permitidas são `active → completed`, `active → blocked` e `active → escalated`; `completed`, `blocked` e `escalated` são terminais e `finish` não pode ser repetido sobre eles. Execução escalada nunca vira concluída: continue por `/sdd-planning` ou um novo slug. Somente `blocked` aceita `direct reopen --slug <slug> --next-action "<ação>"`, que preserva o `RESULT.md` anterior antes de reabrir.
+Trabalhe continuamente, com o menor diff correto:
 
-Não faça push, merge, publicação, deploy ou instalação global sem autorização explícita. Não use reset destrutivo, `git clean -fdx` ou remova trabalho alheio.
+- regra, parser, permissão, cálculo ou bug: RED/GREEN no seam público;
+- fronteira externa: contrato local e sandbox quando necessário;
+- visual: browser/viewport e evidência comparável;
+- mudança mecânica: checks focados e regressão proporcional.
 
-Os contratos internos de `skills/_shared/agents/` pertencem ao método completo: o modo direto não os carrega. O revisor independente excepcional descrito acima não usa o catálogo Agency Agents.
+Use `bm.py direct checkpoint` para registrar arquivo alterado, comando, resultado e evidência estruturada. Evidência de comando `passed` exige `exit_code: 0`; browser, screenshot ou manual exige referência reproduzível. Toda evidência fica vinculada ao digest do brief e ao fingerprint da árvore.
 
-## Resposta final
+Não instalar framework de qualidade, criar abstração futura ou abrir tarefa por camada de teste. Em retomada, use `bm.py direct status` e leia apenas `PROGRESS.md`.
 
-Informe comportamento entregue, arquivos alterados, verificações e resultados, limitações, branch e o caminho do `RESULT.md`. Diferencie claramente o que foi implementado do que apenas foi observado.
+## 6. Concluir
+
+Antes de `direct finish`:
+
+1. comparar diff e aceite;
+2. revisar contrato e qualidade;
+3. executar todos os comandos planejados aplicáveis;
+4. confirmar ausência de evidência falha, obsoleta ou alteração não registrada;
+5. atualizar spec, arquitetura ou `SYSTEM_MODEL.md` somente quando o comportamento aceito mudou;
+6. atualizar `STATE.md` atomicamente.
+
+`completed` exige comportamento entregue, evidência fresca e nenhum bloqueio. `blocked` exige condição externa específica. `escalated` preserva resultado e nunca vira concluído no mesmo quick.
+
+O `RESULT.md` diferencia código, testes, sandbox, deploy, efeito em produção/provedor e homologação humana.
+
+Não fazer push, merge, deploy ou efeito externo além da autorização atual.
+
+## Saída
+
+Informe `Qxxx`, classificação e score, guards aplicados, comportamento, arquivos, verificações, limites de prova, branch, `RESULT.md` e próxima ação.

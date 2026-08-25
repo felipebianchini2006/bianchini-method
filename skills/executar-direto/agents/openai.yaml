@@ -1,6 +1,6 @@
 interface:
   display_name: "Executar Direto"
-  short_description: "Executa entregas pequenas com segurança"
-  default_prompt: "Use $executar-direto para implementar esta entrega coesa sem criar um planejamento SDD completo."
+  short_description: "Executa quick normal ou protegido"
+  default_prompt: "Use $executar-direto para classificar e implementar esta entrega coesa como quick seguro."
 policy:
   allow_implicit_invocation: false

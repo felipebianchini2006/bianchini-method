@@ -1,0 +1,6 @@
+interface:
+  display_name: "Migrar Bianchini"
+  short_description: "Arquiva e migra documentação com segurança"
+  default_prompt: "Use $migrar-bianchini para migrar a documentação anterior deste projeto para `.bianchini`."
+policy:
+  allow_implicit_invocation: false

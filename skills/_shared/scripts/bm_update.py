@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 import shutil
@@ -20,7 +21,10 @@ from typing import Callable
 OFFICIAL_REPOSITORY = "felipebianchini2006/bianchini-method"
 OFFICIAL_BRANCH = "main"
 MAX_VERSION_BYTES = 128
+MAX_RELEASE_MANIFEST_BYTES = 8 * 1024
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
+LINEAGE_RESET_VERSION = "0.4.0"
+LINEAGE_RESET_MANIFEST = "_shared/releases/0.4.0.json"
 MANAGED_SKILL_DIRS = (
     "_shared",
     "design-projeto",
@@ -30,6 +34,7 @@ MANAGED_SKILL_DIRS = (
     "auditar-arquitetura",
     "status-projeto",
     "corrigir-bug",
+    "migrar-bianchini",
     "homologar-sistema",
     "update-bm",
 )
@@ -65,6 +70,90 @@ def version_urls(
     )
     archive = f"https://codeload.github.com/{repository}/tar.gz/refs/heads/{branch}"
     return version, archive
+
+
+def lineage_reset_manifest_url(
+    repository: str = OFFICIAL_REPOSITORY,
+    branch: str = OFFICIAL_BRANCH,
+) -> str:
+    version_urls(repository, branch)
+    return (
+        f"https://raw.githubusercontent.com/{repository}/{branch}/"
+        f"skills/{LINEAGE_RESET_MANIFEST}"
+    )
+
+
+def _is_lineage_reset(
+    installed: tuple[int, int, int],
+    latest: tuple[int, int, int],
+) -> bool:
+    return (
+        latest == parse_version(LINEAGE_RESET_VERSION)
+        and installed > latest
+        and installed[0] > 0
+    )
+
+
+def _validate_lineage_reset_source(repository: str, branch: str) -> None:
+    if repository != OFFICIAL_REPOSITORY or branch != OFFICIAL_BRANCH:
+        raise UpdateError(
+            "reset de linhagem exige a fonte oficial e a branch main validadas"
+        )
+
+
+def _parse_lineage_reset_manifest(
+    content: bytes,
+    *,
+    installed: str,
+    latest: str,
+) -> dict[str, object]:
+    try:
+        document = json.loads(content.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise UpdateError(f"manifesto de reset inválido: {error}") from error
+    if not isinstance(document, dict) or set(document) != {
+        "schema_version",
+        "release_version",
+        "lineage_reset",
+    }:
+        raise UpdateError("manifesto de reset possui estrutura inválida")
+    if document.get("schema_version") != 1 or isinstance(
+        document.get("schema_version"), bool
+    ):
+        raise UpdateError("manifesto de reset possui schema_version inválida")
+    if document.get("release_version") != LINEAGE_RESET_VERSION:
+        raise UpdateError("manifesto de reset diverge da release 0.4.0")
+    if latest != LINEAGE_RESET_VERSION:
+        raise UpdateError("manifesto de reset só pode autorizar a release 0.4.0")
+
+    reset = document.get("lineage_reset")
+    if not isinstance(reset, dict) or set(reset) != {
+        "authorized",
+        "from_major_versions",
+        "to_version",
+    }:
+        raise UpdateError("manifesto de reset possui autorização inválida")
+    if reset.get("authorized") is not True:
+        raise UpdateError("manifesto de reset não autoriza a transição")
+    if reset.get("to_version") != LINEAGE_RESET_VERSION:
+        raise UpdateError("manifesto de reset autoriza destino diferente de 0.4.0")
+    majors = reset.get("from_major_versions")
+    if (
+        not isinstance(majors, list)
+        or not majors
+        or any(
+            not isinstance(value, int) or isinstance(value, bool) or value <= 0
+            for value in majors
+        )
+        or majors != sorted(set(majors))
+    ):
+        raise UpdateError("manifesto de reset possui linhagens de origem inválidas")
+    installed_major = parse_version(installed)[0]
+    if installed_major not in majors:
+        raise UpdateError(
+            f"manifesto de reset não autoriza a linhagem instalada {installed}"
+        )
+    return document
 
 
 def _default_fetch_bytes(url: str, timeout: float) -> bytes:
@@ -165,6 +254,21 @@ def _verify_official_origin(repo: Path, repository: str) -> None:
         )
 
 
+def _verify_git_lineage_reset_source(
+    repo: Path,
+    repository: str,
+    branch: str,
+) -> None:
+    current_branch = _run_git(repo, "branch", "--show-current").stdout.strip()
+    if current_branch != branch:
+        raise UpdateError(
+            f"reset de linhagem exige checkout na branch {branch}; "
+            f"atual: {current_branch or 'detached'}",
+            3,
+        )
+    _verify_official_origin(repo, repository)
+
+
 def _base_result(
     *,
     installed: str,
@@ -197,6 +301,7 @@ def _update_git_checkout(
     latest: str,
     repository: str,
     branch: str,
+    lineage_manifest: bytes | None = None,
 ) -> dict[str, object]:
     current_branch = _run_git(repo, "branch", "--show-current").stdout.strip()
     if current_branch != branch:
@@ -228,6 +333,29 @@ def _update_git_checkout(
         raise UpdateError(
             "origin/main não corresponde à versão oficial consultada; atualização recusada",
             3,
+        )
+    if lineage_manifest is not None:
+        remote_manifest_result = _run_git(
+            repo,
+            "show",
+            f"origin/{branch}:skills/{LINEAGE_RESET_MANIFEST}",
+            check=False,
+        )
+        if remote_manifest_result.returncode != 0:
+            raise UpdateError(
+                "origin/main não contém o manifesto de reset versionado",
+                3,
+            )
+        remote_manifest = remote_manifest_result.stdout.encode("utf-8")
+        if remote_manifest != lineage_manifest:
+            raise UpdateError(
+                "manifesto de reset do origin/main diverge da fonte oficial consultada",
+                3,
+            )
+        _parse_lineage_reset_manifest(
+            remote_manifest,
+            installed=installed,
+            latest=latest,
         )
     _run_git(repo, "merge", "--ff-only", f"origin/{branch}")
     final_version = read_installed_version(skills_root)
@@ -310,9 +438,29 @@ def _reject_tree_symlinks(root: Path, label: str) -> None:
             raise UpdateError(f"{label} contém symlink: {path}")
 
 
-def _validate_remote_skills(remote_skills: Path, latest: str) -> None:
+def _validate_remote_skills(
+    remote_skills: Path,
+    latest: str,
+    *,
+    installed: str,
+    lineage_manifest: bytes | None = None,
+) -> None:
     if read_installed_version(remote_skills) != latest:
         raise UpdateError("versão do archive diverge da versão consultada")
+    if lineage_manifest is not None:
+        manifest_path = remote_skills / LINEAGE_RESET_MANIFEST
+        if not manifest_path.is_file() or manifest_path.is_symlink():
+            raise UpdateError("archive não contém manifesto de reset regular")
+        archive_manifest = manifest_path.read_bytes()
+        if archive_manifest != lineage_manifest:
+            raise UpdateError(
+                "manifesto de reset do archive diverge da fonte oficial consultada"
+            )
+        _parse_lineage_reset_manifest(
+            archive_manifest,
+            installed=installed,
+            latest=latest,
+        )
     for name in MANAGED_SKILL_DIRS:
         _reject_tree_symlinks(remote_skills / name, f"pacote {name}")
 
@@ -436,6 +584,24 @@ def update_bianchini_method(
     latest_tuple = parse_version(latest)
     git_root = _git_root(root)
     mode = "git_checkout" if git_root is not None else "installed_package"
+    lineage_manifest: bytes | None = None
+    if _is_lineage_reset(installed_tuple, latest_tuple):
+        _validate_lineage_reset_source(repository, branch)
+        if git_root is not None:
+            _verify_git_lineage_reset_source(git_root, repository, branch)
+        manifest_url = lineage_reset_manifest_url(repository, branch)
+        lineage_manifest = _fetch_limited(
+            fetch,
+            manifest_url,
+            timeout,
+            MAX_RELEASE_MANIFEST_BYTES,
+            "manifesto de reset",
+        )
+        _parse_lineage_reset_manifest(
+            lineage_manifest,
+            installed=installed,
+            latest=latest,
+        )
     if installed_tuple == latest_tuple:
         return _base_result(
             installed=installed,
@@ -447,7 +613,7 @@ def update_bianchini_method(
             repository=repository,
             branch=branch,
         )
-    if installed_tuple > latest_tuple:
+    if installed_tuple > latest_tuple and lineage_manifest is None:
         return _base_result(
             installed=installed,
             latest=latest,
@@ -477,6 +643,7 @@ def update_bianchini_method(
             latest,
             repository,
             branch,
+            lineage_manifest,
         )
     archive_bytes = _fetch_limited(
         fetch,
@@ -488,7 +655,12 @@ def update_bianchini_method(
     extraction = Path(tempfile.mkdtemp(prefix="bianchini-method-download."))
     try:
         remote_skills = _extract_archive(archive_bytes, extraction)
-        _validate_remote_skills(remote_skills, latest)
+        _validate_remote_skills(
+            remote_skills,
+            latest,
+            installed=installed,
+            lineage_manifest=lineage_manifest,
+        )
         backup = _install_skills_atomically(root, remote_skills, installed)
     finally:
         if extraction.exists():

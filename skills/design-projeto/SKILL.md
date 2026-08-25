@@ -1,19 +1,19 @@
 ---
 name: design-projeto
-description: Use somente com invocação explícita de /design-projeto ou quando /sdd-planning detectar uma interface nova, redesign ou fluxo visual material sem manifesto válido em docs/design.
+description: Use somente com invocação explícita de /design-projeto ou quando /sdd-planning detectar interface nova, redesign ou fluxo visual material sem contrato válido na mudança ativa do Bianchini Method 0.4.
 ---
 
 # Design Projeto
 
 **Anuncie:** "Criando contrato visual executável antes do planejamento."
 
-Esta skill produz referência visual, não código de produção. Ela pode rodar antes de existir `PROJECT_STATE.md`.
+Esta skill produz referência visual, não código de produção. O pacote pertence à mudança ativa em `.bianchini/`.
 
 ## 1. Definir o ciclo e o escopo
 
-1. Localizar o escopo aprovado mais recente.
-2. Sem arquivo local, materializar o texto em `docs/bianchini/changes/<planning_version>/inputs/APPROVED_SCOPE.md`.
-3. Usar a `planning_version` do estado `idle`; sem estado, usar `v1`.
+1. Ler `.bianchini/STATE.md` e localizar a mudança `Cxxx-*` ativa.
+2. Sem workspace, executar `bm.py model init --repo <repo>` e iniciar a mudança pelo `/sdd-planning`.
+3. Usar `SCOPE.md` da mudança; sem escopo materializado, bloquear apenas o design.
 4. Não alterar requisitos, jornadas, texto obrigatório ou identidade fornecida.
 
 Resolver `../_shared/scripts/bm.py`. O manifesto será aceito pelo planejamento somente quando o hash corresponder exatamente ao escopo atual.
@@ -33,7 +33,7 @@ Adaptadores são opcionais. Nunca tornar o BM dependente de Claude, Taste, Image
 Criar somente:
 
 ```text
-docs/design/<planning_version>/
+.bianchini/changes/Cxxx-slug/design/
   DESIGN_MANIFEST.json
   DESIGN_CONTRACT.md
   tokens.css
@@ -85,10 +85,10 @@ Criar `DESIGN_MANIFEST.json` com:
   "scope_source": null,
   "scope_digest": null,
   "design_digest": null,
-  "contract": "docs/design/v1/DESIGN_CONTRACT.md",
-  "prototype": "docs/design/v1/prototype/index.html",
-  "tokens": "docs/design/v1/tokens.css",
-  "screenshots": ["docs/design/v1/screenshots/desktop.png"],
+  "contract": ".bianchini/changes/C001-slug/design/DESIGN_CONTRACT.md",
+  "prototype": ".bianchini/changes/C001-slug/design/prototype/index.html",
+  "tokens": ".bianchini/changes/C001-slug/design/tokens.css",
+  "screenshots": [".bianchini/changes/C001-slug/design/screenshots/desktop.png"],
   "surfaces": ["app-shell", "primary-flow"],
   "breakpoints": ["desktop", "mobile"],
   "files": []
@@ -109,7 +109,7 @@ Depois da aprovação explícita ou delegação inequívoca registrada no escopo
 python3 <bm.py> design-audit verify --root <repo> --scope <scope> --manifest <manifest>
 ```
 
-Arquivo solto dentro de `docs/design` nunca é fonte de verdade. Somente manifesto `approved`, íntegro e ligado ao escopo pode entrar no planejamento.
+Arquivo solto nunca é fonte de verdade. Somente manifesto `approved`, íntegro e ligado ao `SCOPE.md` da mudança pode entrar no planejamento.
 
 ## 6. Revisão visual
 

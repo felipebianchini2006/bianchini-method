@@ -1,6 +1,6 @@
 ---
 name: homologar-sistema
-description: Use somente com invocação explícita de /homologar-sistema ou quando PROJECT_STATE declarar method_version 2 e release.status candidate. Em v1, apenas roteia à homologação legado.
+description: Use para homologar explicitamente o release candidate ligado a uma mudança do Bianchini Method 0.4, combinando gates automatizados, jornadas reais e varredura visual.
 ---
 
 # Homologar Sistema
@@ -22,11 +22,10 @@ Automação reduz repetição, mas não elimina o passe real. Um E2E pode servir
 
 ## 1. Rota e pré-condições
 
-1. Executar `bm.py route`.
-2. V1: exigir Superpowers e usar homologação legado; sem ele, `BLOQUEADO`.
-3. V2: validar estado e confirmar planos `completed`, `verification.plan: passed` e fingerprint completo do RC: `id`, `revision`, `build`, `checksum`.
-4. Confirmar plataformas, perfis, integrações e critérios de aceite do escopo aprovado.
-5. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
+1. Ler `.bianchini/STATE.md` e executar `bm.py model validate --repo <repo>`.
+2. Confirmar mudança, planos e resultados concluídos, além do fingerprint completo do RC: `id`, `revision`, `build`, `checksum`.
+3. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
+4. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
 
 Não homologar árvore fonte quando a entrega é outro artefato. Se uma plataforma com interface não puder ser iniciada e operada, registrar `not_run` e declarar `BLOQUEADO`; nunca inferir aprovação pelo código.
 
@@ -48,9 +47,9 @@ Não iniciar novo planejamento, campanha de arquitetura ou redesign durante homo
 
 ## 3. Inventário e matriz de aceite
 
-Ler critérios e jornadas da spec, plataformas/perfis do estado, cabeçalhos dos planos e resumos dos ledgers. Depois, inspecionar a navegação do RC para inventariar telas, menus, rotas e ações expostas.
+Ler critérios e jornadas das specs, plataformas/perfis do escopo, contratos dos planos e resultados registrados. Depois, inspecionar a navegação do RC para inventariar telas, menus, rotas e ações expostas.
 
-Criar `artifacts/qa/final/<data>/SUMMARY.md`:
+Criar `.bianchini/changes/Cxxx-*/results/HOMOLOGATION.md`:
 
 ```markdown
 | ID | Plataforma | Perfil | Jornada ou ação | Automação | Execução real | Visual | Resultado | Evidência |
@@ -138,7 +137,7 @@ Após duas ondas de homologação sem convergir, declarar `BLOQUEADO`. Com telem
 
 Caso contrário, `BLOQUEADO` com o próximo requisito verificável. Não inventar “aceito com ressalvas”.
 
-Ao aceitar, gravar `release.homologation: accepted` e `release.status: homologated`. A sincronização de specs ocorre somente depois de revisão final e entrega `ready`, por `cycle-close`; homologação não edita `current/specs`.
+Ao aceitar, registrar `status: accepted`, fingerprint e evidências em `HOMOLOGATION.md`. A sincronização de arquitetura, modelo e specs ocorre somente no `cycle-close`; homologação não edita `.bianchini/current/` nem o digest aprovado.
 
 ## 8. Manual conforme escopo
 
@@ -149,7 +148,7 @@ Resolver política com `bm.py policy`:
 - `manual_pdf: full`: gerar manual completo em Markdown e PDF;
 - `manual_pdf: scope`: gerar o nível contratado na spec aprovada; sem contratação, não gerar.
 
-Quando necessário, ler [`references/manual-delivery.md`](references/manual-delivery.md), criar `docs/manuals/manual-do-sistema.md`, gerar `artifacts/delivery/manual-do-sistema.pdf` e validar o PDF. Conversor ausente só bloqueia quando o manual é obrigatório no escopo.
+Quando necessário, ler [`references/manual-delivery.md`](references/manual-delivery.md), criar o manual dentro de `.bianchini/changes/Cxxx-*/results/` e validar o PDF. Conversor ausente só bloqueia quando o manual é obrigatório no escopo.
 
 ## Saída
 

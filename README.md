@@ -1,195 +1,261 @@
-# Bianchini Method v3.2 — Self Update
+# Bianchini Method 0.4
 
-`v3.2` é a versão do pacote. `method_version` permanece `2` para preservar compatibilidade dos projetos standalone existentes.
+Método spec-driven para planejar e executar mudanças com visão do sistema completo, coerência entre fases, documentação viva e verificação proporcional ao risco.
 
-Sistema de nove skills para planejar, executar, auditar, corrigir, homologar e acompanhar projetos em diferentes stacks.
+O salto do `0.4` é tratar o planejamento como um grafo de contratos:
 
-| Situação | Fluxo |
+```text
+sistema atual
+→ sistema após cada fase
+→ sistema final esperado
+```
+
+## Arquitetura
+
+```text
+Bianchini Method
+├── MethodWorkspace
+├── ProjectModel
+├── CoherenceEngine
+│   ├── StructuralValidator
+│   ├── DependencyGraph
+│   ├── ImpactAnalyzer
+│   └── SemanticReviewer
+├── Planning
+├── Execution
+├── Quick
+├── Debug
+└── Migration
+```
+
+- `MethodWorkspace`: caminhos, IDs, digests, transações e DocViva.
+- `ProjectModel`: representação tipada e derivada do sistema; não é outra fonte de persistência.
+- `StructuralValidator`: IDs, referências, ordem, providers, consumers, ownership, migrações e journeys.
+- `ImpactAnalyzer`: consumidores e planos afetados por uma alteração.
+- `SemanticReviewer`: simplicidade, responsabilidade arquitetural, stack e coerência interpretativa.
+
+## Workspace
+
+```text
+.bianchini/
+├── PROJECT.md
+├── STATE.md
+├── current/
+│   ├── ARCHITECTURE.md
+│   ├── SYSTEM_MODEL.md
+│   └── specs/
+├── changes/C001-slug/
+│   ├── SCOPE.md
+│   ├── RESEARCH.md
+│   ├── ARCHITECTURE.md
+│   ├── SYSTEM_MODEL.md
+│   ├── ROADMAP.md
+│   ├── COHERENCE.md
+│   ├── plans/
+│   ├── results/
+│   └── SUMMARY.md
+├── quick/Q001-slug/
+├── debug/{active,resolved}/
+├── debug/KNOWLEDGE.md
+├── archive/
+└── .runtime/
+```
+
+`STATE.md` é somente um índice: trabalho ativo, unidade atual, status, bloqueios, próxima ação, ponteiros e digest vigente. Aprovação detalhada, histórico e evidências ficam nos documentos específicos. O estado é limitado a 64 KiB.
+
+`.planning/` não pertence ao Bianchini Method. Ele não é lido, importado, convertido, copiado ou apagado.
+
+## Planejamento global
+
+```text
+pesquisa
+→ arquitetura global
+→ SYSTEM_MODEL final
+→ roadmap completo
+→ planos por contratos
+→ validação estrutural
+→ impact radius
+→ revisão semântica conjunta
+→ pacote pronto para aprovação
+→ checkpoint humano do digest global
+```
+
+Cada plano declara `depends_on`, `provides`, `consumes`, ownership, interfaces, dados, migrações, efeitos, rollback, model delta, verificação e restrições futuras.
+
+O método simula:
+
+```text
+S0 + delta(P01) = S1
+S1 + delta(P02) = S2
+...
+Sn = SYSTEM_MODEL final
+```
+
+Um plano é bloqueado quando funciona isoladamente, mas quebra o modelo ou uma fase posterior.
+
+### Coerência
+
+Validação estrutural é determinística e independente de LLM. A revisão semântica analisa abstração especulativa, complexidade, responsabilidade, aderência à stack e conflitos interpretativos.
+
+Um check estrutural limpo retorna `structurally_valid`. O check completo retorna `ready_for_approval`. Somente `coherence approve`, com o digest retornado e o responsável pela decisão, transforma o pacote em `approved`.
+
+| Severidade | Regra |
 |---|---|
-| Tarefa pontual ou experimento | Superpowers diretamente |
-| Projeto pequeno ou entrega coesa | `/executar-direto` |
-| Projeto complexo, multifase ou de alto risco | `/sdd-planning` + `/executar-plano` |
+| `ERROR` | bloqueia |
+| `WARNING` | exige correção ou justificativa aprovada no digest |
+| `INFO` | observação |
 
-## Fluxo atual
-
-```text
-escopo aprovado
-  -> design-projeto, somente para UI nova/material sem design válido
-  -> readiness: decisões, suposições, pitfalls, ações externas e spikes
-  -> sdd-planning
-  -> checker semântico, no máximo duas passagens
-  -> aprovação única
-  -> executar-plano com autonomia e plano congelado
-  -> gates por plano
-  -> homologar-sistema: automação + uso real do RC
-  -> revisão final e entrega
-  -> cycle-close: sincronizar specs atuais e arquivar ciclo
-```
-
-`sdd-planning` valida readiness, pesquisa a stack, aplica decisões e pitfalls à spec e congela planos sem reduzir o escopo aprovado. `status-projeto` é somente leitura. `corrigir-bug` é usado dentro da execução e homologação.
-`auditar-arquitetura` é manual, report-only e executada apenas sob pedido explícito.
-
-## Compatibilidade
-
-### Projetos v1
-
-```yaml
-method_version: 1 # ou estado legado existente sem method_version
-```
-
-Continuam integralmente no fluxo legado Superpowers enquanto a fase atual estiver em andamento. A v2 preserva caminhos, ledger, dispatch, revisão e retomada existentes. Se Superpowers não estiver disponível, a execução v1 bloqueia claramente; nunca usa o executor standalone no meio da fase.
-
-Quando o responsável autorizar explicitamente, `route --migrate-to-v2` inicia uma migração controlada: preserva documentação v1 sob `docs/` e cria um estado bootstrap v2. `AGENTS.md` e `CLAUDE.md` nunca são reescritos livremente. Sem essa autorização, a compatibilidade legado continua vencendo.
-
-Ao concluir e commitar todos os gates e a entrega da última fase legado, `executar-plano` roda `legacy-transition --completed`: arquiva o estado v1, aplica a higiene da raiz e cria um estado v2 `idle`. O próximo escopo abre `planning_version: v1` por `/sdd-planning` standalone, sem nova aprovação de migração e sem reexecutar a fase encerrada.
-
-### Projetos v2
-
-```json
-{
-  "method_version": 2,
-  "method_mode": "standalone-adaptive"
-}
-```
-
-Não dependem do Superpowers. Usam estado validado, worktree obrigatória, artefatos persistentes e gates nativos do projeto.
-
-## Estabilidade e autonomia
-
-Novos ciclos usam:
+Mudanças recalculam o raio de impacto:
 
 ```text
-docs/bianchini/current/specs/      -> comportamento atual aceito
-docs/bianchini/changes/vN/         -> mudança atual
-docs/bianchini/archive/vN/         -> ciclo encerrado
-docs/design/vN/                    -> protótipo e contrato visual aprovados
+contrato
+→ consumidores diretos
+→ consumidores transitivos
+→ journeys
+→ planos
+→ gates a repetir
 ```
 
-`READINESS.md` resolve antes do plano:
+Antes da aprovação, a análise é apenas uma prévia e não grava `stale`. Depois da
+aprovação, planos atingidos ficam `stale`, o pacote entra em
+`approved_with_stale` e planos independentes continuam executáveis com o digest
+humano original. Uma nova auditoria gera o próximo digest aprovado.
+
+## Quick previsível
+
+`/executar-direto` classifica:
 
 ```text
-D-* decisões
-A-* suposições
-P-* pitfalls
-U-* ações externas
-S-* spikes
-DS-* superfícies visuais
-SD-* próximas specs de domínio
+risk = scope + external_effect + migration + concurrency + money
 ```
 
-O checker permite uma correção. Depois da aprovação, detalhes internos e ajustes limitados são registrados no ledger sem editar o plano. Escopo, contrato público, design aprovado, impossibilidade externa ou invariante crítico comprovado invalidam o plano apenas na área afetada. Novo custo ou ação irreversível apenas pausam para autorização; não autorizam redesign por si só.
+Cada dimensão vale `0..2`:
 
-A ordem autônoma é: decisão aprovada -> padrão do repositório -> stack existente -> documentação oficial -> opção reversível de menor risco. O agente não interrompe por escolha técnica interna.
+- `0–2`: quick normal;
+- `3–6`: quick protegido;
+- `7–10`: planejamento.
+
+Overrides como múltiplos domínios, migração destrutiva, concorrência sem solução, ownership indefinido ou arquitetura nova sempre escalam.
+
+Pagamento e webhook não escalam por palavra. Um fluxo coeso pode permanecer quick protegido quando documenta origem de verdade, idempotência, autenticidade, deduplicação, retry incerto, persistência, reconciliação, rollback e sandbox. Efeito financeiro/irreversível real exige checkpoint explícito.
+
+Quicks ficam versionados em `.bianchini/quick/Qxxx-*` e atualizam a DocViva ao terminar.
+
+## Debug persistente
+
+```text
+intake → reproduced → diagnosed → red → fixing → green
+→ regression_checked → documented → resolved | blocked | escalated
+```
+
+O debug preserva hipóteses, contraprovas, causa, RED/GREEN, regressões e risco residual. Uma referência opcional `Dxxx → Cxxx/Pxx` só é aceita com evidência.
+
+GREEN antes de RED e evidência anterior ao último patch são rejeitados. Casos resolvidos ficam em `.bianchini/debug/resolved/`; apenas padrões reutilizáveis entram em `KNOWLEDGE.md`.
+
+## Migração única
+
+Não existe adaptador permanente. Projetos anteriores terminam seu ciclo e usam:
+
+```bash
+python3 skills/_shared/scripts/bm.py migrate check --repo .
+python3 skills/_shared/scripts/bm.py migrate apply --repo .
+```
+
+`check` é somente leitura. `apply` exige Git limpo e projeto concluído/`idle`, preserva histórico, usa checksums e rollback, e produz manifesto em `.bianchini/archive/import-AAAA-MM-DD/`.
 
 ## Política adaptativa
 
 | Risco | Execução | Revisão | Testes |
 |---|---|---|---|
-| baixo | `grouped` | gate do plano | unitário/integração/regressão focados; sem mutação |
-| médio | `slice` | por slice vertical | focados por slice; E2E crítico e mutação seletiva no gate |
-| alto/crítico | `strict` | por tarefa | RED/GREEN focal; mutação seletiva obrigatória no gate material |
+| baixo | `grouped` | gate do plano | foco no seam |
+| médio | `slice` | por slice | comportamento vertical |
+| alto/crítico | `strict` | por tarefa | RED/GREEN + revisão independente |
 
-As camadas são distribuídas por estágio, sem nova tarefa por tipo de teste:
+As camadas são distribuídas por estágio:
 
 ```text
 verification.fast
-  -> unitários focados + integração/contrato focada + regressão relacionada
+  → prova focal da unidade
 
 verification.plan
-  -> suítes afetadas + regressão do plano + E2E crítico + mutação seletiva
+  → suítes afetadas + regressão + E2E crítico + mutação seletiva
 
 verification.release
-  -> suíte completa configurada + contratos + regressão + E2E crítico + build + mutação exigida
+  → comandos completos aprovados + contratos + regressão + build
 
 homologar-sistema
-  -> confirmar provas do RC + operar sistema real + varredura visual
+  → operar o RC real e confirmar jornadas/visual
 ```
 
-Regressão é transversal, não uma suíte separada. Mutation testing nunca roda por microtarefa, não usa score global como meta e só bloqueia quando um survivor prova falha de teste em comportamento aprovado de risco alto/crítico. O overlay Codex mantém esses limites explicitamente para não reabrir tarefas, revisões ou subagentes por camada.
-
-Os fix rounds são retornados por `bm.py policy` e contados por `risk_seam`: renomear ou dividir a tarefa não zera o orçamento do mesmo seam. Finding de classe estrutural (crash window, partial commit, TOCTOU, retry após timeout, idempotência concorrente, recuperação após restart) ou dois pareceres consecutivos critical/important no mesmo seam disparam o breaker antecipado e exigem redesenho antes de novo patch. Não há quantidade mínima de tarefas ou agentes.
+Regressão é transversal. Não existe tarefa ou agente por camada de teste, meta global de coverage ou mutation score.
 
 ## Skills
 
-- `design-projeto`: protótipo HTML estático, tokens, contrato e manifesto visual ligados ao escopo.
-- `sdd-planning`: pesquisa atual da stack, spec, simplificação, planos, gates e aprovação única.
-- `executar-plano`: execução v1 legado ou v2 isolada/adaptativa.
-- `executar-direto`: entrega pequena e coesa com brief compacto, scratch ignorado, verificação obrigatória para conclusão e estados terminais; invocação exclusivamente manual por `/executar-direto`.
-- `auditar-arquitetura`: relatório manual de hotspots e mudanças recentes; invocação exclusivamente manual.
-- `status-projeto`: estado, gates, bloqueios e próximo passo, sem mutação.
-- `corrigir-bug`: causa raiz, regressão adequada ao seam, fix mínimo e reteste.
-- `homologar-sistema`: confirma unitários/integração/regressão/E2E/mutação do release, executa o RC real por perfil/plataforma, faz varredura visual e decide o aceite.
-- `update-bm`: verifica a versão oficial e atualiza a instalação local com backup e rollback; invocação exclusivamente manual.
+- `design-projeto`: referência visual aprovada antes do planejamento quando necessária.
+- `sdd-planning`: pesquisa, ProjectModel, roadmap, planos e coerência global.
+- `executar-plano`: execução isolada com verificação de contratos e impacto.
+- `executar-direto`: quick normal/protegido por score; invocação manual.
+- `corrigir-bug`: debug persistente, causa raiz, RED/GREEN e regressão.
+- `status-projeto`: leitura compacta do estado e próximo passo.
+- `migrar-bianchini`: migração explícita e transacional para `.bianchini`; invocação manual.
+- `homologar-sistema`: automação, operação real do RC e varredura visual.
+- `auditar-arquitetura`: auditoria manual report-only.
+- `update-bm`: atualização manual com backup e rollback.
 
-### Contratos internos de subagentes
-
-`skills/_shared/agents/` contém contratos enxutos e agnósticos de stack para cartografia, implementação, revisão e segurança. A homologação mantém o passe real e a validação visual diretamente em sua própria skill, sem depender de prompt externo. `/executar-direto` não utiliza subagentes. Origem adaptada do projeto Agency Agents (MIT); ver [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
-
-## Estado e ferramentas
-
-- Schema: [`schemas/project-state.schema.json`](schemas/project-state.schema.json).
-- Template: [`skills/_shared/STATE_TEMPLATE.md`](skills/_shared/STATE_TEMPLATE.md).
-- CLI standalone: [`scripts/bm.py`](scripts/bm.py), empacotado também em `skills/_shared/scripts/bm.py`.
-
-O CLI usa somente a biblioteca padrão Python e fornece:
+## CLI
 
 ```text
-validate-state  route  legacy-transition  design-audit  planning-audit  planning-check
-change-policy  cycle-close  snapshot  policy  workspace(create|check|locate|resume)
-repo-hygiene(check|migrate)  task-brief  report  review-package
-checkpoint  proof-map  spec-diff  mutation-evidence  update-bm  telemetry  status
+model init|validate
+coherence check|approve
+impact analyze --plan Pxx [--changed-contract ID]
+plan complete --change Cxxx --plan Pxx --actual-delta <json>
+direct classify|start|status|checkpoint|finish
+debug start|list|status|resume|checkpoint|finish
+migrate check|apply
+workspace create|check|locate|resume
+cycle-close --change Cxxx
+task-brief  report  review-package  checkpoint
+policy  proof-map  mutation-evidence  telemetry  status  update-bm
 ```
 
-Implementação v2 em `main`, `master`, detached HEAD ou worktree primária é bloqueada.
+Erros públicos do fluxo 0.4 incluem `MODEL_MISMATCH`, `COHERENCE_ERROR`,
+`WARNING_UNRESOLVED`, `IMPACT_STALE`, `MISSING_PROVIDER`,
+`OWNERSHIP_CONFLICT`, `MIGRATION_ORDER_INVALID`, `MISSING_GUARD`,
+`STALE_EVIDENCE`, `EXTERNAL_AUTHORITY_REQUIRED`, `DOCVIVA_INCOMPLETE` e
+`MIGRATION_REQUIRED`.
 
-`workspace create` também exige repositório limpo e pacote aprovado integralmente commitado. A identidade inclui ciclo e plano (`bm/v1-p01`, `bm/v2-p01`), impedindo reuso acidental entre planejamentos.
+Exemplos:
 
-Novos planejamentos incluem `STACK_RESEARCH.md` em modo `repo_only`, `targeted_web` ou `full`. `planning-audit --strict` retorna os limites vigentes, bloqueia evidência insuficiente, placeholders, comandos em prosa e planos dependentes de fontes legadas. Lean permanece tipicamente pequeno e sem mínimo; Standard e Full absorvem escopos/risco maiores sem retirar requisitos aprovados. Qualquer `deferred_scope` exige autorização explícita registrada do responsável. O snapshot reaplica o gate automaticamente.
-
-`/.superpowers/` deve estar no `.gitignore` versionado e nunca pode conter arquivos rastreados. `repo-hygiene migrate` preserva relatórios legados rastreados em `docs/bianchini/legacy/root-superpowers/`; mudanças ativas ficam em `docs/bianchini/changes/<planning_version>/`; specs aceitas ficam em `docs/bianchini/current/specs/`.
-
-## Eficiência de contexto
-
-A v3.1 mantém as fontes completas e adiciona projeções determinísticas para reduzir leitura ativa:
-
-- `planning-audit` exige `Change` e `Readiness refs` nas unidades quality v2;
-- `task-brief --hydrate-context` reúne somente readiness, specs, gates e ledger aplicáveis;
-- `spec-diff` deriva ADDED, MODIFIED e REMOVED entre specs completas;
-- `mutation-evidence verify` vincula relatório, seam, plano e revisão do código sem usar score global.
-
-Detalhes: [`skills/_shared/CONTEXT_EFFICIENCY.md`](skills/_shared/CONTEXT_EFFICIENCY.md).
-
-## Homologação e manual
-
-Homologação executa `verification.release` com unitários, integração/contratos, regressão, E2E crítico, build e mutação exigida, depois cria o mapa de provas como baseline. Depois abre e opera o RC real por plataforma e perfil, percorre fluxos críticos e ações primárias, verifica estados de erro/recuperação, console/rede e executa varredura visual em toda interface aplicável.
-
-`manual_pdf: scope` é o padrão. Os valores são `none | quick_start | full | scope`; ausência de conversor não bloqueia projeto sem manual contratado.
-
-Cada release candidate usa fingerprint obrigatório `id + revision + build + checksum`. Evidências de homologação só valem quando os quatro valores coincidem.
-
-## Telemetria opt-in
-
-Desabilitada por padrão. Quando habilitada no estado, registra localmente tokens informados pelo host, duração, fix rounds, falhas de gate e bugs de homologação. Não registra prompts, código, diffs ou dados pessoais.
-
-`bm.py status <state> --root <repo> --format text` produz o painel humano; sem `--format text`, mantém JSON estável para automação.
+```bash
+python3 skills/_shared/scripts/bm.py model init --repo .
+python3 skills/_shared/scripts/bm.py model init --repo . --change checkout
+python3 skills/_shared/scripts/bm.py model validate --repo . --change C001
+python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --structural-only
+python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --semantic-report semantic-review.json
+python3 skills/_shared/scripts/bm.py coherence approve --repo . --change C001 --digest <digest> --approved-by "<responsável>"
+python3 skills/_shared/scripts/bm.py impact analyze --repo . --change C001 --plan P02
+python3 skills/_shared/scripts/bm.py workspace create --repo . --change C001 --plan P01
+python3 skills/_shared/scripts/bm.py plan complete --repo . --change C001 --plan P01 --actual-delta actual-delta.json --result "<resultado>" --verification "<evidência>"
+python3 skills/_shared/scripts/bm.py cycle-close --repo . --change C001
+```
 
 ## Instalação local
 
-Copie o diretório `skills` inteiro para preservar recursos compartilhados:
+Copie o diretório `skills` inteiro:
 
 ```bash
 cp -R skills/. ~/.codex/skills/
 # Claude Code: troque ~/.codex por ~/.claude
 ```
 
-Após esta instalação, verifique ou atualize explicitamente com:
+Atualização é sempre explícita:
 
 ```bash
 python3 ~/.codex/skills/_shared/scripts/bm.py update-bm --check
 python3 ~/.codex/skills/_shared/scripts/bm.py update-bm
 ```
 
-No Claude Code, troque `~/.codex` por `~/.claude`. Também é possível usar `/update-bm`. Nenhuma sincronização ocorre sem invocação explícita.
+A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal.
 
 ## Uso
 
@@ -197,22 +263,13 @@ No Claude Code, troque `~/.codex` por `~/.claude`. Também é possível usar `/u
 /design-projeto
 /sdd-planning
 /executar-direto
-/auditar-arquitetura
 /executar-plano all
 /status-projeto
 /corrigir-bug <sintoma>
 /homologar-sistema
+/auditar-arquitetura
+/migrar-bianchini
 /update-bm
-```
-
-## Overlay Codex
-
-```bash
-./codex/install.sh
-```
-
-```text
-$executar-plano-codex all
 ```
 
 ## Validação do pacote
@@ -222,10 +279,4 @@ python3 scripts/run_test_shards.py
 python3 scripts/bm.py --help
 ```
 
-O runner recomendado executa cada classe em processo separado e libera recursos entre shards. A forma monolítica continua disponível para ambientes sem limitação:
-
-```bash
-python3 -m unittest discover -s tests -v
-```
-
-Os testes usam projetos-fixture v1 legado, v2 grouped e v2 strict, além de cenários temporários para design manifest, readiness, checker limitado, specs atuais/deltas, cycle-close, worktree, path traversal, fingerprints antigo/incorreto, telemetria opt-in, breaker, homologação com automação e execução real, bug visual, auditoria e manual fora do escopo.
+O CLI usa biblioteca padrão Python. Testes cobrem workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.

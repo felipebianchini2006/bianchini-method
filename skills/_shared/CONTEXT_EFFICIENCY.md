@@ -1,94 +1,33 @@
-# Context Efficiency v3.1
+# Contexto eficiente no método 0.4
 
-Esta referência descreve as projeções derivadas adicionadas ao Bianchini Method. Nenhuma delas substitui o `PROJECT_STATE.md`, a spec completa, o plano aprovado, o ledger ou as evidências do release.
+Contexto derivado nunca substitui `.bianchini/STATE.md`, o `SYSTEM_MODEL.md`, as specs, o plano aprovado, os resultados ou as evidências atuais.
 
-## Enforcement das unidades quality v2
+## Planejamento
 
-Cada unidade de um plano `planning.quality_version: 2` deve declarar:
+O pacote global contém o sistema completo, mas cada plano deve ser rejeitável isoladamente. Use IDs e contratos para carregar somente:
 
-```markdown
-**Change:** state-machine
-**Readiness refs:** D-001, A-001, P-001, U-001, SD-001
-```
+- plano ativo;
+- providers e dependências concluídas;
+- consumers que podem ser afetados;
+- módulos, interfaces, dados, journeys e invariantes tocados;
+- specs e decisões explicitamente referenciadas.
 
-`planning-audit` valida de forma determinística:
+O `ProjectModel` recompõe `S0 → Sn` de forma determinística. Não copie a narrativa inteira da arquitetura para cada plano.
 
-- categoria `Change` suportada pela política;
-- formato e existência de cada referência;
-- presença do plano em `destinations` do item de readiness;
-- cobertura de todos os itens de readiness destinados ao plano.
+## Execução
 
-Pacotes `quality_version: 1` permanecem compatíveis.
+`workspace create` valida o digest aprovado, dependências, contratos consumidos e status `stale` antes de criar a branch `bm/cxxx-pxx`. Dentro do workspace, carregue o plano, o modelo efetivo e o último resultado necessário; não releia toda a mudança por padrão.
 
-## Brief hidratado
+Mapas de repositório e relatórios temporários ficam em `.bianchini/.runtime/`, vinculados ao hash do `HEAD` e ao digest do escopo. Mudança em qualquer um invalida o cache.
 
-`task-brief` pode produzir uma projeção compacta do contexto da unidade:
+## Resultados e fechamento
 
-```bash
-python3 <bm.py> task-brief \
-  --plan docs/bianchini/changes/v3/plans/P02-auth.md \
-  --task 3 \
-  --state docs/living/PROJECT_STATE.md \
-  --root . \
-  --hydrate-context \
-  --ledger-tail-lines 40 \
-  --output .superpowers/bianchini/context/P02-T03.md
-```
+Cada plano grava somente seu delta real, verificações e impacto em `results/Pxx.md`. `STATE.md` mantém apenas o índice atual. O fechamento recompõe o modelo pelos resultados, exige equivalência com o `SYSTEM_MODEL.md` final e arquiva o ciclo.
 
-A projeção contém somente o digest aprovado, metadados do plano, itens de readiness citados, seções exatas de spec, `verification.fast`, execução ativa e final do ledger. O arquivo deve permanecer em scratch ignorado e pode ser regenerado a qualquer momento.
+## Regras
 
-## Diff de specs
-
-A spec futura completa continua sendo a fonte de verdade. `spec-diff` cria apenas uma visualização ADDED, MODIFIED e REMOVED:
-
-```bash
-python3 <bm.py> spec-diff \
-  --root . \
-  --base docs/bianchini/current/specs/auth.md \
-  --target docs/bianchini/changes/v3/spec-deltas/auth.md \
-  --output artifacts/bianchini/v3/deltas/auth.md
-```
-
-As duas specs devem usar IDs estáveis em headings:
-
-```markdown
-## AUTH-001: Renovação de sessão
-```
-
-O resultado carrega os SHA-256 da base e do target. Alterar qualquer fonte torna a projeção anterior obsoleta.
-
-## Evidência de mutation testing
-
-`mutation-evidence verify` normaliza e valida o relatório no estado final do código:
-
-```bash
-python3 <bm.py> mutation-evidence verify \
-  --state docs/living/PROJECT_STATE.md \
-  --root . \
-  --plan P03 \
-  --risk-seam pricing-calculation \
-  --tool normalized \
-  --command "python3 mutation_runner.py" \
-  --report artifacts/mutation/report.json \
-  --revision "$(git rev-parse HEAD)" \
-  --output artifacts/bianchini/v3/mutation/P03-pricing.json
-```
-
-Formato normalizado mínimo:
-
-```json
-{
-  "schema_version": 1,
-  "mutants": [
-    {"id": "M1", "status": "killed"},
-    {
-      "id": "M2",
-      "status": "survived",
-      "classification": "equivalent",
-      "justification": "O operador produz o mesmo resultado no domínio aprovado."
-    }
-  ]
-}
-```
-
-Também é aceito o relatório JSON do Stryker. Survivors usam `equivalent`, `unreachable`, `non_material` ou `blocking`. Classificação não bloqueante exige justificativa. Revisão divergente do HEAD ou do RC, survivor sem classificação, mutante ignorado ou erro de execução bloqueiam quando a política for `selective` ou `required_selective`. Percentual global nunca decide o gate.
+- `.planning/` não é contexto, fallback nem destino.
+- Histórico detalhado fica em `changes/`, `quick/`, `debug/` e `archive/`.
+- Evidência anterior ao fingerprint vigente é obsoleta.
+- Resumos nunca podem transformar `not_run`, sandbox ou leitura de código em prova de produção.
+- Compressão de contexto não remove requisito, guard, finding ou bloqueio.

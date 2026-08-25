@@ -11,7 +11,7 @@ Usado somente por `/sdd-planning`, e apenas quando o repositório for existente 
 - caminho da raiz do repositório;
 - escopo aprovado ou objetivo do planejamento;
 - hash do `HEAD` atual e digest do escopo;
-- caminho de saída em scratch: `.superpowers/bianchini/cartography/<hash-do-HEAD>-<digest-do-escopo>.md`.
+- caminho de saída em scratch: `.bianchini/.runtime/cartography/<hash-do-HEAD>-<digest-do-escopo>.md`.
 
 ## Responsabilidade
 

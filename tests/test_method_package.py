@@ -1,4 +1,4 @@
-"""Cenários comportamentais e integridade do Bianchini Method v2."""
+"""Cenários comportamentais e integridade do Bianchini Method."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ SKILL_NAMES = (
     "auditar-arquitetura",
     "status-projeto",
     "corrigir-bug",
+    "migrar-bianchini",
     "homologar-sistema",
     "update-bm",
 )
@@ -136,8 +137,9 @@ class PackageIntegrityTests(unittest.TestCase):
                 self.assertEqual(metadata.get("name"), name)
                 self.assertIn("Use ", metadata.get("description", ""))
                 self.assertLessEqual(len(read(path).splitlines()), 250)
-                if name in {"executar-direto", "update-bm"}:
-                    self.assertEqual(metadata.get("disable-model-invocation"), "true")
+                if name in {"executar-direto", "migrar-bianchini", "update-bm"}:
+                    agent = read(path.parent / "agents/openai.yaml")
+                    self.assertIn("allow_implicit_invocation: false", agent)
 
     def test_relative_links_resolve(self) -> None:
         failures: list[str] = []
@@ -4039,7 +4041,7 @@ class DirectExecutionScenarios(unittest.TestCase):
     def test_skill_contract_is_explicit_lightweight_and_has_no_external_agents(self) -> None:
         direct = read(SKILLS["executar-direto"])
         metadata = frontmatter(direct)
-        self.assertEqual(metadata["disable-model-invocation"], "true")
+        self.assertEqual(metadata["name"], "executar-direto")
         for expected in (
             "zero subagentes",
             "menor diff correto",
@@ -4050,28 +4052,23 @@ class DirectExecutionScenarios(unittest.TestCase):
             "BRIEF.md",
             "PROGRESS.md",
             "RESULT.md",
+            "risk = scope + external_effect + migration + concurrency + money",
+            ".bianchini/quick",
         ):
             self.assertIn(expected, direct)
-        for forbidden in (
-            "invocar Superpowers",
-            "Agency Agents",
-            "spec central",
-            "PLANNING_REVIEW",
-            "manual PDF",
-        ):
-            self.assertIn(forbidden, direct)
         self.assertFalse((ROOT / "skills/agency-agents").exists())
         agent_config = read(ROOT / "skills/executar-direto/agents/openai.yaml")
         self.assertNotIn("subagent", agent_config.lower())
         self.assertIn("allow_implicit_invocation: false", agent_config)
-        self.assertIn("Não faça push", direct)
-        self.assertIn("instalação global", direct)
+        self.assertIn("Não fazer push", direct)
+        self.assertIn("Não use `.planning/`", direct)
 
     def test_status_skill_checks_direct_execution_before_project_state(self) -> None:
         status_skill = read(SKILLS["status-projeto"])
         self.assertIn("bm.py direct status", status_skill)
-        self.assertIn("Modo: direto", status_skill)
-        self.assertIn("antes de exigir `PROJECT_STATE.md`", status_skill)
+        self.assertIn("active_work.kind", status_skill)
+        self.assertIn("`.bianchini/STATE.md`", status_skill)
+        self.assertIn("Não ler `.planning/`", status_skill)
 
 
 class AgentContractScenarios(unittest.TestCase):
@@ -4108,8 +4105,7 @@ class AgentContractScenarios(unittest.TestCase):
     def test_direct_mode_keeps_zero_subagents_and_no_catalog(self) -> None:
         direct = read(SKILLS["executar-direto"])
         self.assertIn("zero subagentes", direct)
-        self.assertIn("o modo direto não os carrega", direct)
-        self.assertIn("não usa o catálogo Agency Agents", direct)
+        self.assertIn("não carrega o catálogo interno de agentes", direct)
 
     def test_architecture_audit_requires_explicit_invocation(self) -> None:
         metadata = frontmatter(read(SKILLS["auditar-arquitetura"]))
@@ -4136,7 +4132,7 @@ class AgentContractScenarios(unittest.TestCase):
         executor = read(SKILLS["executar-plano"])
         self.assertIn("../_shared/agents/implementation-worker.md", executor)
         self.assertIn("../_shared/agents/plan-reviewer.md", executor)
-        self.assertIn("nunca por microtarefa", executor)
+        self.assertIn("nunca revise por microtarefa", executor)
         contract = read(self.CONTRACTS["plan-reviewer"])
         self.assertIn("`grouped`: uma revisão no gate do plano", contract)
         self.assertIn("`slice`: uma revisão por slice", contract)
@@ -4202,8 +4198,8 @@ class SkillBehaviorContracts(unittest.TestCase):
     def test_executor_has_no_branch_fallback_or_task_minimum(self) -> None:
         executor = read(SKILLS["executar-plano"])
         planning = read(SKILLS["sdd-planning"])
-        self.assertIn("Não existe fallback para branch atual", executor)
-        self.assertIn("Não há mínimo ou alvo de tarefas", planning)
+        self.assertIn("Não existe fallback para editar na branch principal", executor)
+        self.assertIn("entrega rejeitável ou verificável", planning)
         self.assertNotIn("4–10 tarefas", planning)
 
     def test_planning_commit_and_versioned_workspace_are_mandatory(self) -> None:
@@ -4211,56 +4207,53 @@ class SkillBehaviorContracts(unittest.TestCase):
         planning = read(SKILLS["sdd-planning"])
         contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
         self.assertIn("commit local atômico", planning)
-        self.assertIn("git status --porcelain", planning)
-        self.assertIn("--planning-version v1", executor)
-        self.assertIn("Mudança preexistente bloqueia", executor)
-        self.assertIn("bm/v1-p01", contract)
-        self.assertIn("bm/v2-p01", contract)
+        self.assertIn("git status --porcelain", executor)
+        self.assertIn("--change C001 --plan P01", executor)
+        self.assertIn("bm/c001-p01", executor)
+        self.assertIn("COHERENCE.md` em `approved`", contract)
+        self.assertIn("artefatos do pacote idênticos ao `HEAD`", contract)
 
     def test_planning_research_and_simplification_are_enforced(self) -> None:
         planning = read(SKILLS["sdd-planning"])
         contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
         research = read(ROOT / "skills/sdd-planning/references/stack-research.md")
         for expected in (
-            "STACK_RESEARCH.md",
+            "RESEARCH.md",
             "fontes primárias",
-            "deferred_scope",
-            "planning-audit",
-            "Preservar 100%",
-            "scope_split_approved: true",
-            "PLANO Task N",
+            "Preserve 100%",
+            "model validate",
+            "coherence check",
+            "Um plano não pode parecer correto sozinho",
         ):
             self.assertIn(expected, planning)
-        self.assertIn("limites e a recomendação retornados por `planning-audit`", contract)
-        self.assertIn("fonte executável única no CLI", contract)
-        self.assertIn("nunca reduzir escopo automaticamente", contract)
+        self.assertIn("ProjectModel` é uma representação tipada derivada", contract)
+        self.assertIn("pacote inteiro é validado", contract)
+        self.assertIn("aprovação do digest global", contract)
         self.assertIn("Research mode: repo_only", research)
         self.assertIn("Acessado em: YYYY-MM-DD", research)
         self.assertIn("documentação oficial", research)
 
-    def test_root_superpowers_is_ignored_and_persistent_docs_are_versioned(self) -> None:
+    def test_planning_is_foreign_and_bianchini_docs_are_versioned(self) -> None:
         planning = read(SKILLS["sdd-planning"])
-        executor = read(SKILLS["executar-plano"])
         contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
-        self.assertIn("repo-hygiene migrate", planning)
-        self.assertIn("repo-hygiene check", executor)
-        self.assertIn("/.superpowers/", contract)
-        self.assertIn("docs/bianchini/legacy/root-superpowers/", contract)
-        self.assertIn("/.superpowers/", read(ROOT / ".gitignore"))
+        migration = read(SKILLS["migrar-bianchini"])
+        self.assertIn("Nunca ler `.planning/`", planning)
+        self.assertIn("`.planning/` é namespace estrangeiro", contract)
+        self.assertIn("`.planning/` permanece byte a byte intocado", contract)
+        self.assertIn("checksums", migration)
+        self.assertIn(".bianchini/archive/import-AAAA-MM-DD", migration)
 
-    def test_completed_legacy_execution_requires_automatic_idle_v2_transition(self) -> None:
+    def test_completed_previous_execution_uses_explicit_migration(self) -> None:
         planning = read(SKILLS["sdd-planning"])
         executor = read(SKILLS["executar-plano"])
         contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
-        self.assertIn("legacy-transition --repo", executor)
-        self.assertIn("--completed", executor)
-        self.assertIn("não pedir nova aprovação de migração", executor)
-        self.assertIn("planning_status: idle", planning)
-        self.assertIn("Não chamar `writing-plans`", planning)
-        self.assertIn("Encerramento definitivo do legado", contract)
-        self.assertIn("repositório Git limpo", contract)
-        self.assertIn("--completion-proof", contract)
-        self.assertIn("Nunca editar conteúdo livre de `AGENTS.md`", contract)
+        migration = read(SKILLS["migrar-bianchini"])
+        self.assertIn("/migrar-bianchini", executor)
+        self.assertIn("/migrar-bianchini", planning)
+        self.assertIn("Não existe adaptador permanente", contract)
+        self.assertIn("projeto `idle`/concluído e Git limpo", contract)
+        self.assertIn("migrate check", migration)
+        self.assertIn("migrate apply", migration)
 
     def test_homologation_and_manual_contracts_are_explicit(self) -> None:
         homologation = read(SKILLS["homologar-sistema"])
@@ -4281,10 +4274,10 @@ class SkillBehaviorContracts(unittest.TestCase):
         bugfix = read(SKILLS["corrigir-bug"])
         homologation = read(SKILLS["homologar-sistema"])
         for expected in (
-            "Regressão é uma estratégia transversal",
-            "não são tarefas independentes",
-            "score global de mutação",
-            "mutante sobrevivente",
+            "Regressão é transversal",
+            "Não criar tarefa ou agente por camada de teste",
+            "mutation score global",
+            "mutação seletiva",
         ):
             self.assertIn(expected, contract)
         for expected in (
@@ -4294,9 +4287,9 @@ class SkillBehaviorContracts(unittest.TestCase):
             "mutation",
         ):
             self.assertIn(expected, gates)
-        self.assertIn("não criar tarefa por camada de teste", planning)
-        self.assertIn("não executar E2E completo ou mutação por unidade", executor)
-        self.assertIn("menor nível capaz de reproduzir", bugfix)
+        self.assertIn("Não criar tarefa por arquivo, camada de teste", planning)
+        self.assertIn("Não execute E2E completo ou mutação por microtarefa", executor)
+        self.assertIn("menor interface pública", bugfix)
         self.assertIn("não iniciar uma nova campanha unitária", homologation)
 
     def test_architecture_and_status_skills_exist_in_readme(self) -> None:
@@ -4304,24 +4297,17 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("/auditar-arquitetura", readme)
         self.assertIn("/status-projeto", readme)
 
-    def test_skill_activation_is_explicit_or_scoped_to_method_v2(self) -> None:
+    def test_skill_activation_uses_current_method_or_explicit_policy(self) -> None:
         for name, path in SKILLS.items():
             with self.subTest(skill=name):
                 metadata = frontmatter(read(path))
                 description = metadata["description"]
-                if name == "executar-direto":
-                    self.assertEqual(
-                        description,
-                        "Use quando o usuário solicitar a implementação estruturada de um projeto pequeno ou de uma entrega coesa sem planejamento SDD completo.",
-                    )
-                    self.assertEqual(metadata["disable-model-invocation"], "true")
-                elif name == "update-bm":
-                    self.assertIn("somente com invocação explícita", description)
-                    self.assertEqual(metadata["disable-model-invocation"], "true")
-                else:
-                    self.assertTrue(
-                        f"/{name}" in description or "method_version 2" in description
-                    )
+                self.assertTrue(description.startswith("Use "))
+                self.assertNotIn("method_version 2", description)
+                self.assertNotRegex(description, r"\b[Vv][234]\b")
+                if name in {"executar-direto", "migrar-bianchini", "update-bm"}:
+                    agent = read(path.parent / "agents/openai.yaml")
+                    self.assertIn("allow_implicit_invocation: false", agent)
         audit_description = frontmatter(read(SKILLS["auditar-arquitetura"]))["description"]
         self.assertIn("somente", audit_description)
         self.assertIn("não ativa por risco", audit_description)

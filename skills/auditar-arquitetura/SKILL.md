@@ -1,6 +1,6 @@
 ---
 name: auditar-arquitetura
-description: Use somente quando o usuário invocar /auditar-arquitetura ou pedir explicitamente uma auditoria arquitetural do Bianchini Method. É manual e não ativa por risco, perfil Full ou simples presença de method_version 2.
+description: Use somente quando o usuário invocar /auditar-arquitetura ou pedir explicitamente uma auditoria arquitetural. É manual, report-only e não ativa por risco ou pela presença do Bianchini Method 0.4.
 disable-model-invocation: true
 ---
 
@@ -12,16 +12,15 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva 
 
 ## Contrato
 
-Esta skill é manual, report-only e não implementa correções. `architecture_audit` registra a preferência do projeto, mas não dispara a skill automaticamente. Perfil Full, risco alto/crítico e achados de melhoria não bloqueiam planejamento, aprovação ou entrega por si só.
+Esta skill é manual, report-only e não implementa correções. Perfil `full`, risco alto/crítico e achados de melhoria não disparam a skill nem bloqueiam planejamento, aprovação ou entrega por si só.
 
 Um defeito funcional, de segurança ou integridade diretamente demonstrável não é uma “melhoria arquitetural”: registrá-lo separadamente, com reprodução/evidência, e encaminhá-lo ao fluxo `corrigir-bug` ou ao gate responsável. Não alterar código, status de plano nem aprovação durante a auditoria.
 
 ## Rota
 
-1. Executar `bm.py route`.
-2. V1: manter o projeto no fluxo legado; a auditoria continua manual e não migra artefatos.
-3. V2: validar o estado somente para identificar versão, spec e caminhos.
-4. Se o repositório não tiver Git ou histórico suficiente, declarar a limitação e auditar apenas o delta fornecido explicitamente.
+1. Se existir `.bianchini/STATE.md`, executar `bm.py model validate --repo <repo>` e usar somente seus ponteiros atuais.
+2. Sem `.bianchini`, auditar apenas o intervalo Git solicitado; não inicializar nem migrar o método.
+3. Se o repositório não tiver Git ou histórico suficiente, declarar a limitação e auditar apenas o delta fornecido explicitamente.
 
 ## Coleta econômica
 
@@ -72,7 +71,7 @@ Separar uma seção `Defeitos funcionais diretos` dos candidatos estruturais. Pa
 
 ## Relatório
 
-Criar `docs/bianchini/<planning_version>/ARCHITECTURE_AUDIT.md` com:
+Quando houver mudança ativa, criar `.bianchini/changes/Cxxx-*/results/ARCHITECTURE_AUDIT.md`; sem mudança ativa, devolver o relatório no destino explicitamente pedido pelo usuário. Incluir:
 
 - intervalo Git, data e limitações;
 - arquivos alterados e hotspots priorizados;
@@ -83,7 +82,7 @@ Criar `docs/bianchini/<planning_version>/ARCHITECTURE_AUDIT.md` com:
 
 HTML é opcional e só pode ser gerado quando o usuário pedir explicitamente. Nesse caso, criar uma versão estática ao lado do Markdown, escapar conteúdo dinâmico e não carregar scripts, fontes ou recursos remotos.
 
-Se o estado v2 for atualizado apenas para registrar execução, `architecture_audit_status: passed` significa “relatório concluído”, não “arquitetura certificada”. Nunca usar `blocked` por candidato de melhoria.
+Não alterar `STATE.md`, `COHERENCE.md`, aprovação ou status de plano. Nunca usar `blocked` por candidato de melhoria.
 
 ## Saída
 

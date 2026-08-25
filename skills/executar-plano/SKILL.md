@@ -1,193 +1,170 @@
 ---
 name: executar-plano
-description: Use somente com invocação explícita de /executar-plano ou quando PROJECT_STATE declarar method_version 2 e houver plano aprovado. Em estado v1, apenas roteia ao executor legado e não concorre com executores gerais.
+description: Use para executar planos aprovados do Bianchini Method 0.4 com workspace isolado, contratos verificados, impacto seletivo e DocViva atualizada.
 ---
 
 # Executar Plano
 
-**Anuncie:** "Executando <planos> no modo <v1 legado|grouped|slice|strict>."
+**Anuncie:** "Executando <planos> do Bianchini Method 0.4 no modo <grouped|slice|strict>."
 
-Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `status-projeto`; executar `all` somente quando o pedido atual já for explícito.
+Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `/status-projeto`; executar todos somente quando o pedido atual for explícito.
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py).
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md) e resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py).
 
-## 1. Preflight e rota
+## 1. Preflight
 
-1. Executar `bm.py route`.
-2. V1: exigir Superpowers e usar integralmente o executor legado. Depois do encerramento real, executar a transição da seção 9.
-3. V2: executar `validate-state`, `snapshot verify` e `repo-hygiene check`.
-4. Aprovação pending só muda por aprovação explícita do digest atual; o comando de execução não é aprovação.
-5. Confirmar planos em `approved_plans`, checker `passed`, dependências concluídas e design válido quando presente.
-6. Exigir `git status --porcelain` vazio. Mudança preexistente bloqueia a criação da worktree.
-
-Snapshot divergente invalida aprovação. Ciclo `quality_version: 1` já aprovado continua no contrato antigo; não migrar durante execução.
-
-## 2. Workspace isolado obrigatório
-
-Criar ou retomar um workspace por plano:
+1. Ler `.bianchini/STATE.md`; sem ele, bloquear e orientar `/migrar-bianchini` ou `/sdd-planning` conforme o projeto.
+2. Confirmar `status: approved|executing`, digest vigente, `COHERENCE.md` em `approved` e planos solicitados aprovados.
+3. Validar o modelo sem reabrir a auditoria aprovada:
 
 ```bash
-<bm.py> workspace create --repo <repo> --planning-version v1 --plan P01 --state <PROJECT_STATE.md>
-<bm.py> workspace resume --repo <repo> --planning-version v1 --plan P01
-<bm.py> workspace check --repo <workspace>
+bm.py model validate --repo <repo> --change C001
 ```
 
-Usar a versão real do estado, não o valor fixo do exemplo. Branch `bm/<planning_version>-<plan_id>`. Main, master, detached HEAD e worktree primária são proibidos. Não existe fallback para branch atual.
+4. Bloquear `ERROR`, `WARNING` aberto, plano `stale`, dependência incompleta, consumidor sem provider e divergência do modelo.
+5. Exigir `git status --porcelain` vazio antes de criar ou retomar workspace.
 
-Aquecer dependências uma vez, respeitando `mise` ou configuração equivalente.
+Não executar `coherence check` nem `impact analyze` como consulta de preflight: ambos atualizam `COHERENCE.md`. O gate de workspace valida o checkpoint aprovado. Digest alterado exige nova revisão completa e nova aprovação explícita.
 
-## 3. Retomada e contexto mínimo
+## 2. Workspace isolado
 
-No ledger registrar digest aprovado, base revision, workspace, branch, modo, perfil, readiness refs e máximo de fix rounds.
+Criar o workspace por plano somente a partir do repositório fonte limpo:
 
-Gerar pelo CLI:
+```bash
+bm.py workspace create --repo <repo> --change C001 --plan P01
+```
 
-- `task-brief` por grupo, slice ou tarefa;
-- `report` persistente do implementador;
-- `review-package` determinístico;
-- `checkpoint` após unidade, falha, bloqueio e antes de encerrar contexto.
+O comando bloqueia pacote sem `COHERENCE.md` aprovado, plano `stale`, artefato divergente do `HEAD`, Git sujo ou ID inválido. Para retomar, use `workspace locate|resume --repo <repo> --change C001 --plan P01`; dentro do workspace, use `workspace check --repo <workspace>`.
 
-Retomada começa com `workspace resume`, checkpoint e final do ledger. Não reler planos concluídos nem reconstruir estado pela conversa.
+Branch esperada: `bm/c001-p01`. `main`, `master`, detached HEAD e worktree primária são proibidos. Não existe fallback para editar na branch principal.
 
-Quando o plano usar `quality_version: 2`, preferir `task-brief --hydrate-context --state <PROJECT_STATE.md> --root <repo>` para carregar somente readiness, seções de spec, gates rápidos e final do ledger da unidade. A projeção permanece em `.superpowers/` e nunca substitui os artefatos aprovados.
+Respeite `mise` e configuração equivalente. Instale/aquela dependência somente quando já estiver aprovada pelo plano.
 
-## 4. Autonomia e plano congelado
+## 3. Contexto mínimo e retomada
 
-O plano aprovado é imutável. Antes de pedir decisão, seguir:
+Carregue somente:
+
+- índice atual;
+- plano ativo;
+- partes do `SYSTEM_MODEL.md` tocadas;
+- providers, consumers e restrições futuras do plano;
+- specs e decisões referenciadas;
+- último checkpoint e resultado do plano.
+
+Não releia planos concluídos nem reconstrua estado pela conversa. Gere pelo CLI briefs, relatórios, pacotes de revisão e checkpoints determinísticos quando as interfaces estiverem disponíveis.
+
+## 4. Plano congelado e mudanças
+
+Siga esta ordem para decisão interna:
 
 ```text
 decisão aprovada
--> padrão do repositório
--> stack/dependência existente
--> documentação oficial
--> opção reversível de menor risco
+→ padrão do repositório
+→ stack/dependência existente
+→ documentação oficial
+→ opção reversível de menor risco
 ```
 
-Registrar a decisão e continuar.
+- detalhe interno reversível: decidir e registrar;
+- ajuste limitado sem mudança de contrato: registrar no resultado;
+- contrato, ownership, dado, migration, journey, efeito ou invariante alterado: parar a área afetada, registrar os IDs alterados e recalcular impacto;
+- novo custo ou efeito irreversível: pedir autoridade no checkpoint, preservando o plano se o contrato não mudar.
 
-Quando surgir divergência, executar `bm.py change-policy` com os flags factuais:
-
-- `implementation_detail`: decidir e continuar;
-- `bounded_amendment`: registrar no ledger e continuar sem editar plano, spec ou snapshot;
-- `material_change` com `plan_invalidating: true`: invalidar o pacote e replanejar somente a área afetada;
-- `material_change` somente por custo ou ação irreversível: pausar para autorização e continuar no mesmo plano se o contrato permanecer igual.
-
-Arquivo diferente, comando equivalente, ordem interna, nome ou implementação mais simples não autorizam redesign. `bounded_amendment` não abre tarefa, revisão, fix loop ou subagente.
-
-Parar somente por credencial indispensável sem fallback, novo custo, ação destrutiva/irreversível, mudança material de escopo/contrato/design ou impossibilidade real comprovada. Ação `U-*` ainda não necessária não interrompe trabalho independente; usar o fallback aprovado até `needed_by`.
+Não redesenhar por preferência de nome, arquivo, comando equivalente ou solução "mais elegante". Não implementar necessidade futura.
 
 ## 5. Executar pela política
 
-Antes de cada unidade, executar `bm.py policy` com perfil, risco e `Change` do brief. Divergência pode aumentar garantia; redução exige novo pacote.
-
-Quando o host suportar subagentes, usar [`../_shared/agents/implementation-worker.md`](../_shared/agents/implementation-worker.md). Passar apenas contrato, brief, relatório e contexto necessário. Sem subagentes, cumprir inline.
+Fix round é hipótese, não entrega. Identifique o `risk_seam` estável; renomear a tarefa não reinicia sua contagem. Passe `--risk-seam` e `--consecutive-seam-findings` à política. Ao atingir o breaker, pare patches locais e redesenhe o seam.
 
 ### Grouped
 
-- Agrupar unidades baixas do mesmo seam e ownership compatível.
-- Um brief, auto-revisão e revisão no gate do plano.
-- `verification.fast` focada.
-- Commit atômico por grupo.
+- agrupar unidades baixas do mesmo seam e ownership;
+- um brief e uma revisão no gate do plano;
+- `verification.fast` focal;
+- commit atômico por grupo.
 
 ### Slice
 
-- Cada slice entrega comportamento vertical.
-- Teste comportamental; RED/GREEN somente quando prova regressão real.
-- Revisão por slice.
-- Commit atômico por slice.
+- entregar comportamento vertical;
+- teste comportamental no seam público;
+- revisão por slice;
+- commit atômico por slice.
 
 ### Strict
 
-- Uma unidade crítica por execução.
-- RED pela interface pública, GREEN mínimo e vizinhos de risco.
-- Revisão independente quando disponível.
-- Commit atômico por tarefa.
+- uma unidade crítica por execução;
+- RED pela interface pública, GREEN mínimo e regressão vizinha;
+- revisão independente;
+- commit atômico por tarefa.
 
-Nenhum modo implementa necessidade futura. Testes observam seams públicos.
+Quando subagentes estiverem disponíveis e autorizados, use [`../_shared/agents/implementation-worker.md`](../_shared/agents/implementation-worker.md). O worker recebe somente contrato, brief, modelo necessário e arquivo de resultado. Não criar subagente por camada de teste.
 
-## 6. Profundidade de testes
+## 6. Verificação e revisão
 
-Na unidade, executar somente `verification.fast`:
+Na unidade, execute `verification.fast`: unitário, contrato/integração e regressão diretamente relacionados. E2E entra somente quando for a menor prova pública. Não execute E2E completo ou mutação por microtarefa.
 
-- unitário focado quando lógica mudou;
-- integração/contrato focada quando fronteira mudou;
-- regressão diretamente relacionada;
-- E2E focado apenas quando for a menor prova pública.
+No gate do plano, execute `verification.plan`: suítes afetadas, regressão do plano, jornadas críticas e mutação seletiva exigida. No release, execute os comandos completos aprovados.
 
-Na execução da unidade, não executar E2E completo ou mutação por unidade. Não criar tarefa/subagente por camada de teste.
+Revise em dois eixos:
 
-No gate do plano, executar suítes afetadas, regressão do plano, E2E crítico e mutação seletiva exigida. No release, executar os comandos completos aprovados. Não perseguir cobertura ou mutation score global.
+- **Contrato:** entrega, `provides`, `consumes`, model delta, aceite e ausência de escopo extra;
+- **Qualidade:** correção, segurança, simplicidade, compatibilidade e testes.
 
-Quando `bm.py policy` retornar `selective` ou `required_selective`, validar o relatório final com `mutation-evidence verify`. A evidência deve apontar o mesmo HEAD ou fingerprint do RC, classificar todos os survivors e permanecer vigente após a última alteração no seam.
+Use [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) na cadência do modo: `grouped` no gate do plano, `slice` por slice e `strict` por tarefa. Entregue o caminho do arquivo de saída da revisão; nunca revise por microtarefa em `grouped`.
 
-## 7. Revisão e convergência
+Em risco alto ou crítico envolvendo autenticação/autorização, pagamentos, privacidade, secrets, migração destrutiva ou integridade, execute passagem somente leitura por [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md). Não executá-la em tarefa comum. Entregue o caminho do arquivo de saída do parecer e trate findings no fix loop existente.
 
-Usar [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) na cadência do modo, nunca por microtarefa em `grouped`. Entregar apenas contrato, brief, relatório, review package e o caminho do arquivo de saída da revisão.
+Finding estrutural, crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry ambíguo, idempotência concorrente ou recuperação após restart invalida a hipótese. Pare patches e redesenhe o seam com máquina de estados e matriz de falhas.
 
-Em risco alto ou crítico sensível, usar passagem somente leitura por [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md), incluindo o caminho do arquivo de saída do parecer. Não executá-la em tarefa comum.
+## 7. Fechar cada plano
 
-Revisar Spec e Qualidade. `critical`/`important` abre fix round. Em cada rodada:
+No HEAD final:
 
-1. registrar `risk_seam`;
-2. corrigir a causa mínima;
-3. executar RED/GREEN e regressão focal;
-4. revisar somente o delta;
-5. recalcular policy com `--seam-round`, `--consecutive-seam-findings` e `--structural-finding` aplicáveis.
-
-Fix round é hipótese, não entrega. Gates completos ficam no fechamento. Com breaker ou hipótese estrutural invalidada, parar patches e redesenhar o seam técnico, não o plano comercial inteiro. Nunca exceder o limite.
-
-Revisor não pode transformar `implementation_detail` ou `bounded_amendment` em redesign por preferência.
-
-## 8. Gate, release e homologação
-
-Ao fechar um plano:
-
-1. executar `verification.plan` no HEAD final;
-2. registrar comandos, cwd, horário, resumo e exit code;
-3. usar `corrigir-bug` para falha de produto;
-4. repetir somente gates afetados e dependentes;
-5. gerar checkpoint;
-6. marcar `completed` somente com gates obrigatórios `passed`.
-
-`not_run`, flake aberto ou dependência indispensável mantém `blocked`.
-
-Quando o último plano concluir:
-
-1. gerar RC com `id`, `revision`, `build`, `checksum`;
-2. definir `candidate`;
-3. executar `homologar-sistema`, começando por `verification.release`;
-4. com homologação aceita, revisar o release completo uma vez;
-5. criar `artifacts/delivery/DELIVERY.md` e definir `ready`.
-
-Se o host não invocar skills, ler e cumprir `corrigir-bug` ou `homologar-sistema` diretamente. Manual/PDF somente quando contratado.
-
-## 9. Encerrar ciclo
-
-Após release `ready`, homologação aceita, revisão final aprovada, entrega pronta, commit final e árvore limpa:
+1. registrar comandos, cwd, horário, resultado e exit code;
+2. registrar `provides/consumes` realmente entregues e o delta real do modelo;
+3. comparar o delta com o prometido;
+4. executar, quando houver mudança material:
 
 ```bash
-<bm.py> cycle-close --state <PROJECT_STATE.md> --root <repo>
+bm.py impact analyze --repo <repo> --change C001 --plan P01 \
+  --changed-contract <id>
 ```
 
-Confirmar:
-
-- `spec-deltas` sincronizados em `docs/bianchini/current/specs/`;
-- mudança arquivada em `docs/bianchini/archive/<version>/`;
-- estado `idle` com versão seguinte;
-- mudanças preparadas sem arquivos alheios.
-
-Criar commit local atômico `chore: close <version> and sync current specs`. Não fazer push, merge, deploy ou publicação por inferência.
-
-### Transição legado
-
-Quando fase v1 concluir gates, entrega e commit, executar:
+5. marcar somente consumidores realmente atingidos como `stale`;
+6. repetir jornadas e gates apontados pelo impacto;
+7. materializar o delta real em JSON e executar:
 
 ```bash
-<bm.py> legacy-transition --repo <repo> --state <PROJECT_STATE.md> --completed
+bm.py plan complete --repo <repo> --change C001 --plan P01 \
+  --actual-delta <delta-real.json> \
+  --result "<resultado>" \
+  --verification "<evidência>"
 ```
 
-Após conclusão comprovada, não pedir nova aprovação de migração. Confirmar archive legado, estado v2 `idle`, higiene e árvore limpa. `--completed` exige marcador objetivo ou `--completion-proof` commitado.
+8. confirmar o resultado em `.bianchini/changes/Cxxx-*/results/` e o `STATE.md` atualizado.
+
+`not_run`, flake aberto, evidência obsoleta ou dependência indispensável mantém o plano bloqueado. Uma mudança interna sem contrato/dado/invariante não invalida planos futuros.
+
+## 8. Fechar a mudança
+
+Depois do último plano:
+
+1. reconstruir `Sn` e executar `model validate`;
+2. exigir equivalência com o `SYSTEM_MODEL.md` final;
+3. executar o check estrutural, a revisão semântica conjunta atualizada e journeys ponta a ponta;
+4. executar `verification.release` e homologação aplicável no RC exato;
+5. revisar o release completo uma vez;
+6. se o digest mudou, obter nova aprovação explícita e gravá-la com `coherence approve`;
+7. sincronizar arquitetura, modelo e specs em `.bianchini/current/`;
+8. mover a mudança concluída para `.bianchini/archive/`;
+9. deixar `STATE.md` compacto em `idle` com `last_completed` e próxima ação.
+
+Depois dos gates aplicáveis e com Git limpo, execute `bm.py cycle-close --repo <repo> --change C001`. O CLI recompõe o modelo pelos resultados, promove arquitetura/modelo e arquiva a mudança com rollback de falha intermediária.
+
+Existência isolada de endpoint, tabela, fila ou tela não comprova integração. Diferencie código, testes, sandbox, deploy, efeito externo e homologação humana.
+
+Não fazer push, merge, deploy ou publicação por inferência. Respeite a autorização atual do usuário e as regras do repositório.
 
 ## Saída
 
-Informar rota, planos/modos, workspaces, decisões autônomas, mudanças classificadas, gates, homologação, commits, ledgers/checkpoints, sync/archive do ciclo, manual e bloqueios. Não perguntar por decisão técnica reversível já coberta pelo envelope.
+Informe mudança/plano, modo, workspace, modelo antes/depois, contratos entregues, impact radius, planos `stale`, gates, commits, resultados, DocViva e bloqueios.

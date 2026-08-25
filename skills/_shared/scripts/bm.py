@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Primitivas determinísticas do Bianchini Method v2. Somente stdlib."""
+"""Primitivas determinísticas do Bianchini Method 0.4. Somente stdlib."""
 
 from __future__ import annotations
 
@@ -35,6 +35,8 @@ from bm_update import (
     render_update_result,
     update_bianchini_method,
 )
+import bm_v04_workflows as v04
+import bm_v04_planning as v04_planning
 
 
 EXIT_INVALID = 2
@@ -544,6 +546,11 @@ def confined_path(root: Path, value: str, label: str) -> Path:
 def reject_symlink_chain(root: Path, path: Path, label: str) -> None:
     base = root.resolve()
     candidate = path if path.is_absolute() else base / path
+    # macOS pode expor o mesmo diretório lexicalmente por /var e /private/var.
+    # Resolva o pai existente antes de comparar, mas preserve o último nome para
+    # ainda detectar o próprio alvo quando ele for um symlink.
+    candidate_parent = candidate.parent.resolve()
+    candidate = candidate_parent / candidate.name
     try:
         relative = candidate.absolute().relative_to(base)
     except ValueError as error:
@@ -4335,6 +4342,29 @@ def render_status(summary: dict[str, Any]) -> str:
     )
 
 
+def direct_risk_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    overrides = [
+        name
+        for name, enabled in (
+            ("multiple_objectives", args.multiple_objectives),
+            ("destructive_migration", args.destructive_migration),
+            ("uncontrolled_concurrency", args.uncontrolled_concurrency),
+            ("undefined_ownership", args.undefined_ownership),
+            ("ambiguous_financial_rule", args.ambiguous_financial_rule),
+            ("new_material_architecture", args.new_material_architecture),
+        )
+        if enabled
+    ]
+    return v04.classify_quick_risk(
+        args.scope_score,
+        args.external_effect_score,
+        args.migration_score,
+        args.concurrency_score,
+        args.money_score,
+        overrides,
+    )
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="bm", description=__doc__)
     commands = result.add_subparsers(dest="command", required=True)
@@ -4349,6 +4379,85 @@ def parser() -> argparse.ArgumentParser:
     route.add_argument("--repo", type=Path, default=Path.cwd())
     route.add_argument("--new-project", action="store_true")
     route.add_argument("--migrate-to-v2", action="store_true")
+
+    model = commands.add_parser("model")
+    model.add_argument("action", choices=["init", "validate"])
+    model.add_argument("--repo", type=Path, default=Path.cwd())
+    model.add_argument("--change")
+
+    coherence = commands.add_parser("coherence")
+    coherence.add_argument("action", choices=["check", "approve"])
+    coherence.add_argument("--repo", type=Path, default=Path.cwd())
+    coherence.add_argument("--change", required=True)
+    coherence.add_argument("--structural-only", action="store_true")
+    coherence.add_argument("--semantic-report", type=Path)
+    coherence.add_argument("--digest")
+    coherence.add_argument("--approved-by")
+
+    impact = commands.add_parser("impact")
+    impact.add_argument("action", choices=["analyze"])
+    impact.add_argument("--repo", type=Path, default=Path.cwd())
+    impact.add_argument("--change", required=True)
+    impact.add_argument("--plan", required=True)
+    impact.add_argument("--changed-contract", action="append", default=[])
+    impact.add_argument("--changed-ownership", action="append", default=[])
+    impact.add_argument("--changed-interface", action="append", default=[])
+    impact.add_argument("--changed-data", action="append", default=[])
+    impact.add_argument("--changed-migration", action="append", default=[])
+    impact.add_argument("--changed-journey", action="append", default=[])
+    impact.add_argument("--changed-effect", action="append", default=[])
+    impact.add_argument("--changed-invariant", action="append", default=[])
+    impact.add_argument("--global-change", action="store_true")
+
+    plan_result = commands.add_parser("plan")
+    plan_result.add_argument("action", choices=["complete"])
+    plan_result.add_argument("--repo", type=Path, default=Path.cwd())
+    plan_result.add_argument("--change", required=True)
+    plan_result.add_argument("--plan", required=True)
+    plan_result.add_argument("--actual-delta", type=Path, required=True)
+    plan_result.add_argument("--result", required=True)
+    plan_result.add_argument("--verification", action="append", default=[])
+
+    debug = commands.add_parser("debug")
+    debug.add_argument(
+        "action", choices=["start", "list", "status", "resume", "checkpoint", "finish"]
+    )
+    debug.add_argument("--repo", type=Path, default=Path.cwd())
+    debug.add_argument("--id")
+    debug.add_argument("--objective")
+    debug.add_argument("--expected")
+    debug.add_argument("--actual")
+    debug.add_argument("--environment")
+    debug.add_argument("--origin-ref", action="append", default=[])
+    debug.add_argument("--origin-evidence")
+    debug.add_argument(
+        "--relation", choices=["caused_by", "detected_in", "regression_of"]
+    )
+    debug.add_argument(
+        "--event",
+        choices=[
+            "reproduced",
+            "diagnosed",
+            "red",
+            "fixing",
+            "green",
+            "regression_checked",
+            "documented",
+        ],
+    )
+    debug.add_argument("--evidence")
+    debug.add_argument("--hypothesis", action="append", default=[])
+    debug.add_argument("--experiment", action="append", default=[])
+    debug.add_argument("--eliminated-hypothesis", action="append", default=[])
+    debug.add_argument("--root-cause")
+    debug.add_argument("--neighbor-regression", action="append", default=[])
+    debug.add_argument("--residual-risk")
+    debug.add_argument("--status", choices=["resolved", "blocked", "escalated"])
+    debug.add_argument("--reason")
+
+    migrate = commands.add_parser("migrate")
+    migrate.add_argument("action", choices=["check", "apply"])
+    migrate.add_argument("--repo", type=Path, default=Path.cwd())
 
     hygiene = commands.add_parser("repo-hygiene")
     hygiene.add_argument("action", choices=["check", "migrate"])
@@ -4397,8 +4506,10 @@ def parser() -> argparse.ArgumentParser:
     change.add_argument("--internal-order", action="store_true")
 
     close = commands.add_parser("cycle-close")
-    close.add_argument("--state", type=Path, required=True)
-    close.add_argument("--root", type=Path, required=True)
+    close.add_argument("--state", type=Path)
+    close.add_argument("--root", type=Path)
+    close.add_argument("--repo", type=Path, default=Path.cwd())
+    close.add_argument("--change")
 
     decide = commands.add_parser("policy")
     decide.add_argument("--profile", choices=["lean", "standard", "full"], required=True)
@@ -4425,6 +4536,7 @@ def parser() -> argparse.ArgumentParser:
     workspace.add_argument("action", choices=["create", "check", "locate", "resume"])
     workspace.add_argument("--repo", type=Path, default=Path.cwd())
     workspace.add_argument("--plan")
+    workspace.add_argument("--change")
     workspace.add_argument("--planning-version")
     workspace.add_argument("--state", type=Path)
     workspace.add_argument("--target", type=Path)
@@ -4504,7 +4616,8 @@ def parser() -> argparse.ArgumentParser:
 
     direct = commands.add_parser("direct")
     direct.add_argument(
-        "action", choices=["start", "status", "checkpoint", "finish", "reopen"]
+        "action",
+        choices=["classify", "start", "status", "checkpoint", "finish", "reopen"],
     )
     direct.add_argument("--repo", type=Path, default=Path.cwd())
     direct.add_argument("--slug")
@@ -4559,6 +4672,23 @@ def parser() -> argparse.ArgumentParser:
     direct.add_argument("--accept-unrecorded", action="append", default=[])
     direct.add_argument("--evidence", action="append", default=[])
     direct.add_argument("--waive-verification", action="append", default=[])
+    direct.add_argument("--scope-score", type=int, choices=[0, 1, 2], default=0)
+    direct.add_argument(
+        "--external-effect-score", type=int, choices=[0, 1, 2], default=0
+    )
+    direct.add_argument("--migration-score", type=int, choices=[0, 1, 2], default=0)
+    direct.add_argument("--concurrency-score", type=int, choices=[0, 1, 2], default=0)
+    direct.add_argument("--money-score", type=int, choices=[0, 1, 2], default=0)
+    direct.add_argument("--guard", action="append", default=[])
+    direct.add_argument("--webhook-flow", action="store_true")
+    direct.add_argument("--payment-flow", action="store_true")
+    direct.add_argument("--production-authorized", action="store_true")
+    direct.add_argument("--multiple-objectives", action="store_true")
+    direct.add_argument("--destructive-migration", action="store_true")
+    direct.add_argument("--uncontrolled-concurrency", action="store_true")
+    direct.add_argument("--undefined-ownership", action="store_true")
+    direct.add_argument("--ambiguous-financial-rule", action="store_true")
+    direct.add_argument("--new-material-architecture", action="store_true")
 
     updater = commands.add_parser("update-bm")
     updater.add_argument("--check", action="store_true")
@@ -4594,6 +4724,122 @@ def main() -> int:
                     args.migrate_to_v2,
                 )
             )
+        elif args.command == "model":
+            if args.action == "init":
+                initialized = v04.init_workspace(args.repo)
+                if args.change:
+                    emit(v04_planning.create_change(args.repo, args.change))
+                else:
+                    emit(initialized)
+            else:
+                if args.change:
+                    emit(v04_planning.validate_change_model(args.repo, args.change))
+                else:
+                    emit(v04.validate_workspace(args.repo))
+        elif args.command == "coherence":
+            if args.action == "check":
+                emit(
+                    v04_planning.coherence_check(
+                        args.repo,
+                        args.change,
+                        structural_only=args.structural_only,
+                        semantic_report=args.semantic_report,
+                    )
+                )
+            else:
+                if not args.digest or not args.approved_by:
+                    raise BMError("coherence approve exige --digest e --approved-by")
+                emit(
+                    v04_planning.coherence_approve(
+                        args.repo,
+                        args.change,
+                        digest=args.digest,
+                        approved_by=args.approved_by,
+                    )
+                )
+        elif args.command == "impact":
+            emit(
+                v04_planning.impact_analyze(
+                    args.repo,
+                    args.change,
+                    args.plan,
+                    changed_contracts=args.changed_contract,
+                    changed_ownership=args.changed_ownership,
+                    changed_interfaces=args.changed_interface,
+                    changed_data=args.changed_data,
+                    changed_migrations=args.changed_migration,
+                    changed_journeys=args.changed_journey,
+                    changed_effects=args.changed_effect,
+                    changed_invariants=args.changed_invariant,
+                    global_change=args.global_change,
+                )
+            )
+        elif args.command == "plan":
+            emit(
+                v04_planning.plan_complete(
+                    args.repo,
+                    args.change,
+                    args.plan,
+                    actual_delta=args.actual_delta,
+                    result=args.result,
+                    verification=args.verification,
+                )
+            )
+        elif args.command == "migrate":
+            if args.action == "check":
+                emit(v04.migration_check(args.repo))
+            else:
+                emit(v04.migration_apply(args.repo))
+        elif args.command == "debug":
+            if args.action == "start":
+                if not all((args.objective, args.expected, args.actual, args.environment)):
+                    raise BMError(
+                        "debug start exige --objective, --expected, --actual e --environment"
+                    )
+                emit(
+                    v04.debug_start(
+                        args.repo,
+                        args.objective,
+                        args.expected,
+                        args.actual,
+                        args.environment,
+                        args.origin_ref,
+                        args.relation,
+                        args.origin_evidence,
+                    )
+                )
+            elif args.action in {"list", "status", "resume"}:
+                if args.action in {"status", "resume"} and not args.id:
+                    raise BMError(f"debug {args.action} exige --id")
+                emit(v04.debug_status(args.repo, args.id if args.action != "list" else None))
+            elif args.action == "checkpoint":
+                if not all((args.id, args.event, args.evidence)):
+                    raise BMError("debug checkpoint exige --id, --event e --evidence")
+                emit(
+                    v04.debug_checkpoint(
+                        args.repo,
+                        args.id,
+                        args.event,
+                        args.evidence,
+                        hypotheses=args.hypothesis,
+                        experiments=args.experiment,
+                        eliminated_hypotheses=args.eliminated_hypothesis,
+                        root_cause=args.root_cause,
+                        neighboring_regressions=args.neighbor_regression,
+                        residual_risk=args.residual_risk,
+                    )
+                )
+            else:
+                if not args.id:
+                    raise BMError("debug finish exige --id")
+                emit(
+                    v04.debug_finish(
+                        args.repo,
+                        args.id,
+                        args.status or "resolved",
+                        args.reason,
+                    )
+                )
         elif args.command == "repo-hygiene":
             emit(
                 repository_hygiene(
@@ -4643,7 +4889,14 @@ def main() -> int:
                 )
             )
         elif args.command == "cycle-close":
-            emit(cycle_close(args.state, args.root))
+            if (args.repo.resolve() / ".bianchini/STATE.md").is_file():
+                if not args.change:
+                    raise BMError("cycle-close 0.4 exige --change")
+                emit(v04_planning.close_change(args.repo, args.change))
+            else:
+                if not args.state or not args.root:
+                    raise BMError("cycle-close anterior exige --state e --root")
+                emit(cycle_close(args.state, args.root))
         elif args.command == "policy":
             emit(
                 policy(
@@ -4660,7 +4913,31 @@ def main() -> int:
                 )
             )
         elif args.command == "workspace":
-            if args.action == "create":
+            workspace_v04 = (args.repo.resolve() / ".bianchini/STATE.md").is_file()
+            if workspace_v04 and args.action == "create":
+                if not args.plan or not args.change:
+                    raise BMError("--change e --plan são obrigatórios para criar workspace 0.4")
+                emit(
+                    v04_planning.execution_workspace_create(
+                        args.repo, args.change, args.plan, args.target
+                    )
+                )
+            elif workspace_v04 and args.action == "check":
+                emit(v04_planning.execution_workspace_check(args.repo))
+            elif workspace_v04:
+                if not args.plan or not args.change:
+                    raise BMError(
+                        f"--change e --plan são obrigatórios para {args.action} no método 0.4"
+                    )
+                emit(
+                    v04_planning.execution_workspace_locate(
+                        args.repo,
+                        args.change,
+                        args.plan,
+                        resume=args.action == "resume",
+                    )
+                )
+            elif args.action == "create":
                 if not args.plan or not args.planning_version or not args.state:
                     raise BMError(
                         "--plan, --planning-version e --state são obrigatórios para criar workspace"
@@ -4769,7 +5046,68 @@ def main() -> int:
             else:
                 emit(telemetry_summary(args.state, args.root))
         elif args.command == "direct":
-            if args.action == "start":
+            risk = direct_risk_from_args(args)
+            uses_v04 = (args.repo.resolve() / ".bianchini").exists()
+            if args.action == "classify":
+                emit(risk)
+            elif uses_v04 and args.action == "start":
+                if not all((args.objective, args.scope)):
+                    raise BMError("direct start exige --objective e --scope")
+                if not args.acceptance or not args.verification:
+                    raise BMError(
+                        "direct start exige ao menos um --acceptance e um --verification"
+                    )
+                emit(
+                    v04.quick_start(
+                        args.repo,
+                        args.objective,
+                        args.scope,
+                        args.acceptance,
+                        args.verification,
+                        risk,
+                        args.guard,
+                        webhook_flow=args.webhook_flow,
+                        payment_flow=args.payment_flow,
+                    )
+                )
+            elif uses_v04 and args.action == "status":
+                emit(v04.quick_status(args.repo, args.slug))
+            elif uses_v04 and args.action == "checkpoint":
+                if not all((args.slug, args.checkpoint, args.next_action)):
+                    raise BMError(
+                        "direct checkpoint exige --slug, --checkpoint e --next-action"
+                    )
+                emit(
+                    v04.quick_checkpoint(
+                        args.repo,
+                        args.slug,
+                        args.checkpoint,
+                        args.changed_file,
+                        args.executed_commands,
+                        args.evidence,
+                        args.blocker,
+                        args.next_action,
+                    )
+                )
+            elif uses_v04 and args.action == "finish":
+                if not all((args.slug, args.status, args.next_action)):
+                    raise BMError("direct finish exige --slug, --status e --next-action")
+                emit(
+                    v04.quick_finish(
+                        args.repo,
+                        args.slug,
+                        args.status,
+                        args.behavior,
+                        [*args.verification, *args.evidence],
+                        args.limitation,
+                        args.next_action,
+                        args.blocker,
+                        args.production_authorized,
+                    )
+                )
+            elif uses_v04 and args.action == "reopen":
+                raise BMError("ORDER_VIOLATION: quick 0.4 terminal é imutável")
+            elif args.action == "start":
                 if not all((args.slug, args.objective, args.scope, args.current_state)):
                     raise BMError(
                         "direct start exige --slug, --objective, --scope e --current-state"
@@ -4867,6 +5205,12 @@ def main() -> int:
     except BMError as error:
         print(str(error), file=sys.stderr)
         return error.exit_code
+    except v04.WorkflowError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_BLOCKED
+    except v04_planning.PlanningError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_BLOCKED
     except (OSError, UnicodeError, subprocess.SubprocessError, KeyError, TypeError, ValueError) as error:
         print(f"erro de entrada/IO: {error}", file=sys.stderr)
         return EXIT_INVALID

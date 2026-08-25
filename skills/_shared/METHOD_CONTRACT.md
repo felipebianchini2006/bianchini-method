@@ -1,333 +1,336 @@
-# Contrato do Bianchini Method
+# Contrato do Bianchini Method 0.4
 
-Referência normativa das oito skills. Use [`scripts/bm.py`](scripts/bm.py) para decisões frágeis e repetíveis; não reimplemente essas primitivas em prompts.
+Referência normativa das skills públicas. Use [`scripts/bm.py`](scripts/bm.py) para operações determinísticas; não replique em prompt validação, score, grafo, digest, escrita atômica ou migração.
 
-## Execução direta explícita
+## Workspace canônico
 
-`/executar-direto` é um fluxo independente e opt-in para uma entrega única, coesa e de risco baixo ou médio localizado. Ele não altera o roteamento v1/v2, não cria `PROJECT_STATE.md` e não invoca Superpowers. O CLI mantém `BRIEF.md`, `PROGRESS.md`, `RESULT.md` e estado mínimo em `.superpowers/bianchini/direct/<slug>/`, sempre ignorado pelo Git e confinado ao repositório.
-
-```bash
-bm.py direct start --repo <repo> --slug <slug> --objective <objetivo> --scope <escopo> --current-state <síntese factual> --acceptance <critério> --verification <comando>
-bm.py direct status --repo <repo> [--slug <slug>]
-bm.py direct checkpoint --repo <repo> --slug <slug> --checkpoint <marco> --next-action <ação>
-bm.py direct finish --repo <repo> --slug <slug> --status completed --next-action <ação>
-bm.py direct reopen --repo <repo> --slug <slug> --next-action <ação>   # somente execução blocked
-```
-
-O início bloqueia detached HEAD e alterações não reconhecidas, registra `/.superpowers/` em `.git/info/exclude` sem tocar o `.gitignore` do projeto, confirma que o scratch não aparece no `git status`, cria `bm/direct/<slug>` quando necessário e escala hazards estruturais para `/sdd-planning` antes de implementar o risco. Não cria worktree, planos, spec, auditoria, homologação completa ou manual.
-
-O brief tem identidade por digest (objetivo, estado atual, escopo, não objetivos, aceite, risco, tipo de mudança, hazards, subsistemas e comandos de verificação): retomada exige digest igual; digest diferente bloqueia e pede novo slug ou `--update-brief` explícito. `finish --status completed` usa evidência estruturada registrada por `checkpoint --evidence` (JSON com `kind`, `status`, `summary`, e `command`/`exit_code` ou `evidence`): exige estado `active`, verificação `passed`, todos os comandos planejados cobertos por evidência aprovada com `exit_code: 0` ou dispensados via `--waive-verification "comando: justificativa"`, nenhuma evidência atual `failed`/`blocked`/`not_run` nem obsoleta (cada evidência é carimbada com digest do brief e fingerprint da árvore; brief ou código alterado depois do registro invalida a prova, e `--update-brief` zera verificação e evidências), ao menos um comportamento entregue, nenhum bloqueio aberto e nenhuma alteração fora de `changed_files` (aceite explícito só com `--accept-unrecorded "caminho: justificativa"`). `blocked` e `escalated` exigem motivo via `--blocker` ou `--limitation`. `completed`, `blocked` e `escalated` são terminais; escalado nunca vira concluído; apenas `blocked` pode ser reaberto preservando o resultado anterior.
-
-## Roteamento v1/v2
-
-Com estado existente, execute `bm.py route docs/living/PROJECT_STATE.md`. Sem estado, execute `bm.py route --repo <repo> --new-project`; artefatos `docs/superpowers/` vencem a flag de projeto novo.
-
-### Projeto v1
-
-`method_version: 1` sempre usa o fluxo legado baseado em Superpowers. Um arquivo sem marcador só é v1 implícito quando `load_state` encontra evidência reconhecida, como `docs/superpowers/`; JSON corrompido ou arquivo desconhecido bloqueia. Localize a instalação e passe `--superpowers-path <caminho>` ao roteador.
-
-- Superpowers disponível: devolver `v1-superpowers` e seguir integralmente o fluxo legado, seus caminhos, ledger, dispatch, revisão e retomada.
-- Superpowers ausente: `BLOQUEADO`; informar a dependência e não executar com o motor v2.
-- Nunca migrar, renumerar, normalizar estado ou criar artefatos v2 no meio de uma fase legado.
-
-Durante um ciclo ativo, migração para v2 só existe após autorização explícita do responsável. Nesse caso, executar `bm.py route --repo <repo> --new-project --migrate-to-v2`, preservar planos legados sob `docs/` como históricos e criar um estado bootstrap v2 com `planning_status: in_progress`. Para regras do repositório, respeitar exclusivamente a política delimitada abaixo. O bootstrap pode ter `plans: []` somente enquanto o novo planejamento ainda está sendo produzido; antes de `pending_approval`, deve existir ao menos um plano completo.
-
-### Encerramento definitivo do legado
-
-Depois que o executor v1 concluir e commitar todos os gates, verificação final e entrega, a migração deixa de exigir nova aprovação e passa a ser parte obrigatória do encerramento:
-
-```bash
-bm.py legacy-transition --repo <repo> --state <PROJECT_STATE.md> --completed [--completion-proof <arquivo>]
-```
-
-O comando exige repositório Git limpo, estado legado commitado, `--completed` e evidência objetiva de conclusão. Aceita marcador final reconhecido no estado; sem marcador, `--completion-proof` deve apontar para arquivo regular, sem symlink, rastreado e commitado no HEAD, com evidência de gates, entrega ou aceite. O resultado registra caminho e SHA-256 do proof. Depois preserva os bytes legados em `docs/bianchini/legacy/transitions/PROJECT_STATE-v1-final.md`, aplica a higiene de `/.superpowers/`, substitui o estado ativo por v2 `idle` e prepara as mudanças no índice.
-
-Nunca editar conteúdo livre de `AGENTS.md` ou `CLAUDE.md` durante a transição. Sem seção já delimitada por `<!-- bianchini-method:start -->` e `<!-- bianchini-method:end -->`, apenas relatar uma sugestão; com marcadores, qualquer edição fica limitada ao bloco.
-
-`--completed` nunca pode ser usado como atalho: fase em andamento, bloqueada ou não commitada permanece v1. O estado `idle` é reproduzível, não possui escopo aprovado, spec, revisão, plano, aprovação ou execução ativa. `/sdd-planning` transforma `idle` em `in_progress` somente quando houver novo escopo aprovado.
-
-Valores legados reconhecidos apenas para leitura/status:
-
-| Canônico | Valores v1 |
-|---|---|
-| `pending` | `pending`, `planned`, `pendente`, `planejado` |
-| `approved` | `approved`, `aprovado` |
-| `in_progress` | `in_progress`, `in-progress`, `em_andamento` |
-| `completed` | `completed`, `done`, `concluido`, `concluído` |
-| `blocked` | `blocked`, `bloqueado` |
-
-### Projeto v2
-
-`method_version: 2` e `method_mode: standalone-adaptive` usam somente o motor deste pacote. Superpowers não é lido nem necessário.
-
-- marcador ausente sem legado: somente `sdd-planning` inicia v2;
-- estado v2 `idle`: encerramento legado concluído; o próximo `/sdd-planning` é standalone e não usa Superpowers;
-- marcador ausente com `docs/superpowers/vN/`: tratar como v1 provisório;
-- marcador inválido, duplicado ou futuro: `BLOQUEADO`, sem downgrade.
-
-Resolva o caminho absoluto do CLI empacotado e substitua `<bm.py>` nos comandos:
-
-```bash
-python3 <bm.py> validate-state docs/living/PROJECT_STATE.md
-```
-
-O schema canônico está em [`schemas/project-state.schema.json`](schemas/project-state.schema.json).
-
-Novos ciclos usam `planning.quality_version: 2`. Pacotes `quality_version: 1` já aprovados continuam válidos até seu encerramento; não são convertidos no meio da execução.
-
-## Design antes do planejamento
-
-`/design-projeto` é a única skill pública que pode criar uma referência visual nova antes do SDD. Ela produz HTML/CSS/JS estático em `docs/design/<version>/`, sem código de produção.
-
-Somente `DESIGN_MANIFEST.json` com `status: approved`, `scope_digest` atual e `design_digest` válido é fonte de verdade. Arquivos soltos sob `docs/design`, screenshot antigo ou protótipo de outro escopo são ignorados.
-
-```bash
-bm.py design-audit seal --root <repo> --scope <scope> --manifest <manifest>
-bm.py design-audit verify --root <repo> --scope <scope> --manifest <manifest>
-```
-
-Interface nova, redesign, delta visual com decisão nova ou fluxo visual material sem manifesto válido executa `/design-projeto` antes de `/sdd-planning`. Mudança pequena que preserva o design system existente segue os tokens e componentes do repositório sem criar protótipo. Projeto sem interface não cria design.
-
-## Readiness e estabilidade do plano
-
-Antes da spec e dos planos, todo novo ciclo cria `READINESS.md` com JSON determinístico e `USER_ACTIONS.md`. IDs têm funções fechadas:
-
-- `D-*`: decisão travada;
-- `A-*`: suposição confirmada ou limitada;
-- `P-*`: pitfall com prevenção, recuperação e verificação;
-- `U-*`: ação externa com plano limite e fallback;
-- `S-*`: spike encerrado;
-- `DS-*`: superfície visual do manifesto;
-- `SD-*`: próxima spec de domínio.
-
-Cada item declara destinos e o ID deve existir neles. Suposição alta/crítica sem evidência, pitfall crítico sem mitigação, spike pendente/falho, design obrigatório sem manifesto ou ação externa sem limite bloqueiam o pacote antes da aprovação.
-
-O checker semântico tem no máximo duas passagens:
+Todo estado persistente novo vive em `.bianchini/`:
 
 ```text
-passagem 1 -> aprovar, bloquear ou pedir uma correção
-passagem 2 -> aprovar ou bloquear
+.bianchini/
+├── PROJECT.md
+├── STATE.md
+├── current/
+│   ├── ARCHITECTURE.md
+│   ├── SYSTEM_MODEL.md
+│   └── specs/
+├── changes/C001-slug/
+│   ├── SCOPE.md
+│   ├── RESEARCH.md
+│   ├── ARCHITECTURE.md
+│   ├── SYSTEM_MODEL.md
+│   ├── ROADMAP.md
+│   ├── COHERENCE.md
+│   ├── plans/
+│   ├── results/
+│   └── SUMMARY.md
+├── quick/Q001-slug/
+├── debug/{active,resolved}/
+├── debug/KNOWLEDGE.md
+├── archive/
+└── .runtime/
 ```
 
-```bash
-bm.py planning-check record --state <state> --root <repo> --report <PLANNING_REVIEW.md>
-```
+`.runtime/` é ignorado pelo Git e contém somente locks, staging e recuperação de escrita interrompida. O restante é legível, versionável e confinado ao repositório.
 
-O histórico é append-only e liga cada passagem aos digests do pacote e do relatório. Alterar uma entrada ou o `PLANNING_REVIEW.md` depois de `passed` invalida o checker. Terceira passagem é proibida.
+`.planning/` é namespace estrangeiro: nunca ler como fonte do método, copiar, converter, mover, apagar ou usar como fallback. Documentação anterior do Bianchini só entra pelo fluxo explícito de migração.
 
-## Plano congelado e mudanças durante execução
+## MethodWorkspace e estado
 
-O pacote aprovado é imutável. Use `bm.py change-policy` para classificar divergências:
+`MethodWorkspace` é a única interface para resolver caminhos, alocar IDs, escrever atomicamente e atualizar DocViva. Skills não criam estado manualmente quando existir comando equivalente.
 
-- `implementation_detail`: escolha interna reversível; decidir e continuar;
-- `bounded_amendment`: caminho, comando ou ordem interna; registrar no ledger e continuar sem editar o plano aprovado;
-- `material_change` invalidante: escopo, contrato público, design aprovado, impossibilidade externa ou invariante crítico; invalidar o pacote e replanejar apenas a área afetada.
-- `material_change` de autorização: novo custo ou ação irreversível; pausar para decisão do responsável sem redesign. Só replanejar se a decisão alterar escopo, contrato ou design.
+`.bianchini/STATE.md` é o índice canônico e compacto. Seu frontmatter JSON contém somente:
 
-Solução mais elegante, nome de arquivo, divisão interna ou preferência do revisor não autorizam redesign. `bounded_amendment` não cria nova tarefa, revisão ou subagente. Redesign exige `plan_invalidating: true`; custo ou ação irreversível isolados exigem autorização, não nova decomposição.
+- `schema_version`;
+- `method`;
+- `status`;
+- `active_work`;
+- `current_unit`;
+- `blockers`;
+- `next_action`;
+- `last_completed`;
+- `pointers`;
+- `digest`;
+- `updated_at`.
 
-## Envelope de autonomia
+O arquivo deve permanecer abaixo de 64 KiB. Histórico, ledger, eventos, hipóteses, evidências e resultados pertencem a `changes/`, `quick/`, `debug/` e `archive/`; nunca acumulá-los em `STATE.md`.
 
-A decisão automática segue esta ordem:
-
-```text
-decisão aprovada do responsável
--> padrão existente no repositório
--> stack e dependências já usadas
--> documentação oficial
--> opção reversível de menor risco
-```
-
-O agente registra a decisão e continua. Só interrompe por credencial externa indispensável, novo custo, ação destrutiva/irreversível, mudança material de escopo/contrato/design ou impossibilidade real comprovada. `USER_ACTIONS.md` antecipa essas dependências e permite continuar com fixture, fake ou sandbox até o plano limite.
-
-## Specs atuais, deltas e encerramento
-
-A fonte atual vive em:
-
-```text
-docs/bianchini/current/specs/
-```
-
-Cada ciclo vive em `docs/bianchini/changes/<version>/`. Arquivos em `spec-deltas/` contêm o contrato completo esperado após a mudança, não instruções de edição ambíguas. Durante planejamento e execução, `current/specs` permanece congelado.
-
-Depois de release `ready`, homologação aceita, revisão final aprovada e entrega pronta:
-
-```bash
-bm.py cycle-close --state <PROJECT_STATE.md> --root <repo>
-```
-
-O comando verifica snapshot e árvore limpa, sincroniza os `SD-*`, arquiva a mudança em `docs/bianchini/archive/<version>/`, incrementa `planning_version`, cria estado `idle` e prepara um commit. Symlink, target fora de `current/specs`, source fora da mudança ou conflito de archive bloqueiam sem aceitar fechamento parcial.
-
-## Política adaptativa
-
-Classificar cada plano pelo maior risco real e gravar `execution`, `review` e `test_seams`.
-
-| Risco | Execution | Review | Teste |
-|---|---|---|---|
-| baixo | `grouped` | `plan_gate` | uma verificação por seam do grupo; sem TDD/revisão por microtarefa |
-| médio | `slice` | `per_slice` | ciclo comportamental por slice vertical |
-| alto/crítico | `strict` | `per_task` | RED/GREEN e revisão independente por tarefa |
-
-Regras:
-
-- agrupar tarefas baixas que compartilham seam e gate;
-- nunca agrupar contratos, migrações ou ownership conflitante;
-- não criar tarefa ou agente para satisfazer contagem mínima;
-- escalar o modo quando risco descoberto aumentar; não reduzir sem atualizar plano aprovado;
-- calcular política com `bm.py policy` e registrar o JSON no ledger.
-
-## Estratégia adaptativa de testes
-
-Regressão é uma estratégia transversal: ela reaproveita unitários, integração/contrato e E2E para provar que comportamento anterior não foi quebrado. Unitários, integração/contrato, E2E e mutation testing são famílias de gate; não são tarefas independentes, fases novas, revisões extras ou um subagente por camada.
-
-A composição obrigatória é proporcional ao estágio:
-
-- `verification.fast`: unitários focados quando lógica mudou, integração/contrato focada quando uma fronteira mudou e regressão diretamente relacionada. E2E focado só entra quando for o menor seam público capaz de provar a unidade; nunca executar a suíte E2E completa ou mutação aqui.
-- `verification.plan`: suítes dos módulos e fronteiras afetadas, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva quando `bm.py policy` exigir.
-- `verification.release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E de todas as jornadas críticas, regressão completa configurada, build do RC e evidência de mutação vigente quando obrigatória. “Completa” significa os comandos de release aprovados, não toda combinação possível de plataforma ou tela.
-
-Política de mutation testing:
-
-- `not_required`: risco baixo ou mudança puramente visual, documental ou mecânica;
-- `selective`: risco médio com regra material, cálculo, parser, permissão, estado ou transformação; usar somente seams alterados e ferramenta já existente ou aprovada;
-- `required_selective`: risco alto/crítico com regra material; o planejamento deve declarar comando e escopo antes da execução.
-
-Não usar score global de mutação como gate nem perseguir percentual. Um mutante sobrevivente só bloqueia quando prova que um comportamento aprovado de risco alto ou crítico pode mudar sem o teste falhar. Mutante equivalente, inalcançável ou sem impacto material recebe justificativa curta e não abre fix loop. Nunca instalar ferramenta de mutação durante uma unidade; ausência de ferramenta obrigatória deve ser resolvida no planejamento ou registrada como bloqueio antes da implementação.
-
-Após correção, reexecutar apenas a regressão afetada e vizinhos de risco. `verification.plan` e `verification.release` voltam a executar somente em seus gates. Evidência de mutação pertence ao commit/RC medido e fica obsoleta após alteração no seam.
-
-Usar os fix rounds máximos retornados por `bm.py policy`. O orçamento é contado por `risk_seam`, não por nome de tarefa ou plano: registrar o seam de risco no ledger a cada rodada e recalcular `bm.py policy` com `--risk-seam` e `--seam-round` acumulado do seam. Renomear, dividir ou reabrir a unidade não zera a contagem do mesmo seam.
-
-O breaker dispara na primeira destas condições:
-
-- contagem acumulada do seam atinge o máximo do perfil;
-- dois pareceres consecutivos com finding critical/important no mesmo seam (`--consecutive-seam-findings`);
-- qualquer finding de classe estrutural (`--structural-finding`): crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry após timeout, idempotência concorrente ou recuperação após restart.
-
-Com `breaker: true` ou `redesign_required: true`, a hipótese atual está invalidada: parar patches imediatamente. Antes de qualquer novo patch no seam, produzir e registrar redesenho com máquina de estados, limites transacionais, operações irreversíveis, pontos de crash, atores concorrentes, estado durável de retomada e matriz de falhas; problema estrutural bloqueia o plano. A menor mudança aceitável é a menor que torna o invariante verdadeiro; preservar uma coreografia comprovadamente insegura não é mudança mínima, é hipótese inválida.
-
-## Workspace obrigatório v2
-
-Toda implementação v2 ocorre em linked worktree fora da branch principal.
-
-```bash
-python3 <bm.py> workspace create --repo . --planning-version v1 --plan P01 --state docs/living/PROJECT_STATE.md
-python3 <bm.py> workspace locate --repo . --planning-version v1 --plan P01
-python3 <bm.py> workspace resume --repo . --planning-version v1 --plan P01
-python3 <bm.py> workspace check --repo <workspace>
-```
-
-`workspace create` bloqueia qualquer alteração tracked/untracked, exige estado e snapshot aprovados e confirma que escopo, spec, planos, revisão, estado e manifesto existem no `HEAD` com os mesmos bytes. Arquivo ignorado mas não commitado também bloqueia. A identidade usa `<planning_version>-<plan_id>` (`bm/v1-p01`, `bm/v2-p01`) para não reutilizar ciclos antigos.
-
-`workspace check` bloqueia `main`, `master`, detached HEAD e a worktree primária. Não existe fallback para implementação na branch atual. Planejamento, status e o commit local do pacote aprovado podem ocorrer na principal; edição de código não.
-
-## Higiene da raiz
-
-`.superpowers/` na raiz contém somente artefatos locais/transitórios e deve estar coberto por `/.superpowers/` no `.gitignore` versionado. Nenhum arquivo sob essa raiz pode permanecer rastreado.
-
-```bash
-bm.py repo-hygiene check --repo <repo>
-bm.py repo-hygiene migrate --repo <repo>
-```
-
-`migrate` exige ausência de mudanças alheias, move somente arquivos já rastreados preservando seus bytes para `docs/bianchini/legacy/root-superpowers/`, adiciona o ignore e prepara essas mudanças no índice. `docs/superpowers/` pode permanecer como histórico v1; mudanças ativas v2 ficam em `docs/bianchini/changes/<planning_version>/` e specs aceitas em `docs/bianchini/current/specs/`. `workspace create` executa o check e bloqueia qualquer violação.
-
-## Artefatos determinísticos
-
-Para cada unidade executada, use:
-
-```bash
-bm.py task-brief --plan <plano> --tasks <1,2|1-3> --output <brief.md>
-bm.py report --brief <brief.md> --output <report.md>
-bm.py review-package --base <base> --head HEAD --brief <brief.md> --report <report.md> --output <review.md>
-bm.py checkpoint --state <state> --ledger <ledger> --cwd <workspace> --output <checkpoint.json>
-```
-
-- `task-brief`: extrai uma tarefa, lista/intervalo ou heading explícito de grupo, preserva ordem e fixa hashes do plano e unidades;
-- `report`: contrato persistente do implementador;
-- `review-package`: diff completo sanitizado do intervalo, commits, brief e relatório;
-- `checkpoint`: estado mínimo e caminho absoluto do workspace para retomar após compactação ou nova sessão.
-
-## Auditoria arquitetural manual
-
-`auditar-arquitetura` só roda por pedido explícito. Ela começa por histórico Git, hotspots e arquivos recentemente alterados, produz candidatos `Strong | Worth exploring | Speculative` e não implementa. Melhorias estruturais não bloqueiam planejamento; defeitos funcionais diretamente comprovados são separados e seguem os gates normais.
-
-## Fingerprint do release
-
-Um candidato ativo contém `id`, `revision`, `build` e `checksum`. Toda evidência automatizada repete os quatro campos; `proof-map` só aceita correspondência exata. Reutilizar ID com revisão, build ou checksum diferente não transfere prova.
-
-## Telemetria opcional
-
-Telemetria é opt-in e local. Com `telemetry.enabled: true`, registrar deltas numéricos sem prompt, código, diff, segredo ou dado pessoal:
-
-```bash
-bm.py telemetry record --state <state> --root <repo> --plan P01 \
-  --phase execution --duration-ms 1200 --input-tokens 800 --output-tokens 300
-bm.py telemetry summary --state <state> --root <repo>
-```
-
-As métricas suportadas são tokens de entrada/saída, duração, fix rounds, falhas de gate e bugs de homologação. O arquivo JSONL é append-only e confinado à raiz do projeto. Desabilitada, a operação não cria artefato.
-
-O ledger é append-only. Logs completos, diffs e screenshots ficam em arquivos apontados pelo ledger.
-
-## Aprovação única
-
-O pacote novo contém escopo local, pesquisa, readiness, ações externas, spec da mudança, specs de domínio quando aplicáveis, planos, checker final, specs atuais afetadas e design aprovado aplicável. Se o escopo existir somente na conversa/URL mutável, materializar `docs/bianchini/changes/vN/inputs/APPROVED_SCOPE.md`.
-
-## Pesquisa e simplificação do planejamento
-
-Todo novo planejamento v2 usa `planning.quality_version: 2`, registra `planning.research_mode` e inclui `STACK_RESEARCH.md`. Selecionar o menor modo suficiente: `repo_only` para stack estabelecida sem integração/decisão sensível nova; `targeted_web` para API, biblioteca, pagamento, autenticação, mobile, infraestrutura ou decisão sensível a versão; `full` somente para garantia Full explícita, auditoria/regulação, arquitetura nova de alto impacto ou várias decisões críticas. `repo_only` inventaria manifests, lockfiles, CI, testes e padrões locais sem exigir URL. Os modos web exigem fontes primárias oficiais, URL e data. Registrar sempre o modo, o motivo e somente decisões aplicadas.
-
-O escopo aprovado define resultados e invariantes, não a decomposição operacional. Preservar 100% dele; simplificar implementação nunca significa retirar requisito. Reescrever planos legados ou externos em slices de entrega autocontidos; readiness deve resolver suposições materiais antes deles; execução nunca deve depender de `inputs/`, `docs/superpowers/` ou “PLANO Task N”. Setup, lint, documentação e baseline entram na primeira entrega que os utiliza. Regressão final, evidências, execução real do RC e varredura visual pertencem aos gates e a `homologar-sistema`, salvo artefato distribuível independente contratado.
-
-Antes do snapshot, executar:
-
-```bash
-bm.py planning-audit docs/living/PROJECT_STATE.md --root <repo> --strict
-```
-
-O gate exige pesquisa proporcional, unidades completas, comandos reproduzíveis e orçamento proporcional ao perfil. Seguir os limites e a recomendação retornados por `planning-audit`; eles têm fonte executável única no CLI, são tetos e nunca metas ou mínimos. Exceder o perfil exige escalar mantendo todo o escopo. Acima de Full, usar `indivisible` com justificativa e otimizar contexto; nunca reduzir escopo automaticamente.
-
-`deferred_scope` não é ferramenta de economia. Só pode conter requisito aprovado quando o responsável tiver autorizado explicitamente a divisão antes do planejamento, com `scope_split_approved: true`, autor e horário. Sem essa prova, o audit e o snapshot bloqueiam. “Menor ciclo”, simplicidade, custo ou limite de contexto não constituem autorização.
-
-Estados com `planning.quality_version: 1` ou `2` também executam esse gate dentro de `snapshot create|verify`; portanto, um pacote novo não consegue contornar a auditoria omitindo o comando explícito.
-
-Criar e verificar o manifesto:
-
-```bash
-bm.py snapshot create <state> --root <repo>
-bm.py snapshot verify <state> --root <repo>
-```
-
-`sha256-manifest-v1` ordena caminhos relativos e calcula hashes dos bytes. `PROJECT_STATE.md` e o manifesto não entram no próprio manifesto. Registrar aprovação explícita do digest antes de executar. O comando de execução não vale como aprovação; não existe aprovação parcial.
-
-## Economia de contexto
-
-- `planning-audit` informa `package_words` apenas como tamanho documental e limita contexto operacional por `shared_context_words`, `max_plan_words` e `max_execution_unit_words`;
-- planejamento lê fontes uma vez e grava síntese com ponteiros;
-- execução lê plano atual e somente seus `spec_refs`;
-- grouped usa um brief/revisão por grupo; slice, por slice; strict, por tarefa;
-- revisor recebe brief, relatório e pacote de diff, nunca histórico inteiro;
-- homologação lê critérios, gates e resumos, inventaria a superfície do RC e abre detalhes somente para executar jornadas, investigar falha ou validar divergência;
-- referências opcionais são carregadas na fase indicada.
-
-## Eficiência de contexto derivada
-
-Unidades de novos planos `quality_version: 2` declaram `Change` e `Readiness refs`; o audit valida categoria, existência, destino e cobertura. `task-brief --hydrate-context`, `spec-diff` e `mutation-evidence verify` geram projeções reproduzíveis sem criar nova fonte de verdade. Contratos, comandos e formatos estão em [`CONTEXT_EFFICIENCY.md`](CONTEXT_EFFICIENCY.md).
-
-## Atualização do método
-
-`/update-bm` é exclusivamente manual e executa `bm.py update-bm`. A versão local vive em `_shared/VERSION`; a fonte remota é a `main` oficial. Instalação copiada preserva diretórios alheios, cria backup e substitui somente as skills gerenciadas. Checkout Git exige origem oficial, `main`, árvore limpa e fast-forward. Versão local igual ou superior nunca é substituída. Falha de rede, archive inseguro, divergência de versão ou erro de escrita bloqueia sem declarar atualização.
-
-## Fontes de verdade e segurança
+Fontes de verdade:
 
 | Informação | Fonte |
 |---|---|
-| comportamento atual | `docs/bianchini/current/specs/` + spec da mudança aprovada |
-| estado | `PROJECT_STATE.md` validado |
-| operação | ledger + checkpoint |
-| problema aberto | `KNOWN_ISSUES.md` |
-| aceite | `artifacts/qa/final/<data>/SUMMARY.md` |
-| entrega | `artifacts/delivery/DELIVERY.md` |
+| índice e próximo passo | `.bianchini/STATE.md` |
+| decisões e trade-offs | `ARCHITECTURE.md` |
+| sistema completo | `SYSTEM_MODEL.md` |
+| comportamento aceito | `.bianchini/current/specs/` |
+| pacote, digest e coerência | `.bianchini/changes/Cxxx-*` |
+| quick | `.bianchini/quick/Qxxx-*` |
+| debug | `.bianchini/debug/active|resolved/` |
+| histórico encerrado | `.bianchini/archive/` |
 
-Sem autorização explícita, não alterar produção, cobrar, publicar, enviar mensagem real, apagar dados, executar migração destrutiva ou expor segredo/dado pessoal.
+## ProjectModel
+
+`ProjectModel` é uma representação tipada derivada, não outra fonte de persistência. Ele compila `SYSTEM_MODEL.md`, arquitetura atual, specs, contratos e deltas dos planos nas seções:
+
+```text
+modules interfaces capabilities contracts ownership data
+integrations journeys invariants effects
+```
+
+`ARCHITECTURE.md` explica decisões, alternativas e trade-offs. `SYSTEM_MODEL.md` descreve de forma compacta como o sistema inteiro funciona. Não duplicar a mesma narrativa nos dois.
+
+O planejamento calcula:
+
+```text
+S0 = sistema atual
+S1 = S0 + delta de P01
+S2 = S1 + delta de P02
+...
+Sn = sistema final esperado
+```
+
+`Sn` deve ser equivalente ao `SYSTEM_MODEL.md` da mudança. No fechamento aceito, esse modelo substitui `.bianchini/current/SYSTEM_MODEL.md`.
+
+```bash
+bm.py model init --repo <repo> [--change <nome-curto>]
+bm.py model validate --repo <repo> [--change C001]
+```
+
+## Coerência estrutural e semântica
+
+O pacote inteiro é validado antes da aprovação. Dependência, referência, ordem e ownership nunca ficam a cargo da interpretação da LLM.
+
+### StructuralValidator
+
+Determinístico e bloqueante:
+
+- formato, IDs e referências;
+- DAG e ordem topológica;
+- `provides`, `consumes` e produtor ausente;
+- consumidor anterior ao produtor;
+- ownership incompatível;
+- contrato removido antes da migração de consumidores;
+- ordem e compatibilidade de migração;
+- requisito sem fase, fase sem aceite ou plano sem verificação;
+- journey incompleta;
+- efeito externo sem guard obrigatório;
+- divergência entre o modelo calculado e o modelo final.
+
+### SemanticReviewer
+
+Interpretativo e registrado: abstração especulativa, módulo raso, complexidade desnecessária, responsabilidade no lugar errado, incompatibilidade semântica, aderência à stack/documentação oficial e risco arquitetural omitido.
+
+O revisor semântico normaliza um relatório; não grava raciocínio interno. Se um achado puder virar contrato ou invariante verificável, ele volta ao `StructuralValidator`. Caso contrário permanece `WARNING` ou `INFO`. Revisão indisponível nunca é declarada como executada.
+
+```bash
+bm.py coherence check --repo <repo> --change C001 --structural-only
+bm.py coherence check --repo <repo> --change C001 --semantic-report <relatorio.json>
+bm.py coherence approve --repo <repo> --change C001 \
+  --digest <digest> --approved-by "<responsável>"
+```
+
+O check estrutural limpo retorna `structurally_valid`; ele não aprova. O check completo com revisão semântica disponível, sem `ERROR` ou `WARNING` aberto, retorna `ready_for_approval` e coloca `STATE.md` em `pending_approval`. Somente `coherence approve`, após autoridade humana explícita, pode gravar o checkpoint e mudar o estado para `approved`. O comando revalida o digest e registra responsável e horário; não executar em nome do responsável.
+
+Cada finding contém código, severidade, origem, planos/contratos afetados, evidência, correção esperada e status.
+
+| Severidade | Efeito |
+|---|---|
+| `ERROR` | bloqueia planejamento, snapshot ou execução |
+| `WARNING` | exige correção ou justificativa humana incluída no digest |
+| `INFO` | observação sem ação obrigatória |
+
+Status válidos: `open`, `resolved`, `accepted_with_justification`. `WARNING` aberto impede aprovação.
+
+## Planejamento global
+
+Fluxo obrigatório:
+
+```text
+estado atual
+→ pesquisa da stack e fontes oficiais proporcionais
+→ arquitetura global
+→ SYSTEM_MODEL final
+→ roadmap de todas as fases
+→ planos detalhados
+→ validação estrutural
+→ impact radius
+→ revisão semântica conjunta
+→ resolução dos findings
+→ aprovação do digest global
+```
+
+Cada plano `Pxx` declara resultado, aceite, `depends_on`, `provides`, `consumes`, módulos/interfaces, ownership, delta do ProjectModel, dados/migrações, efeitos externos, rollback, verificações e restrições futuras.
+
+O pacote aprovado é imutável. Detalhe interno reversível continua. Mudança em contrato, ownership, dado, migração, journey ou invariante recalcula o impacto e torna somente os planos afetados `stale`.
+
+## Impact radius
+
+```text
+contrato alterado
+→ consumidores diretos
+→ consumidores transitivos
+→ jornadas afetadas
+→ planos afetados
+→ verificações a repetir
+```
+
+Classificação:
+
+- `local`: somente o plano atual;
+- `direct`: plano e consumidores diretos;
+- `transitive`: toda a cadeia de consumidores;
+- `global`: modelo, invariante central ou ownership global.
+
+O resultado fica na seção `Impact Radius` de `COHERENCE.md`. Antes da aprovação,
+ele é somente uma prévia e não grava planos `stale`. Depois da aprovação, planos
+atingidos ficam `stale`, o status passa a `approved_with_stale` e o digest humano
+original é preservado. Planos independentes continuam executáveis. Nova auditoria
+e nova aprovação produzem o próximo digest global.
+
+```bash
+bm.py impact analyze --repo <repo> --change C001 --plan P03 \
+  [--changed-contract <id> ...]
+```
+
+## Execução de planos
+
+Antes de editar código:
+
+1. validar `STATE.md`, digest e modelo sem reexecutar uma auditoria mutável;
+2. confirmar plano aprovado, não `stale` e dependências concluídas;
+3. reconstruir o modelo atual e confirmar contratos consumidos;
+4. exigir Git limpo e criar o workspace isolado pelo CLI:
+
+```bash
+bm.py workspace create --repo <repo> --change C001 --plan P01
+```
+
+O gate exige `COHERENCE.md` em `approved` ou `approved_with_stale`, artefatos do pacote idênticos ao `HEAD` e o plano solicitado fora da lista `stale`. O segundo
+status autoriza somente planos independentes que preservaram aprovação.
+`coherence check` e `impact analyze` atualizam `COHERENCE.md`; não usá-los como
+consultas de preflight. O workspace fica fora de `main`, `master`, detached HEAD e
+worktree primária.
+
+O plano aprovado continua congelado. A ordem autônoma é:
+
+```text
+decisão aprovada
+→ padrão do repositório
+→ stack/dependência existente
+→ documentação oficial
+→ opção reversível de menor risco
+```
+
+Detalhe interno ou ajuste limitado é registrado. Mudança material recalcula o impacto e replaneja somente o fechamento afetado. Custo ou efeito irreversível pausa para autoridade; não implica redesign por si só.
+
+Após cada plano, registrar o delta real, comparar `provides/consumes`, aplicar ao modelo, recalcular impacto, repetir integrações afetadas e atualizar `STATE.md`. Existência isolada de endpoint, tabela ou tela não prova integração.
+
+```bash
+bm.py plan complete --repo <repo> --change C001 --plan P01 \
+  --actual-delta <delta-real.json> \
+  --result "<resultado entregue>" \
+  --verification "<evidência vigente>"
+```
+
+O comando exige dependências concluídas, contratos consumidos presentes, delta real equivalente ao aprovado e evidência. Drift material retorna `IMPACT_STALE` para replanejamento; não altera silenciosamente o pacote.
+
+## Gates adaptativos
+
+| Risco | Execução | Revisão | Testes |
+|---|---|---|---|
+| baixo | `grouped` | gate do plano | unitário/contrato/regressão focados |
+| médio | `slice` | por slice | comportamento vertical + gate afetado |
+| alto/crítico | `strict` | por tarefa | RED/GREEN e revisão independente |
+
+- `verification.fast`: prova focal da unidade;
+- `verification.plan`: suítes afetadas, regressão do plano, E2E crítico e mutação seletiva exigida;
+- `verification.release`: comandos completos aprovados, contratos, regressão, E2E, build e evidência de mutação vigente.
+
+Regressão é transversal. Não criar tarefa ou agente por camada de teste. Não perseguir coverage ou mutation score global. Finding estrutural, crash window, partial commit, TOCTOU, retry ambíguo, idempotência concorrente ou recuperação após restart invalida a hipótese e exige redesenho do seam antes de novo patch.
+
+O breaker epistêmico é contado por `risk_seam`, não pelo nome da tarefa: renomear, dividir ou reordenar a tarefa não zera a contagem do mesmo seam. Dois findings estruturais consecutivos no mesmo seam exigem parar o fix loop e redesenhar o contrato. Para concorrência, persistência ou integração externa, revise explicitamente máquina de estados, matriz de falhas e a janela entre inspeção e ação. Um patch menor que mantém crash window, TOCTOU ou perda silenciosa não é mudança mínima aceitável.
+
+### Contratos internos
+
+- `repo-cartographer` é somente leitura e só entra em brownfield grande/desconhecido; não usar em projeto novo ou pequeno. O cache combina hash do `HEAD` e digest do escopo.
+- `implementation-worker` recebe contrato, brief, modelo necessário e caminho do relatório; não propõe refatoração fora do plano.
+- `plan-reviewer`: uma revisão no gate em `grouped`, uma por slice em `slice` e independente por tarefa em `strict`. Retorna contagem por severidade e caminho do arquivo de saída da revisão.
+- `security-reviewer` roda somente em risco alto ou crítico sensível, em passagem somente leitura. Não roda em tarefa comum e devolve findings ao fix loop existente.
+- Quick usa zero subagentes e não carrega esse catálogo.
+
+## Quick
+
+`/executar-direto` classifica uma entrega coesa antes de editar:
+
+```text
+risk = scope + external_effect + migration + concurrency + money
+```
+
+Cada dimensão vale `0..2`:
+
+- `0–2`: quick normal;
+- `3–6`: quick protegido;
+- `7–10`: planejamento.
+
+Overrides obrigatórios para planejamento: `scope=2`, migração destrutiva, concorrência não controlada, ownership indefinido, regra financeira ambígua, arquitetura material nova ou várias entregas independentes.
+
+```bash
+bm.py direct classify --repo <repo> \
+  --scope-score <0..2> \
+  --external-effect-score <0..2> \
+  --migration-score <0..2> \
+  --concurrency-score <0..2> \
+  --money-score <0..2> \
+  [--multiple-objectives | --destructive-migration | --uncontrolled-concurrency] \
+  [--undefined-ownership | --ambiguous-financial-rule | --new-material-architecture]
+```
+
+Pagamento e webhook não escalam pela palavra. Quick protegido exige guards aplicáveis: documentação oficial, origem de verdade, idempotência, autenticidade, deduplicação, replay/ordem, timeout incerto, persistência, reconciliação, rollback, sandbox e checkpoint de produção. Cobrança real, refund, operação paga, ativação externa ou efeito irreversível exige autoridade explícita no momento do efeito.
+
+`direct start` persiste `BRIEF.md`, `PROGRESS.md` e `RESULT.md` em `.bianchini/quick/Qxxx-*`; score, overrides e digest fazem parte do brief. Evidência fica vinculada ao digest e ao fingerprint final. Conclusão atualiza `STATE.md` e a spec/modelo afetados.
+
+## Debug persistente
+
+```text
+intake → reproduced → diagnosed → red → fixing → green
+→ regression_checked → documented → resolved | blocked | escalated
+```
+
+```bash
+bm.py debug start|list|status|resume|checkpoint|finish --repo <repo> ...
+```
+
+Cada `Dxxx` registra esperado/real, ambiente, reprodução, hipóteses e contraprovas, causa, RED, GREEN, regressões vizinhas, risco residual e referência opcional comprovada a `Cxxx/Pxx` com relação `caused_by`, `detected_in` ou `regression_of`.
+
+GREEN antes de RED é inválido. Quando automação não for possível, usar procedimento manual determinístico. Evidência anterior ao último patch fica obsoleta. Debug resolvido vai para `debug/resolved/`; somente padrões causais reutilizáveis vão para `KNOWLEDGE.md`.
+
+Bug que restaura contrato aceito não muda spec. Contrato errado exige decisão e impact radius.
+
+## Migração explícita
+
+Não existe adaptador permanente. Projetos anteriores terminam no fluxo em que estão e depois executam:
+
+```bash
+bm.py migrate check --repo <repo>
+bm.py migrate apply --repo <repo>
+```
+
+`check` é somente leitura. `apply` exige projeto `idle`/concluído e Git limpo, usa mapa origem→destino, SHA-256, staging transacional e rollback. Reconhece somente documentação anterior do Bianchini em `docs/living`, `docs/bianchini`, `artifacts/bianchini`, documentos Bianchini identificáveis em `docs/design` e resultados em `.superpowers/bianchini/direct`.
+
+Colisão, formato desconhecido, symlink externo, path traversal, checksum divergente ou ciclo ativo bloqueiam. A origem só é removida após verificar o destino. O manifesto fica em `.bianchini/archive/import-AAAA-MM-DD/`. `.planning/` permanece byte a byte intocado.
+
+## Encerramento e DocViva
+
+Toda tarefa terminal atualiza `STATE.md` atomicamente. O fechamento exige modelo final equivalente, jornadas ponta a ponta, gates de release, homologação e revisão final aplicáveis. Então sincroniza specs/modelo atuais e move a mudança para `archive/`.
+
+```bash
+bm.py cycle-close --repo <repo> --change C001
+```
+
+Relatar separadamente: código/commit, testes, sandbox, deploy, efeito em produção/provedor e homologação humana. Um limite não comprova o seguinte.
+
+## Atualização e segurança
+
+`/update-bm` permanece manual. A transição para `0.4.0` usa o manifesto oficial de mudança de linhagem uma única vez; depois retorna à comparação semântica normal.
+
+Sem autorização explícita, não cobrar, publicar, enviar mensagem real, apagar dados, executar migração destrutiva, alterar produção de forma arriscada ou expor segredo/dado pessoal. Nunca versionar credenciais, payloads sensíveis, logs grandes ou artefatos temporários.

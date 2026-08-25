@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 SHARDS = (
+    "MethodV04Scenarios",
     "PackageIntegrityTests",
     "RoutingAndStateScenarios",
     "SnapshotScenarios",
@@ -30,8 +31,19 @@ REVIEW_SHARDS = (
     "ContextEfficiencyReviewScenarios",
 )
 
+CORE_04_SHARDS = (
+    "MethodWorkspaceTests",
+    "ProjectModelTests",
+    "CoherenceTests",
+)
+
 SELF_UPDATE_SHARDS = (
     "SelfUpdateScenarios",
+)
+
+LINEAGE_SHARDS = (
+    "LineageResetPackageScenarios",
+    "LineageResetGitScenarios",
 )
 
 CODEX_SHARDS = (
@@ -55,13 +67,20 @@ def run_shard(module: str, shard: str, environment: dict[str, str]) -> int:
 def main() -> int:
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     for shard in SHARDS:
-        if run_shard("test_method_package", shard, environment) != 0:
+        module = "test_method_v04_cli" if shard == "MethodV04Scenarios" else "test_method_package"
+        if run_shard(module, shard, environment) != 0:
             return 1
     for shard in REVIEW_SHARDS:
         if run_shard("test_context_efficiency_review", shard, environment) != 0:
             return 1
+    for shard in CORE_04_SHARDS:
+        if run_shard("test_bm_core_modules", shard, environment) != 0:
+            return 1
     for shard in SELF_UPDATE_SHARDS:
         if run_shard("test_self_update", shard, environment) != 0:
+            return 1
+    for shard in LINEAGE_SHARDS:
+        if run_shard("test_update_lineage_reset", shard, environment) != 0:
             return 1
     for shard in CODEX_SHARDS:
         if run_shard("test_codex_overlay", shard, environment) != 0:
@@ -69,7 +88,9 @@ def main() -> int:
     total = (
         len(SHARDS)
         + len(REVIEW_SHARDS)
+        + len(CORE_04_SHARDS)
         + len(SELF_UPDATE_SHARDS)
+        + len(LINEAGE_SHARDS)
         + len(CODEX_SHARDS)
     )
     print(f"\n{total} shards aprovados.", file=sys.stderr)

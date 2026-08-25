@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bianchini.method/schemas/state-v04.schema.json",
+  "title": "Bianchini Method 0.4 State Index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method",
+    "active_work",
+    "current_unit",
+    "status",
+    "blockers",
+    "next_action",
+    "last_completed",
+    "pointers",
+    "digest",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "method": {"const": "0.4"},
+    "active_work": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "status"],
+          "properties": {
+            "kind": {"enum": ["change", "quick", "debug"]},
+            "id": {"type": "string", "pattern": "^[CQD][0-9]{3}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?$"},
+            "status": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "current_unit": {"type": ["string", "null"]},
+    "status": {
+      "enum": [
+        "idle",
+        "planning",
+        "pending_approval",
+        "approved",
+        "approved_with_stale",
+        "executing",
+        "pending_close",
+        "active",
+        "blocked"
+      ]
+    },
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "next_action": {"type": ["string", "null"]},
+    "last_completed": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "status"],
+          "properties": {
+            "kind": {"enum": ["change", "quick", "debug", "migration"]},
+            "id": {"type": "string", "minLength": 1},
+            "status": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "pointers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["architecture", "system_model", "specs", "coherence"],
+      "properties": {
+        "architecture": {"type": "string", "pattern": "^\\.bianchini/"},
+        "system_model": {"type": "string", "pattern": "^\\.bianchini/"},
+        "specs": {"type": "string", "pattern": "^\\.bianchini/"},
+        "coherence": {"type": ["string", "null"], "pattern": "^\\.bianchini/"}
+      }
+    },
+    "digest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "updated_at": {"type": "string", "minLength": 1}
+  }
+}

@@ -1,43 +1,55 @@
 ---
 name: status-projeto
-description: Use com invocação explícita de /status-projeto ou pedido de status em projeto cujo PROJECT_STATE declare method_version 2. Para v1, somente informa a rota legado sem assumir execução standalone.
+description: Use para ler `.bianchini/STATE.md` e resumir trabalho atual, coerência, impacto, gates, bloqueios e próximo passo sem mutar o projeto.
 ---
 
 # Status do Projeto
 
 **Anuncie:** "Lendo o estado verificável do projeto."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Esta skill é somente leitura: não corrige estado, não executa plano e não cria artefato.
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Esta skill é somente leitura: não corrige estado, não executa trabalho e não cria artefato.
 
 ## Fluxo
 
-1. Executar `bm.py direct status --repo <repo>` antes de exigir `PROJECT_STATE.md`.
-2. Se houver execução ativa, mostrar `Modo: direto`, objetivo, branch, checkpoint, verificação, bloqueios e próxima ação. Para detalhe, abrir apenas `PROGRESS.md`.
-3. Sem execução direta ativa, localizar `docs/living/PROJECT_STATE.md`.
-4. Executar `bm.py route` com caminho do Superpowers quando detectado.
-5. V1 com Superpowers: ler estado/status legado e informar que o executor continua legado.
-6. V1 sem Superpowers: informar `BLOQUEADO` e a dependência ausente; não sugerir execução v2 automática.
-7. V2: executar `bm.py validate-state` e `bm.py status <state> --root <repo> --format text`. Usar o JSON padrão somente para automação.
-8. Se estado v2 for inválido, reportar erros do schema e parar; não inferir valores.
+1. Localizar `.bianchini/STATE.md`.
+2. Sem ele, informar `MIGRATION_REQUIRED` quando houver documentação anterior do Bianchini; caso contrário, informar que o método ainda não foi iniciado. Não ler `.planning/`.
+3. Validar o estado com `bm.py model validate --repo <repo>`. Estado inválido é reportado como erro; não inferir valores.
+4. Ler somente o frontmatter e os ponteiros necessários.
+5. Se `active_work.kind` for `quick`, usar `bm.py direct status --repo <repo>` e abrir apenas `PROGRESS.md` quando necessário.
+6. Se for `debug`, usar `bm.py debug status --repo <repo> --id <Dxxx-do-estado>` e não abrir o caso completo sem pedido de detalhe.
+7. Se for `change`, consultar `COHERENCE.md` e o resultado do plano ativo somente para contar findings, impacto e gates.
 
 ## Resposta compacta
 
 Mostrar:
 
-- método/rota e `planning_version`;
-- `planning_status`, `quality_version`, readiness, checker, digest e aprovação;
-- design aprovado, specs atuais, mudança ativa, planos por status e unidade atual;
-- política `grouped|slice|strict` de cada plano ativo;
-- plano/unidade/gate atuais e próximo plano executável com seu modo;
-- `verification.fast`, `plan` e `release`;
-- auditoria arquitetural;
-- RC, homologação, revisão final e entrega;
+- método `0.4` e tipo/ID do trabalho ativo;
+- status, fase, plano/unidade/gate atuais;
+- arquitetura e `SYSTEM_MODEL.md` apontados;
+- digest e aprovação;
+- findings `ERROR`, `WARNING` e `INFO` abertos;
+- impact radius e planos `stale`;
+- verificações atuais e próxima executável;
+- último trabalho concluído;
 - bloqueios abertos;
-- telemetria local resumida, somente quando habilitada;
 - uma única `next_action`.
 
-Não ler spec, planos completos ou ledgers quando o estado basta. Abrir apenas o checkpoint/ledger do plano ativo se o usuário pedir detalhe operacional.
+Não listar histórico, planos completos, hipóteses, logs ou todas as evidências. Abrir detalhes somente se o usuário pedir.
+
+Separe claramente:
+
+```text
+planejado
+implementado/commitado
+testado
+sandbox
+deployado
+efeito confirmado em produção/provedor
+homologado por humano/dispositivo
+```
+
+Um limite não comprova o seguinte.
 
 ## Saída
 
-Responder com fatos do estado validado, caminhos relevantes e próximo passo. Distinguir claramente `planejado`, `implementado`, `gate aprovado`, `homologado` e `entregue`.
+Responder com fatos do estado validado, caminhos úteis e próximo passo. Se o estado estiver stale ou contraditório, informar o erro exato sem repará-lo.
