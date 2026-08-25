@@ -35,6 +35,11 @@ Todo estado persistente novo vive em `.bianchini/`:
 
 `.planning/` é namespace estrangeiro: nunca ler como fonte do método, copiar, converter, mover, apagar ou usar como fallback. Documentação anterior do Bianchini só entra pelo fluxo explícito de migração.
 
+`direct`, `debug`, `workspace` e `cycle-close` nunca possuem fallback para
+formatos anteriores. O primeiro `direct start` ou `debug start` inicializa
+`.bianchini` somente em projeto novo. Qualquer fonte anterior reconhecida produz
+`MIGRATION_REQUIRED` antes de escrever. Argumentos públicos antigos são inválidos.
+
 ## MethodWorkspace e estado
 
 `MethodWorkspace` é a única interface para resolver caminhos, alocar IDs, escrever atomicamente e atualizar DocViva. Skills não criam estado manualmente quando existir comando equivalente.
@@ -287,7 +292,10 @@ bm.py direct classify --repo <repo> \
 
 Pagamento e webhook não escalam pela palavra. Quick protegido exige guards aplicáveis: documentação oficial, origem de verdade, idempotência, autenticidade, deduplicação, replay/ordem, timeout incerto, persistência, reconciliação, rollback, sandbox e checkpoint de produção. Cobrança real, refund, operação paga, ativação externa ou efeito irreversível exige autoridade explícita no momento do efeito.
 
-`direct start` persiste `BRIEF.md`, `PROGRESS.md` e `RESULT.md` em `.bianchini/quick/Qxxx-*`; score, overrides e digest fazem parte do brief. Evidência fica vinculada ao digest e ao fingerprint final. Conclusão atualiza `STATE.md` e a spec/modelo afetados.
+`direct start` inicializa o workspace 0.4 em projeto novo e persiste `BRIEF.md`,
+`PROGRESS.md` e `RESULT.md` em `.bianchini/quick/Qxxx-*`; score, overrides e digest
+fazem parte do brief. Evidência fica vinculada ao digest e ao fingerprint final.
+Conclusão atualiza `STATE.md` e a spec/modelo afetados.
 
 ## Debug persistente
 
@@ -299,6 +307,9 @@ intake → reproduced → diagnosed → red → fixing → green
 ```bash
 bm.py debug start|list|status|resume|checkpoint|finish --repo <repo> ...
 ```
+
+`debug start` também inicializa o workspace quando não existe estado anterior.
+Consultas e retomadas são somente leitura e exigem um `STATE.md` 0.4 válido.
 
 Cada `Dxxx` registra esperado/real, ambiente, reprodução, hipóteses e contraprovas, causa, RED, GREEN, regressões vizinhas, risco residual e referência opcional comprovada a `Cxxx/Pxx` com relação `caused_by`, `detected_in` ou `regression_of`.
 

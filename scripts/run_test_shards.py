@@ -20,9 +20,7 @@ SHARDS = (
     "PlanningStabilityScenarios",
     "ContextEfficiencyScenarios",
     "AdaptivePolicyScenarios",
-    "WorkspaceAndArtifactScenarios",
     "BehavioralProjectScenarios",
-    "DirectExecutionScenarios",
     "AgentContractScenarios",
     "SkillBehaviorContracts",
 )

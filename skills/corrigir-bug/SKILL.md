@@ -13,6 +13,11 @@ Princípio: nenhum fix antes de uma causa sustentada por evidência. Sintoma, co
 
 ## 1. Abrir ou retomar
 
+Sem `.bianchini`, `debug start` inicializa o workspace 0.4 quando o projeto é
+novo. Se houver documentação anterior reconhecida, o CLI retorna
+`MIGRATION_REQUIRED`; migre explicitamente antes de abrir o caso. Nenhum comando
+de debug pode cair em armazenamento anterior.
+
 ```bash
 bm.py debug list --repo <repo>
 bm.py debug start --repo <repo> ...

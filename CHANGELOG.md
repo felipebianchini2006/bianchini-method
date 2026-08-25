@@ -2,6 +2,15 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 0.4.1 — Entrada 0.4 sem fallback legado
+
+- inicializa `.bianchini` automaticamente no primeiro quick ou debug de projeto novo;
+- exige `/migrar-bianchini` quando qualquer fonte anterior reconhecida estiver presente;
+- remove o fallback automático de `direct`, `workspace` e `cycle-close` para fluxos anteriores;
+- remove argumentos públicos antigos desses comandos para impedir ativação acidental;
+- adiciona regressões que proíbem escrita em `.superpowers`, `docs/living` e `.planning` pelos fluxos novos;
+- valida o pacote instalado em cópia limpa, além do checkout de desenvolvimento.
+
 ## 0.4.0 — ProjectModel e coerência global
 
 ### Workspace e DocViva

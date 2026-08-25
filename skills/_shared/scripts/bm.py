@@ -4506,10 +4506,8 @@ def parser() -> argparse.ArgumentParser:
     change.add_argument("--internal-order", action="store_true")
 
     close = commands.add_parser("cycle-close")
-    close.add_argument("--state", type=Path)
-    close.add_argument("--root", type=Path)
     close.add_argument("--repo", type=Path, default=Path.cwd())
-    close.add_argument("--change")
+    close.add_argument("--change", required=True)
 
     decide = commands.add_parser("policy")
     decide.add_argument("--profile", choices=["lean", "standard", "full"], required=True)
@@ -4537,8 +4535,6 @@ def parser() -> argparse.ArgumentParser:
     workspace.add_argument("--repo", type=Path, default=Path.cwd())
     workspace.add_argument("--plan")
     workspace.add_argument("--change")
-    workspace.add_argument("--planning-version")
-    workspace.add_argument("--state", type=Path)
     workspace.add_argument("--target", type=Path)
 
     brief = commands.add_parser("task-brief")
@@ -4623,34 +4619,8 @@ def parser() -> argparse.ArgumentParser:
     direct.add_argument("--slug")
     direct.add_argument("--objective")
     direct.add_argument("--scope")
-    direct.add_argument("--current-state")
-    direct.add_argument("--update-brief", action="store_true")
     direct.add_argument("--acceptance", action="append", default=[])
-    direct.add_argument("--non-objective", action="append", default=[])
-    direct.add_argument("--likely-file", action="append", default=[])
     direct.add_argument("--verification", action="append", default=[])
-    direct.add_argument(
-        "--risk", choices=["low", "medium", "high", "critical"], default="low"
-    )
-    direct.add_argument(
-        "--change-kind",
-        choices=[
-            "behavioral",
-            "mechanical",
-            "visual",
-            "bug",
-            "business-rule",
-            "calculation",
-            "data-transform",
-            "parser",
-            "permission",
-            "state-machine",
-        ],
-        default="behavioral",
-    )
-    direct.add_argument("--hazard", action="append", default=[])
-    direct.add_argument("--subsystems", type=int, default=1)
-    direct.add_argument("--related-change", action="append", default=[])
     direct.add_argument("--checkpoint")
     direct.add_argument("--changed-file", action="append", default=[])
     direct.add_argument(
@@ -4660,7 +4630,6 @@ def parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
     )
-    direct.add_argument("--result-entry", action="append", default=[])
     direct.add_argument("--blocker", action="append", default=[])
     direct.add_argument("--next-action")
     direct.add_argument(
@@ -4668,10 +4637,7 @@ def parser() -> argparse.ArgumentParser:
     )
     direct.add_argument("--behavior", action="append", default=[])
     direct.add_argument("--limitation", action="append", default=[])
-    direct.add_argument("--out-of-scope", action="append", default=[])
-    direct.add_argument("--accept-unrecorded", action="append", default=[])
     direct.add_argument("--evidence", action="append", default=[])
-    direct.add_argument("--waive-verification", action="append", default=[])
     direct.add_argument("--scope-score", type=int, choices=[0, 1, 2], default=0)
     direct.add_argument(
         "--external-effect-score", type=int, choices=[0, 1, 2], default=0
@@ -4796,6 +4762,7 @@ def main() -> int:
                     raise BMError(
                         "debug start exige --objective, --expected, --actual e --environment"
                     )
+                v04.require_workspace(args.repo, create=True)
                 emit(
                     v04.debug_start(
                         args.repo,
@@ -4809,10 +4776,12 @@ def main() -> int:
                     )
                 )
             elif args.action in {"list", "status", "resume"}:
+                v04.require_workspace(args.repo)
                 if args.action in {"status", "resume"} and not args.id:
                     raise BMError(f"debug {args.action} exige --id")
                 emit(v04.debug_status(args.repo, args.id if args.action != "list" else None))
             elif args.action == "checkpoint":
+                v04.require_workspace(args.repo)
                 if not all((args.id, args.event, args.evidence)):
                     raise BMError("debug checkpoint exige --id, --event e --evidence")
                 emit(
@@ -4830,6 +4799,7 @@ def main() -> int:
                     )
                 )
             else:
+                v04.require_workspace(args.repo)
                 if not args.id:
                     raise BMError("debug finish exige --id")
                 emit(
@@ -4889,14 +4859,10 @@ def main() -> int:
                 )
             )
         elif args.command == "cycle-close":
-            if (args.repo.resolve() / ".bianchini/STATE.md").is_file():
-                if not args.change:
-                    raise BMError("cycle-close 0.4 exige --change")
-                emit(v04_planning.close_change(args.repo, args.change))
-            else:
-                if not args.state or not args.root:
-                    raise BMError("cycle-close anterior exige --state e --root")
-                emit(cycle_close(args.state, args.root))
+            v04.require_workspace(args.repo)
+            if not args.change:
+                raise BMError("cycle-close 0.4 exige --change")
+            emit(v04_planning.close_change(args.repo, args.change))
         elif args.command == "policy":
             emit(
                 policy(
@@ -4913,8 +4879,8 @@ def main() -> int:
                 )
             )
         elif args.command == "workspace":
-            workspace_v04 = (args.repo.resolve() / ".bianchini/STATE.md").is_file()
-            if workspace_v04 and args.action == "create":
+            v04.require_workspace(args.repo)
+            if args.action == "create":
                 if not args.plan or not args.change:
                     raise BMError("--change e --plan são obrigatórios para criar workspace 0.4")
                 emit(
@@ -4922,9 +4888,9 @@ def main() -> int:
                         args.repo, args.change, args.plan, args.target
                     )
                 )
-            elif workspace_v04 and args.action == "check":
+            elif args.action == "check":
                 emit(v04_planning.execution_workspace_check(args.repo))
-            elif workspace_v04:
+            else:
                 if not args.plan or not args.change:
                     raise BMError(
                         f"--change e --plan são obrigatórios para {args.action} no método 0.4"
@@ -4935,35 +4901,6 @@ def main() -> int:
                         args.change,
                         args.plan,
                         resume=args.action == "resume",
-                    )
-                )
-            elif args.action == "create":
-                if not args.plan or not args.planning_version or not args.state:
-                    raise BMError(
-                        "--plan, --planning-version e --state são obrigatórios para criar workspace"
-                    )
-                emit(
-                    workspace_create(
-                        args.repo,
-                        args.planning_version,
-                        args.plan,
-                        args.state,
-                        args.target,
-                    )
-                )
-            elif args.action == "check":
-                emit(workspace_check(args.repo))
-            else:
-                if not args.plan or not args.planning_version:
-                    raise BMError(
-                        f"--plan e --planning-version são obrigatórios para {args.action}"
-                    )
-                emit(
-                    workspace_locate(
-                        args.repo,
-                        args.planning_version,
-                        args.plan,
-                        args.action == "resume",
                     )
                 )
         elif args.command == "task-brief":
@@ -5047,16 +4984,16 @@ def main() -> int:
                 emit(telemetry_summary(args.state, args.root))
         elif args.command == "direct":
             risk = direct_risk_from_args(args)
-            uses_v04 = (args.repo.resolve() / ".bianchini").exists()
             if args.action == "classify":
                 emit(risk)
-            elif uses_v04 and args.action == "start":
+            elif args.action == "start":
                 if not all((args.objective, args.scope)):
                     raise BMError("direct start exige --objective e --scope")
                 if not args.acceptance or not args.verification:
                     raise BMError(
                         "direct start exige ao menos um --acceptance e um --verification"
                     )
+                v04.require_workspace(args.repo, create=True)
                 emit(
                     v04.quick_start(
                         args.repo,
@@ -5070,9 +5007,11 @@ def main() -> int:
                         payment_flow=args.payment_flow,
                     )
                 )
-            elif uses_v04 and args.action == "status":
+            elif args.action == "status":
+                v04.require_workspace(args.repo)
                 emit(v04.quick_status(args.repo, args.slug))
-            elif uses_v04 and args.action == "checkpoint":
+            elif args.action == "checkpoint":
+                v04.require_workspace(args.repo)
                 if not all((args.slug, args.checkpoint, args.next_action)):
                     raise BMError(
                         "direct checkpoint exige --slug, --checkpoint e --next-action"
@@ -5089,7 +5028,8 @@ def main() -> int:
                         args.next_action,
                     )
                 )
-            elif uses_v04 and args.action == "finish":
+            elif args.action == "finish":
+                v04.require_workspace(args.repo)
                 if not all((args.slug, args.status, args.next_action)):
                     raise BMError("direct finish exige --slug, --status e --next-action")
                 emit(
@@ -5105,83 +5045,8 @@ def main() -> int:
                         args.production_authorized,
                     )
                 )
-            elif uses_v04 and args.action == "reopen":
-                raise BMError("ORDER_VIOLATION: quick 0.4 terminal é imutável")
-            elif args.action == "start":
-                if not all((args.slug, args.objective, args.scope, args.current_state)):
-                    raise BMError(
-                        "direct start exige --slug, --objective, --scope e --current-state"
-                    )
-                if not args.acceptance or not args.verification:
-                    raise BMError(
-                        "direct start exige ao menos um --acceptance e um --verification"
-                    )
-                if args.subsystems < 1:
-                    raise BMError("--subsystems deve ser positivo")
-                emit(
-                    direct_start(
-                        args.repo,
-                        args.slug,
-                        args.objective,
-                        args.scope,
-                        args.current_state,
-                        args.acceptance,
-                        args.non_objective,
-                        args.likely_file,
-                        args.verification,
-                        args.risk,
-                        args.change_kind,
-                        args.hazard,
-                        args.subsystems,
-                        args.related_change,
-                        args.executed_commands,
-                        args.result_entry,
-                        args.update_brief,
-                    )
-                )
-            elif args.action == "status":
-                emit(direct_status(args.repo, args.slug))
-            elif args.action == "reopen":
-                if not all((args.slug, args.next_action)):
-                    raise BMError("direct reopen exige --slug e --next-action")
-                emit(direct_reopen(args.repo, args.slug, args.next_action))
-            elif args.action == "checkpoint":
-                if not all((args.slug, args.checkpoint, args.next_action)):
-                    raise BMError(
-                        "direct checkpoint exige --slug, --checkpoint e --next-action"
-                    )
-                emit(
-                    direct_checkpoint(
-                        args.repo,
-                        args.slug,
-                        args.checkpoint,
-                        args.changed_file,
-                        args.executed_commands,
-                        args.result_entry,
-                        args.verification[0] if args.verification else "pending",
-                        args.next_action,
-                        args.blocker,
-                        args.evidence,
-                    )
-                )
             else:
-                if not all((args.slug, args.status, args.next_action)):
-                    raise BMError("direct finish exige --slug, --status e --next-action")
-                emit(
-                    direct_finish(
-                        args.repo,
-                        args.slug,
-                        args.status,
-                        args.behavior,
-                        args.verification,
-                        args.limitation,
-                        args.out_of_scope,
-                        args.next_action,
-                        args.blocker,
-                        args.accept_unrecorded,
-                        args.waive_verification,
-                    )
-                )
+                raise BMError("ORDER_VIOLATION: quick 0.4 terminal é imutável")
         elif args.command == "update-bm":
             try:
                 update_result = update_bianchini_method(

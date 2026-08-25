@@ -48,4 +48,4 @@ jobs:
           grep -q "update-bm" /tmp/bm-help.txt
           python3 scripts/bm.py proof-map --help | grep -q "mutation-evidence"
           python3 scripts/bm.py update-bm --help | grep -q -- "--check"
-          test "$(cat skills/_shared/VERSION)" = "0.4.0"
+          test "$(cat skills/_shared/VERSION)" = "0.4.1"

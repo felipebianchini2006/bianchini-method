@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -91,6 +92,323 @@ def empty_model(**sections: object) -> dict[str, object]:
 
 
 class MethodV04Scenarios(unittest.TestCase):
+    def test_first_quick_initializes_v04_without_legacy_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            planning = repo / ".planning"
+            planning.mkdir()
+            (planning / "foreign.md").write_text("não tocar\n", encoding="utf-8")
+            planning_before = tree_digest(planning)
+
+            started = cli_json(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Ajustar parser",
+                "--scope",
+                "uma alteração localizada",
+                "--acceptance",
+                "parser aceita entrada válida",
+                "--verification",
+                "test_parser",
+                "--scope-score",
+                "0",
+            )
+
+            self.assertRegex(str(started["id"]), r"^Q001-")
+            self.assertTrue((repo / ".bianchini/STATE.md").is_file())
+            self.assertTrue((repo / f".bianchini/quick/{started['id']}/BRIEF.md").is_file())
+            self.assertFalse((repo / ".superpowers").exists())
+            self.assertFalse((repo / "docs/living").exists())
+            self.assertEqual(tree_digest(planning), planning_before)
+
+    def test_first_debug_initializes_v04_without_legacy_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+
+            started = cli_json(
+                "debug",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Corrigir cálculo",
+                "--expected",
+                "total 10",
+                "--actual",
+                "total 11",
+                "--environment",
+                "teste local",
+            )
+
+            self.assertRegex(str(started["id"]), r"^D001-")
+            self.assertTrue((repo / ".bianchini/STATE.md").is_file())
+            self.assertTrue(
+                (repo / f".bianchini/debug/active/{started['id']}.md").is_file()
+            )
+            self.assertFalse((repo / ".superpowers").exists())
+            self.assertFalse((repo / "docs/living").exists())
+
+    def test_invalid_first_work_does_not_leave_partial_workspace(self) -> None:
+        attempts = (
+            (
+                "direct",
+                "start",
+                "--objective",
+                "Entrada incompleta",
+                "--scope",
+                "local",
+            ),
+            (
+                "debug",
+                "start",
+                "--objective",
+                "Debug incompleto",
+                "--expected",
+                "A",
+                "--actual",
+                "B",
+            ),
+        )
+        for command in attempts:
+            with self.subTest(command=command[0]), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                init_git(repo)
+                result = cli(*command, "--repo", str(repo))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse((repo / ".bianchini").exists())
+                self.assertFalse((repo / ".superpowers").exists())
+
+    def test_first_execution_requires_explicit_migration_for_old_bianchini_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            legacy = repo / "docs/living"
+            legacy.mkdir(parents=True)
+            (legacy / "PROJECT_STATE.md").write_text(
+                "# Bianchini Method\nstatus: idle\n", encoding="utf-8"
+            )
+            before = tree_digest(repo / "docs")
+
+            quick = cli(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Ajustar parser",
+                "--scope",
+                "local",
+                "--acceptance",
+                "funciona",
+                "--verification",
+                "test_parser",
+            )
+            debug = cli(
+                "debug",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Corrigir parser",
+                "--expected",
+                "válido",
+                "--actual",
+                "inválido",
+                "--environment",
+                "teste",
+            )
+            workspace = cli(
+                "workspace",
+                "create",
+                "--repo",
+                str(repo),
+                "--change",
+                "C001",
+                "--plan",
+                "P01",
+            )
+            close = cli(
+                "cycle-close",
+                "--repo",
+                str(repo),
+                "--change",
+                "C001",
+            )
+
+            self.assertNotEqual(quick.returncode, 0)
+            self.assertNotEqual(debug.returncode, 0)
+            self.assertNotEqual(workspace.returncode, 0)
+            self.assertNotEqual(close.returncode, 0)
+            for result in (quick, debug, workspace, close):
+                self.assertIn("MIGRATION_REQUIRED", result.stderr)
+            self.assertFalse((repo / ".bianchini").exists())
+            self.assertFalse((repo / ".superpowers").exists())
+            self.assertEqual(tree_digest(repo / "docs"), before)
+
+    def test_every_recognized_legacy_source_blocks_first_work(self) -> None:
+        cases = (
+            ("docs-bianchini", "docs/bianchini/old.md", "old\n"),
+            ("artifacts", "artifacts/bianchini/result.json", "{}\n"),
+            ("direct", ".superpowers/bianchini/direct/Q001/BRIEF.md", "old\n"),
+            (
+                "design",
+                "docs/design/C001/DESIGN_MANIFEST.json",
+                json.dumps({"schema_version": 1, "status": "approved"}),
+            ),
+        )
+        for name, relative, content in cases:
+            with self.subTest(source=name), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                init_git(repo)
+                source = repo / relative
+                source.parent.mkdir(parents=True)
+                source.write_text(content, encoding="utf-8")
+                result = cli(
+                    "direct",
+                    "start",
+                    "--repo",
+                    str(repo),
+                    "--objective",
+                    "Teste de migração",
+                    "--scope",
+                    "local",
+                    "--acceptance",
+                    "funciona",
+                    "--verification",
+                    "test",
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("MIGRATION_REQUIRED", result.stderr)
+                self.assertFalse((repo / ".bianchini").exists())
+
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            foreign = repo / "docs/design/foreign/notes.md"
+            foreign.parent.mkdir(parents=True)
+            foreign.write_text("não é Bianchini\n", encoding="utf-8")
+            started = cli_json(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Design estrangeiro",
+                "--scope",
+                "local",
+                "--acceptance",
+                "funciona",
+                "--verification",
+                "test",
+            )
+            self.assertRegex(str(started["id"]), r"^Q001-")
+            self.assertEqual(foreign.read_text(encoding="utf-8"), "não é Bianchini\n")
+
+    def test_legacy_fallback_arguments_are_not_public_in_v04(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            state = repo / "legacy-state.json"
+            state.write_text('{"method_version":2}', encoding="utf-8")
+
+            commands = (
+                (
+                    "direct",
+                    "start",
+                    "--repo",
+                    str(repo),
+                    "--objective",
+                    "teste",
+                    "--scope",
+                    "local",
+                    "--acceptance",
+                    "ok",
+                    "--verification",
+                    "test",
+                    "--current-state",
+                    "legado",
+                ),
+                (
+                    "workspace",
+                    "create",
+                    "--repo",
+                    str(repo),
+                    "--plan",
+                    "P01",
+                    "--planning-version",
+                    "v2",
+                    "--state",
+                    str(state),
+                ),
+                (
+                    "cycle-close",
+                    "--repo",
+                    str(repo),
+                    "--state",
+                    str(state),
+                    "--root",
+                    str(repo),
+                ),
+            )
+            for command in commands:
+                with self.subTest(command=command[0]):
+                    result = cli(*command)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn("usage: bm", result.stderr)
+
+            self.assertFalse((repo / ".bianchini").exists())
+            self.assertFalse((repo / ".superpowers").exists())
+            self.assertFalse((repo / "docs/living").exists())
+
+    def test_clean_installed_package_starts_only_v04_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            installed = base / "installed"
+            shutil.copytree(ROOT / "skills", installed / "skills")
+            installed_cli = installed / "skills/_shared/scripts/bm.py"
+            repo = base / "repo"
+            init_git(repo)
+
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(installed_cli),
+                    "direct",
+                    "start",
+                    "--repo",
+                    str(repo),
+                    "--objective",
+                    "Smoke instalado",
+                    "--scope",
+                    "local",
+                    "--acceptance",
+                    "workspace criado",
+                    "--verification",
+                    "smoke",
+                ],
+                cwd=repo,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            result = json.loads(completed.stdout)
+            self.assertRegex(result["id"], r"^Q001-")
+            self.assertEqual(
+                (installed / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
+                "0.4.1",
+            )
+            self.assertTrue((repo / ".bianchini/STATE.md").is_file())
+            self.assertFalse((repo / ".superpowers").exists())
+            self.assertFalse((repo / "docs/living").exists())
+
     def test_model_init_creates_only_bianchini_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -672,6 +990,23 @@ class MethodV04Scenarios(unittest.TestCase):
         self.assertEqual(planning["route"], "planning")
         self.assertIn("destructive_migration", planning["overrides"])
 
+        boundaries = (
+            ((0, 1, 0, 0, 1), (2, "normal")),
+            ((0, 1, 1, 0, 1), (3, "protected")),
+            ((0, 2, 1, 1, 2), (6, "protected")),
+            ((1, 2, 1, 1, 2), (7, "planning")),
+        )
+        for scores, expected in boundaries:
+            arguments = ["direct", "classify"]
+            for name, value in zip(
+                ("scope", "external-effect", "migration", "concurrency", "money"),
+                scores,
+            ):
+                arguments.extend([f"--{name}-score", str(value)])
+            with self.subTest(boundary=expected[0]):
+                result = cli_json(*arguments)
+                self.assertEqual((result["score"], result["route"]), expected)
+
         for dimension in ("scope", "migration", "concurrency"):
             scores = {
                 "scope": "0",
@@ -1090,10 +1425,10 @@ class MethodV04Scenarios(unittest.TestCase):
     def test_version_files_use_zero_four_lineage(self) -> None:
         self.assertEqual(
             (ROOT / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-            "0.4.0",
+            "0.4.1",
         )
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.0"', workflow)
+        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.1"', workflow)
         root_schema = (ROOT / "schemas/state-v04.schema.json").read_bytes()
         packaged_schema = (
             ROOT / "skills/_shared/schemas/state-v04.schema.json"

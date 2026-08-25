@@ -119,6 +119,20 @@ def _empty_system_model() -> dict[str, Any]:
     }
 
 
+def _has_legacy_bianchini_artifacts(root: Path) -> bool:
+    """Detecta somente fontes aceitas pela migração explícita do método."""
+
+    direct_sources = (
+        root / "docs/living/PROJECT_STATE.md",
+        root / "docs/bianchini",
+        root / "artifacts/bianchini",
+        root / ".superpowers/bianchini/direct",
+    )
+    if any(path.exists() for path in direct_sources):
+        return True
+    return bool(_recognized_design_files(root / "docs/design"))
+
+
 def init_workspace(repo: Path, *, allow_existing: bool = False) -> dict[str, Any]:
     """Cria a raiz canônica sem percorrer namespaces estrangeiros."""
 
@@ -133,12 +147,7 @@ def init_workspace(repo: Path, *, allow_existing: bool = False) -> dict[str, Any
             "workspace": str(workspace),
             "created": False,
         }
-    legacy_roots = (
-        root / "docs/living/PROJECT_STATE.md",
-        root / "docs/bianchini",
-        root / "artifacts/bianchini",
-    )
-    if any(path.exists() for path in legacy_roots):
+    if _has_legacy_bianchini_artifacts(root):
         raise WorkflowError(
             "MIGRATION_REQUIRED", "documentação anterior detectada; use /migrar-bianchini"
         )
@@ -158,6 +167,27 @@ def init_workspace(repo: Path, *, allow_existing: bool = False) -> dict[str, Any
         "workspace": str(workspace),
         "created": True,
     }
+
+
+def require_workspace(repo: Path, *, create: bool = False) -> dict[str, Any]:
+    """Resolve exclusivamente o workspace 0.4, sem fallback para formatos antigos."""
+
+    root = _repo_root(repo)
+    state = _state_path(root)
+    if state.is_file():
+        return read_state(root)
+    if _has_legacy_bianchini_artifacts(root):
+        raise WorkflowError(
+            "MIGRATION_REQUIRED", "documentação anterior detectada; use /migrar-bianchini"
+        )
+    if create:
+        init_workspace(root)
+        return read_state(root)
+    if _workspace(root).exists():
+        raise WorkflowError("DOCVIVA_INCOMPLETE", ".bianchini existe sem STATE.md válido")
+    raise WorkflowError(
+        "DOCVIVA_INCOMPLETE", "Bianchini Method 0.4 não iniciado; execute model init"
+    )
 
 
 def read_state(root: Path) -> dict[str, Any]:

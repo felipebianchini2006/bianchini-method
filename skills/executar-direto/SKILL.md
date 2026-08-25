@@ -15,7 +15,10 @@ O quick usa zero subagentes, não carrega o catálogo interno de agentes e faz u
 
 Leia regras, `.bianchini/STATE.md` quando existir, manifests, CI, Git e apenas os arquivos ligados ao objetivo. Registre objetivo, estado atual factual, não objetivos, aceite, seams e comandos reais de verificação.
 
-Não use `.planning/`. Se existir documentação anterior do Bianchini e o quick depender dela, pare e use `/migrar-bianchini`.
+Não use `.planning/`. Sem `.bianchini`, `direct start` inicializa o workspace 0.4
+quando o projeto é novo. Se existir qualquer documentação anterior reconhecida,
+o CLI bloqueia com `MIGRATION_REQUIRED`; use `/migrar-bianchini`. Nunca use flags
+ou rotas de execução de versões anteriores.
 
 ## 2. Classificar o risco
 

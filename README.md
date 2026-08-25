@@ -121,6 +121,10 @@ aprovação, planos atingidos ficam `stale`, o pacote entra em
 `approved_with_stale` e planos independentes continuam executáveis com o digest
 humano original. Uma nova auditoria gera o próximo digest aprovado.
 
+O primeiro quick ou debug de um projeto novo inicializa `.bianchini`
+automaticamente. Se houver documentação anterior reconhecida, a execução bloqueia
+com `MIGRATION_REQUIRED`; não existe fallback para `.superpowers` ou `docs/living`.
+
 ## Quick previsível
 
 `/executar-direto` classifica:
