@@ -1,206 +1,188 @@
 # Changelog
 
-## 3.2.0 - Self Update seguro
+O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
-- adiciona `/update-bm` e `bm.py update-bm` com consulta explícita da versão oficial;
-- atualiza instalações copiadas substituindo somente diretórios gerenciados e preservando skills alheias;
-- cria backup persistente e executa rollback quando uma substituição falha;
-- bloqueia archive com path traversal, symlink, arquivo especial, entrada duplicada ou versão divergente;
-- em checkout Git, exige origem oficial, `main` limpa e fast-forward de `origin/main`;
-- nunca faz downgrade e oferece `--check` sem alteração de arquivos.
+## 0.4.0 — ProjectModel e coerência global
 
-## 3.1.0 - Context Efficiency determinística
+### Workspace e DocViva
 
-- exige `Change` e `Readiness refs` em cada unidade de novos planejamentos quality v2, validando existência, destino e cobertura no readiness;
-- adiciona contexto hidratado opcional ao `task-brief`, limitado à unidade, specs referenciadas, readiness aplicável, gates rápidos e final do ledger;
-- adiciona `spec-diff` como projeção ADDED/MODIFIED/REMOVED vinculada aos digests das specs completas;
-- adiciona `mutation-evidence verify` para normalizar relatórios, classificar survivors e vincular a prova ao HEAD ou fingerprint do RC;
-- preserva `quality_version: 1`, specs completas, aprovação única e ausência de score global de mutação;
-- adiciona CI versionada para executar todos os shards e validar o CLI.
+- centraliza todo estado novo em `.bianchini/`;
+- transforma `STATE.md` em índice compacto com limite de 64 KiB;
+- separa estado atual, mudanças, quicks, debugs, resultados e arquivo histórico;
+- adiciona `MethodWorkspace` para caminhos confinados, IDs, escrita atômica, digests e transações;
+- mantém `.planning/` totalmente separado e byte a byte intocado;
+- remove do fluxo novo roteamento por geração e contrato `quality_version`.
 
-## 3.0.0 - Planning Stability e design independente
+### Modelo do sistema
 
-- adiciona `/design-projeto` para gerar protótipo HTML estático, tokens, contrato e manifesto visual antes do SDD, sem depender do Claude;
-- aceita design somente por `DESIGN_MANIFEST.json` aprovado e ligado ao hash do escopo;
-- adiciona `READINESS.md` e `USER_ACTIONS.md` com decisões, suposições, pitfalls, ações externas, spikes, superfícies e specs de domínio rastreáveis;
-- limita o checker semântico a duas passagens e uma única correção;
-- congela planos aprovados e classifica divergências como detalhe interno, ajuste limitado ou mudança material;
-- amplia o envelope de autonomia e restringe interrupções a dependência externa, custo, ação irreversível, mudança material ou impossibilidade comprovada;
-- cria specs atuais em `docs/bianchini/current/specs/`, mudanças em `changes/` e archive determinístico por `cycle-close`;
-- preserva projetos v1 e ciclos `quality_version: 1` já aprovados sem migração no meio da execução;
-- aplica as mesmas barreiras de redesign e autonomia ao overlay Codex.
+- adiciona `ProjectModel` tipado com módulos, interfaces, capabilities, contratos, ownership, dados, integrações, journeys, invariantes e efeitos;
+- adiciona `SYSTEM_MODEL.md` como representação compacta do sistema completo;
+- mantém decisões, alternativas e trade-offs em `ARCHITECTURE.md`;
+- simula `S0 → S1 → ... → Sn` pelos deltas dos planos;
+- bloqueia fechamento quando o modelo calculado diverge do modelo final esperado;
+- promove o modelo aprovado para `.bianchini/current/SYSTEM_MODEL.md` no encerramento.
 
-## 2.8.0 - Testes adaptativos sem custo por microtarefa
+### Coerência entre fases
 
-- distribui unitários, integração/contrato, E2E, regressão e mutation testing entre `verification.fast`, `verification.plan` e `verification.release`;
-- mantém regressão como estratégia transversal e impede tarefa, revisão ou subagente por camada de teste;
-- limita o estágio `fast` a provas focadas, move E2E crítico e mutação seletiva para o gate do plano e reserva a regressão ampla para o release;
-- adiciona `test_strategy` e `mutation_policy` ao resultado de `bm.py policy`, sem alterar schema ou estado do projeto;
-- não usa score global de mutação e só bloqueia survivor que demonstre comportamento aprovado alto/crítico sem proteção;
-- protege o executor Codex contra E2E completo, regressão completa, mutação e campanhas de cobertura por unidade;
-- mantém `homologar-sistema` como consumidor das provas automatizadas e executor do passe real, sem recriar a campanha técnica.
+- separa `StructuralValidator` determinístico de `SemanticReviewer` interpretativo;
+- valida IDs, referências, DAG, `provides/consumes`, ordem, ownership, migração, journeys e guards externos sem depender de LLM;
+- revisa abstração especulativa, profundidade, complexidade, responsabilidade e aderência à stack na camada semântica;
+- adiciona findings `ERROR`, `WARNING` e `INFO` com origem, evidência, correção e status;
+- exige correção ou justificativa humana de `WARNING` antes da aprovação;
+- registra prompt, entradas, fontes e digest do parecer sem armazenar raciocínio interno;
+- separa os estados `structurally_valid`, `ready_for_approval` e `approved`;
+- adiciona `coherence approve` como único checkpoint capaz de gravar responsável, horário e digest aprovado;
+- impede que revisão semântica indisponível ou autoridade presumida produzam falso passe;
+- executa auditoria depois da arquitetura, depois dos planos, antes/depois de cada plano e no fechamento.
 
-## 2.7.0 - Homologação operacional no release candidate
+### Impact radius
 
-- mantém regressão e E2E como baseline, mas impede que automação isolada encerre a homologação de produtos com interface;
-- exige abrir e operar o RC real por plataforma e perfil, cobrindo fluxos críticos e ações primárias expostas;
-- adiciona inventário da superfície executável, sucesso, validação/erro, cancelamento/recuperação, persistência e verificação de console/rede;
-- torna a varredura visual básica obrigatória para toda interface, independentemente de design importado ou brand kit;
-- concentra o contrato operacional e visual em `homologar-sistema/SKILL.md`, sem depender de prompt externo;
-- atualiza a ordem executável para `automated_regression -> coded_e2e -> proof_map -> real_system_pass -> visual_sweep`.
+- adiciona grafo de consumidores diretos e transitivos;
+- classifica mudanças em `local`, `direct`, `transitive` e `global`;
+- relaciona contrato alterado, journeys, planos e gates a repetir;
+- marca somente planos realmente atingidos como `stale`;
+- preserva aprovação de planos independentes;
+- usa prévia sem invalidação antes da aprovação e `approved_with_stale` depois;
+- preserva o digest humano até uma nova auditoria e aprovação explícita;
+- registra o resultado em `COHERENCE.md` sem criar nova fonte documental.
 
-## 2.6.0 — Breaker epistêmico por seam de risco
+### Quick protegido
 
-- `bm.py policy` passa a contar o orçamento de fix rounds por `risk_seam` (`--risk-seam`, `--seam-round`): renomear, dividir ou reabrir a tarefa não zera a contagem do mesmo seam;
-- finding de classe estrutural (`--structural-finding`: crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry após timeout, idempotência concorrente, recuperação após restart) invalida a hipótese imediatamente e retorna `hypothesis_invalidated`/`redesign_required`;
-- dois pareceres consecutivos com critical/important no mesmo seam (`--consecutive-seam-findings`) disparam breaker antecipado; antes de novo patch, o contrato exige máquina de estados, limites transacionais, pontos de crash, estado durável de retomada e matriz de falhas;
-- fix round formalizado como hipótese, não entrega: somente RED/GREEN focal, regressão relacionada e revisão do delta; gates completos, documentação e mudança de status ficam no gate do plano, após zero critical/important;
-- `plan-reviewer` ganha o eixo de espaço negativo (operação irreversível, morte do processo antes/depois, estado durável de retomada, evidência ambígua, objeto alterado entre inspeção e ação) e registra `risk_seam` em findings critical/important;
-- "mudança mínima" subordinada explicitamente ao invariante: preservar coreografia comprovadamente insegura não é mudança mínima.
+- substitui hazards por palavra por score `scope + external_effect + migration + concurrency + money`;
+- roteia `0–2` para quick normal, `3–6` para protegido e `7–10` para planejamento;
+- aplica overrides determinísticos para múltiplos domínios, migração destrutiva, concorrência sem solução, ownership indefinido, regra financeira ambígua e arquitetura nova;
+- permite pagamento e webhook coesos como quick protegido;
+- exige guards proporcionais de idempotência, autenticidade, deduplicação, replay, ordem, timeout incerto, persistência, reconciliação e rollback;
+- mantém efeitos financeiros/irreversíveis reais atrás de checkpoint explícito;
+- passa a versionar `BRIEF.md`, `PROGRESS.md` e `RESULT.md` em `.bianchini/quick/Qxxx-*`;
+- atualiza DocViva e specs/modelo afetados ao finalizar.
 
-## 2.5.3 — Evidência vinculada ao brief e ao estado final do código
+### Debug persistente
 
-- cada evidência registrada em checkpoint é carimbada com o digest do brief atual e um fingerprint da árvore de trabalho (`HEAD` + diff + conteúdo de arquivos não rastreados);
-- `finish --status completed` bloqueia evidência obsoleta: brief atualizado ou código alterado depois do registro exige reexecutar as verificações e registrar novo checkpoint;
-- `--update-brief` invalida explicitamente `verification` e `evidence`, registrando o fato nos resultados;
-- evidências visuais/manuais aceitam `check_id`: nova tentativa do mesmo check substitui a anterior em vez de manter uma falha antiga bloqueando.
+- adiciona `debug start|list|status|resume|checkpoint|finish`;
+- persiste `intake → reproduced → diagnosed → red → fixing → green → regression_checked → documented`;
+- rejeita GREEN anterior ao RED e evidência anterior ao último patch;
+- preserva hipóteses eliminadas, contraprovas, causa raiz e regressões;
+- aceita reprodução manual determinística quando automação não for viável;
+- permite referência comprovada `Dxxx → Cxxx/Pxx`;
+- move casos resolvidos para `debug/resolved/`;
+- mantém somente padrões causais reutilizáveis em `KNOWLEDGE.md`.
 
-## 2.5.2 — Evidência estruturada na execução direta
+### Migração e numeração
 
-- substitui o parsing textual de evidência por registros estruturados em `checkpoint --evidence` (JSON com `kind`, `status`, `summary`, `command`/`exit_code` ou `evidence`), eliminando falsos positivos como "Found 0 errors" e falsos negativos como "exit code 1";
-- `status: passed` em evidência de comando exige `exit_code: 0`; inconsistência é rejeitada na entrada;
-- `checkpoint --verification passed` sem evidência aprovada registrada é bloqueado;
-- `finish --status completed` usa somente a evidência estruturada salva: cada comando planejado no brief precisa da evidência mais recente aprovada ou de dispensa explícita `--waive-verification "comando: justificativa"` registrada nas limitações; evidência atual `failed`/`blocked`/`not_run` bloqueia;
-- resumos das evidências atuais entram automaticamente no `RESULT.md`;
-- `executar-plano` passa a entregar explicitamente o caminho do arquivo de saída ao `plan-reviewer` e ao `security-reviewer`, mantendo o relatório completo fora do contexto.
+- adiciona `/migrar-bianchini` e `migrate check|apply`;
+- migra uma única vez documentação anterior reconhecida, sem adaptador permanente;
+- exige projeto concluído/`idle`, Git limpo, mapa origem→destino e SHA-256;
+- preserva histórico Git, usa staging transacional e executa rollback em falha;
+- bloqueia formato desconhecido, colisão, symlink externo, path traversal e checksum divergente;
+- cria manifesto em `.bianchini/archive/import-AAAA-MM-DD/`;
+- reinicia a linhagem pública em `0.4.0`, reservando `1.0` para contrato estável;
+- aceita uma única transição oficial da numeração anterior e depois restaura comparação semântica normal.
 
-## 2.5.1 — Correções adversariais da execução direta
+## 0.3 — Estabilidade, contexto e atualização
 
-- evidência que relata falha (`falhou`, `failed`, `erro`, `não passou`, `timeout`, `cancelado`) não sustenta mais `--status completed`, mesmo contendo palavra de ferramenta;
-- conclusão compara o `git status` com `changed_files` e bloqueia alterações não registradas; aceite explícito exige `--accept-unrecorded "caminho: justificativa"` e fica registrado nas limitações e no `RESULT.md`;
-- `--blocker` passa a ser aplicado no `direct finish`; `blocked` e `escalated` exigem motivo registrado via `--blocker` ou `--limitation`;
-- contratos internos passam a exigir relatório completo em arquivo e retorno curto ao orquestrador (veredito, contagem por severidade e caminho);
-- cache do `repo-cartographer` ganha chave composta `<hash-do-HEAD>-<digest-do-escopo>`, evitando reutilizar cartografia de outro escopo no mesmo commit.
+### Planejamento e design
 
-## 2.5.0 — Execução direta endurecida e contratos internos de subagentes
+- adicionou `/design-projeto` para produzir protótipo HTML estático, tokens, contrato e manifesto visual antes do planejamento;
+- vinculou design aprovado ao digest do escopo e rejeitou screenshots/protótipos soltos;
+- introduziu readiness com decisões, suposições, pitfalls, ações externas, spikes, superfícies visuais e specs de domínio;
+- passou a exigir fontes primárias em pesquisa sensível a versão;
+- limitou a revisão semântica a uma correção factual antes do bloqueio;
+- congelou planos aprovados e separou detalhe interno, ajuste limitado e mudança material;
+- ampliou autonomia para decisões reversíveis cobertas por stack, repositório e documentação oficial;
+- introduziu specs atuais e deltas completos de domínio, sincronizados somente no fechamento.
 
-- `direct start` registra `/.superpowers/` em `.git/info/exclude` sem alterar o `.gitignore` do projeto e confirma que o scratch não aparece no `git status`;
-- `direct finish --status completed` exige estado `active`, verificação `passed`, evidência reconhecida, comportamento entregue e ausência de bloqueio aberto;
-- `completed`, `blocked` e `escalated` tornam-se estados terminais; escalado nunca vira concluído; `direct reopen` reabre somente `blocked` preservando o resultado anterior;
-- o brief ganha digest de identidade completo; retomada com digest divergente bloqueia e pede novo slug ou `--update-brief` explícito;
-- `--current-state` passa a ser obrigatório e rejeita texto genérico;
-- `executar-direto` e `auditar-arquitetura` ficam restritos a invocação manual (`disable-model-invocation` e `allow_implicit_invocation: false`);
-- adiciona cinco contratos internos em `skills/_shared/agents/` (repo-cartographer, implementation-worker, plan-reviewer, security-reviewer, ui-finish-reviewer), referenciados por caminho pelas skills do método completo e adaptados do Agency Agents (MIT, `THIRD_PARTY_NOTICES.md`);
-- `/executar-direto` permanece com zero subagentes e sem o catálogo de contratos.
+### Economia de contexto
 
-## 2.4.3 — Hardening cirúrgico de estado e planejamento
+- adicionou `Change` e referências de readiness por unidade;
+- criou `task-brief --hydrate-context` com somente specs, decisões, gates e ledger aplicáveis;
+- criou `spec-diff` como projeção ADDED/MODIFIED/REMOVED ligada aos digests das specs completas;
+- criou `mutation-evidence verify` ligado ao HEAD/fingerprint do RC;
+- preservou fontes completas e evitou transformações derivadas como nova fonte de verdade;
+- adicionou CI versionada e runner fragmentado por classe.
 
-- bloqueia estado corrompido ou ambíguo sem evidência legado;
-- exige prova objetiva para encerrar v1 e torna a higiene transacional;
-- adapta pesquisa, risco agregado e orçamento ao contexto realmente carregado;
-- centraliza os limites operacionais no resultado de `planning-audit`.
+### Atualização segura
 
-## 2.4.2 — Lean volta a ser realmente pequeno
+- adicionou `/update-bm` e `update-bm --check`;
+- passou a consultar a versão oficial somente sob invocação explícita;
+- preservou skills alheias ao substituir apenas diretórios gerenciados;
+- criou backup persistente e rollback de substituição;
+- bloqueou archive com path traversal, symlink, arquivo especial, entrada duplicada ou versão divergente;
+- em checkout Git, exigiu origem oficial, branch principal limpa e fast-forward;
+- impediu downgrade silencioso.
 
-- define uma faixa típica enxuta e teto estrito controlado pelo audit;
-- reduz os demais tetos Lean proporcionalmente;
-- registra warning acima da faixa típica para evitar usar o teto como meta;
-- mantém escalada para Standard/Full e preservação integral do escopo.
+## 0.2 — Execução segura e gates adaptativos
 
-## 2.4.1 — Preservação obrigatória do escopo aprovado
+### Planejamento enxuto
 
-- corrige o orçamento fixo que podia incentivar adiamento automático de requisitos;
-- escala capacidade de planejamento por perfil Lean, Standard e Full;
-- exige preservar 100% do escopo ao escalar o perfil ou justificar pacote Full amplo;
-- bloqueia `deferred_scope` sem autorização explícita do responsável, autor e horário;
-- esclarece que simplicidade e economia reduzem decomposição/contexto, nunca o produto contratado.
+- tornou obrigatória a pesquisa proporcional da stack;
+- introduziu modos `repo_only`, `targeted_web` e `full`;
+- adicionou `planning-audit --strict` contra placeholders, comandos vagos e dependência de fontes transitórias;
+- criou orçamentos de contexto como tetos, nunca metas ou motivo para retirar requisito;
+- bloqueou `deferred_scope` sem autorização explícita, responsável e horário;
+- consolidou setup, lint, docs e baseline na primeira entrega que os consome.
 
-## 2.4.0 — Pesquisa de stack e planejamento enxuto verificável
+### Execução direta
 
-- torna obrigatória em novos ciclos a pesquisa atual da stack com fontes primárias e impacto no design;
-- inclui `STACK_RESEARCH.md` no pacote de aprovação única;
-- adiciona passagem explícita de simplificação que trata planos legados como fontes, não como decomposição normativa;
-- introduz orçamento operacional de planos, unidades, plataformas e contexto ativo, com split ou exceção justificada;
-- adiciona `planning-audit --strict` para bloquear placeholders, comandos vagos, referências legadas e unidades incompletas;
-- preserva leitura e execução de estados v2 anteriores sem o novo contrato de qualidade.
+- adicionou `/executar-direto` como fluxo manual para entrega coesa;
+- criou brief, progresso e resultado com digest de identidade;
+- exigiu estado atual factual, aceite e comandos planejados;
+- tornou `completed`, `blocked` e `escalated` estados terminais;
+- permitiu reabrir somente trabalho bloqueado, preservando resultado anterior;
+- passou a registrar evidência estruturada de comando, browser, screenshot ou procedimento manual;
+- vinculou evidência ao digest do brief e ao fingerprint final da árvore;
+- invalidou evidência após mudança de brief ou código;
+- exigiu `exit_code: 0` para comando aprovado;
+- bloqueou alterações fora dos arquivos registrados;
+- endureceu mensagens que continham termos de sucesso, mas relatavam falha real;
+- manteve branch isolada e proibiu scratch rastreado.
 
-## 2.3.3 — Encerramento legado com transição automática
+### Testes e homologação
 
-- mantém toda fase v1 no Superpowers até gates, verificação, entrega e commit finais;
-- adiciona `legacy-transition --completed` com preflight de árvore limpa e estado commitado;
-- preserva o estado v1 byte a byte e cria estado v2 `idle` para o próximo escopo;
-- inicia o primeiro ciclo standalone como `planning_version: v1`, sem chamada a skills Superpowers;
-- mantém migração de ciclo legado ainda ativo dependente de autorização explícita.
+- distribuiu unitários, integração/contrato, E2E, regressão e mutação entre gates `fast`, `plan` e `release`;
+- tornou regressão uma estratégia transversal, sem tarefa ou agente por camada;
+- reservou E2E crítico e mutação seletiva para gates proporcionais;
+- rejeitou mutation score global como meta;
+- passou a bloquear survivor somente quando ele demonstra comportamento material desprotegido;
+- exigiu operar o RC real por plataforma/perfil depois da automação;
+- adicionou inventário de superfícies, sucesso, erro, cancelamento, recuperação e persistência;
+- tornou a varredura visual básica obrigatória quando houver interface;
+- amarrou provas ao fingerprint `id + revision + build + checksum`.
 
-## 2.3.2 — Migração explícita e higiene da raiz
+### Breaker e correção
 
-- adiciona rota explícita e auditável de projetos v1 para v2;
-- permite estado bootstrap sem planos somente durante `planning_status: in_progress`;
-- proíbe arquivos rastreados sob `.superpowers/` na raiz;
-- migra artefatos históricos para `docs/bianchini/legacy/root-superpowers/` preservando bytes;
-- exige `/.superpowers/` no `.gitignore` versionado antes da execução v2.
+- passou a contar fix rounds por `risk_seam`, sem reset por renomear tarefa;
+- antecipou breaker após findings críticos/importantes consecutivos no mesmo seam;
+- classificou crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry ambíguo, idempotência concorrente e recuperação após restart como achados estruturais;
+- exigiu máquina de estados, limites transacionais, estado durável e matriz de falhas antes de novo patch;
+- manteve fix round como hipótese RED/GREEN, não como entrega completa;
+- subordinou mudança mínima ao invariante correto.
 
-## 2.3.1 — Worktree baseada no pacote aprovado
+## 0.1 — Fundação standalone
 
-- bloqueia `workspace create` quando o repositório possui alteração não commitada;
-- exige estado, snapshot, pacote e manifesto aprovados e presentes no `HEAD`;
-- usa `planning_version + plan_id` na identidade de branch/worktree;
-- garante por regressão que estado, plano e manifesto chegam à worktree;
-- adiciona runner fragmentado por classe para ambientes com limite de subprocessos.
+### Estado, aprovação e execução
 
-## 2.3.0 — Behavioral fixtures e telemetria opt-in
+- removeu dependência obrigatória de metodologia externa no fluxo principal;
+- criou contrato de estado validável e máquina de estados de release;
+- introduziu snapshot de aprovação única com manifesto SHA-256 ordenado e não autorreferente;
+- bloqueou aprovação parcial e invalidou pacote alterado após aprovação;
+- criou worktree obrigatória por ciclo/plano, fora da branch principal e da worktree primária;
+- exigiu estado, plano, snapshot e manifesto commitados antes da implementação;
+- adicionou briefs, relatórios, review packages e checkpoints determinísticos;
+- implementou políticas `grouped`, `slice` e `strict` sem quantidade mínima de tarefas;
+- adicionou revisão de contrato e qualidade proporcional ao risco;
+- integrou correção por causa raiz, regressão e reteste ao fluxo;
+- criou encerramento com specs sincronizadas, archive e estado ocioso.
 
-- transforma briefs grouped em pacotes determinísticos com ID/hash e validação do modo de cada unidade;
-- adiciona telemetria local opcional para tokens, duração, fix rounds, gates e bugs de homologação;
-- completa o status com gate atual e resumo da telemetria;
-- adiciona fixtures completas v1, v2 grouped e v2 strict;
-- executa cenários ponta a ponta de snapshot, grouped, status, telemetria e fingerprint do RC.
+### Segurança e confiabilidade
 
-## 2.2.0 — Hardening standalone final
-
-- reconhece estados v1 sem `method_version` e mantém a exigência do Superpowers legado;
-- confina manifesto e arquivos do snapshot à raiz, inclusive contra symlinks de escape;
-- exige fingerprint completo do RC e correspondência exata das evidências;
-- adiciona briefs grouped por lista, intervalo ou heading com hashes por unidade;
-- torna auditoria arquitetural manual, orientada a hotspots e report-only;
-- restaura enums `architecture_audit: disabled` e `manual_pdf: none|quick_start|full|scope`;
-- adiciona locate/resume de worktree, checkpoint absoluto e status estruturado completo;
-- valida dependências inexistentes/cíclicas e estados de aprovação incoerentes;
-- sanitiza diffs de revisão e normaliza erros de entrada/IO sem traceback;
-- amplia a suíte adversarial de 28 para 42 cenários.
-
-## 2.1.0 — Correções da auditoria externa
-
-- restaura compatibilidade v1 estrita: Superpowers obrigatório e bloqueio quando ausente;
-- adiciona `auditar-arquitetura` e `status-projeto`;
-- adiciona JSON Schema e estado v2 com planning, execução, auditoria, manual e três níveis de verificação;
-- implementa CLI stdlib para rota, schema, snapshot, worktree, política, briefs, relatórios, revisão e checkpoint;
-- proíbe implementação v2 na branch principal ou worktree primária;
-- implementa políticas `grouped`, `slice` e `strict` com revisão/testes proporcionais;
-- aplica fix rounds proporcionais ao perfil com breaker determinístico;
-- remove qualquer mínimo indireto de tarefas;
-- torna homologação automation-first e manual/PDF dependente do escopo;
-- substitui testes de strings por fixtures e cenários comportamentais executáveis.
-
-## 2.0.1 — Auditoria adversarial
-
-- torna o snapshot de aprovação determinístico e não autorreferente com `sha256-manifest-v1`;
-- define quem registra a aprovação quando planejamento e execução ocorrem em sessões diferentes;
-- elimina aprovação parcial e invalida qualquer pacote aprovado cujo manifesto mudou;
-- unifica estados de release em `pending -> candidate -> homologated -> ready`;
-- adiciona mapa explícito dos estados legados v1 sem reescrever projetos antigos;
-- materializa escopo aprovado apenas em conversa para permitir reprodução posterior;
-- reduz leitura de contexto por ponteiros e carrega referências somente na fase necessária;
-- adiciona fallback inline para hosts sem invocação entre skills e evita agentes em tarefas mecânicas;
-- amplia a suíte de contrato de 12 para 23 testes adversariais.
-
-## 2.0.0 — Standalone Adaptive
-
-- remove dependência obrigatória do Superpowers nas quatro skills;
-- adiciona roteamento explícito e compatibilidade entre projetos v1 e v2;
-- introduz contrato de estado v2, snapshot de aprovação única e máquina de estados de release;
-- adiciona execução standalone com ledger por plano, topologia adaptativa, TDD/validation-first e revisão Spec/Qualidade;
-- define gates por stack e risco com fallbacks verificáveis;
-- integra correção por causa raiz ao fluxo de planos e homologação;
-- completa homologação com runners por plataforma, pacote de aceite e manual PDF;
-- adiciona validação automatizada do próprio pacote sem dependências de terceiros.
+- confinou caminhos, manifestos e artefatos à raiz do projeto, inclusive contra symlink;
+- normalizou erros de entrada e IO sem traceback desnecessário;
+- bloqueou dependências ausentes/cíclicas e estados de aprovação incoerentes;
+- sanitizou diffs entregues a revisores;
+- criou fingerprint obrigatório do release candidate;
+- tornou telemetria local opt-in e limitada a métricas numéricas;
+- proibiu prompts, código, diffs, segredos e dados pessoais na telemetria;
+- adicionou auditoria arquitetural manual orientada a hotspots e sem mutação;
+- introduziu contratos internos enxutos para cartografia, implementação, revisão e segurança;
+- manteve homologação real e validação visual como responsabilidade explícita do método.
