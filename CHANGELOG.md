@@ -2,6 +2,14 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 0.4.3 — Execução direta sem replanejamento automático
+
+- torna a invocação explícita de `/executar-direto` uma decisão definitiva de roteamento;
+- mantém scores `3–10` e sinais críticos no quick protegido, com guards e evidências proporcionais;
+- remove a saída automática ou manual `escalated` dos quicks novos;
+- usa planos, specs e decisões em `.bianchini/` como documentação e rastreio, sem exigir novo `/sdd-planning`;
+- preserva bloqueios reais de autoridade, informação e efeitos externos, sem tratar complexidade como bloqueio.
+
 ## 0.4.2 — Aposentadoria dos adaptadores antigos
 
 - remove da interface pública `route`, `legacy-transition` e `repo-hygiene`;

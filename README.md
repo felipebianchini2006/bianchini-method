@@ -136,14 +136,15 @@ risk = scope + external_effect + migration + concurrency + money
 Cada dimensão vale `0..2`:
 
 - `0–2`: quick normal;
-- `3–6`: quick protegido;
-- `7–10`: planejamento.
+- `3–10`: quick protegido.
 
-Overrides como múltiplos domínios, migração destrutiva, concorrência sem solução, ownership indefinido ou arquitetura nova sempre escalam.
+Sinais como múltiplos domínios, migração destrutiva, concorrência sem solução, ownership indefinido ou arquitetura nova reforçam guards e evidências, mas não trocam o fluxo escolhido.
 
 Pagamento e webhook não escalam por palavra. Um fluxo coeso pode permanecer quick protegido quando documenta origem de verdade, idempotência, autenticidade, deduplicação, retry incerto, persistência, reconciliação, rollback e sandbox. Efeito financeiro/irreversível real exige checkpoint explícito.
 
 Quicks ficam versionados em `.bianchini/quick/Qxxx-*` e atualizam a DocViva ao terminar.
+
+Quando `/executar-direto` é invocado, score e risco nunca redirecionam para `/sdd-planning`. O conteúdo de `.bianchini/` continua servindo como documentação e rastreio da execução.
 
 ## Debug persistente
 

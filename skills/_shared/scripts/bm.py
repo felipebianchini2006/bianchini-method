@@ -3246,7 +3246,7 @@ def direct_payload(state: dict[str, Any], directory: Path) -> dict[str, Any]:
         "brief": str(directory / "BRIEF.md"),
         "progress": str(directory / "PROGRESS.md"),
         "result": str(directory / "RESULT.md"),
-        "next_step": "/sdd-planning" if state["mode"] == "escalated" else None,
+        "next_step": None,
     }
 
 
@@ -3310,12 +3310,12 @@ def direct_start(
     unknown_hazards = sorted(set(hazards) - DIRECT_HAZARDS)
     if unknown_hazards:
         raise BMError("hazard inválido: " + ", ".join(unknown_hazards))
-    escalation_reasons = sorted(set(hazards))
+    risk_signals = sorted(set(hazards))
     if risk in {"high", "critical"}:
-        escalation_reasons.append(f"risk:{risk}")
+        risk_signals.append(f"risk:{risk}")
     if subsystems > 1:
-        escalation_reasons.append(f"independent-subsystems:{subsystems}")
-    mode = "escalated" if escalation_reasons else "direct"
+        risk_signals.append(f"independent-subsystems:{subsystems}")
+    mode = "direct"
     incoming_digest = direct_brief_digest(
         {
             "objective": objective,
@@ -3338,7 +3338,7 @@ def direct_start(
             raise BMError(
                 f"BLOQUEADO: execução direta {slug} está em estado terminal "
                 f"{existing['status']}; use um novo slug (ou 'direct reopen' para "
-                "execução bloqueada). Execução escalada continua em /sdd-planning.",
+                "execução bloqueada).",
                 EXIT_BLOCKED,
             )
         if stored_brief_digest(existing) != incoming_digest:
@@ -3346,12 +3346,6 @@ def direct_start(
                 raise BMError(
                     "BLOQUEADO: digest do brief divergente do registrado; use um novo "
                     "slug ou atualize explicitamente o brief com --update-brief",
-                    EXIT_BLOCKED,
-                )
-            if mode == "escalated":
-                raise BMError(
-                    "BLOQUEADO: a atualização do brief introduz risco/hazard que exige "
-                    "escalonamento; use um novo slug e /sdd-planning",
                     EXIT_BLOCKED,
                 )
             if change_kind in DIRECT_RED_GREEN_KINDS:
@@ -3404,7 +3398,7 @@ def direct_start(
         )
 
     target_branch = branch
-    if mode == "direct" and branch in {"main", "master"}:
+    if branch in {"main", "master"}:
         target_branch = f"bm/direct/{slug}"
         if run_git(["branch", "--list", target_branch], root):
             raise BMError(f"BLOQUEADO: branch direta já existe: {target_branch}", EXIT_BLOCKED)
@@ -3431,13 +3425,13 @@ def direct_start(
         "risk": risk,
         "change_kind": change_kind,
         "verification_strategy": strategy,
-        "hazards": escalation_reasons,
+        "hazards": risk_signals,
         "hazards_declared": sorted(set(hazards)),
         "brief_digest": incoming_digest,
         "subsystems": subsystems,
         "branch": target_branch,
         "base_commit": base_commit,
-        "status": "escalated" if mode == "escalated" else "active",
+        "status": "active",
         "last_checkpoint": None,
         "changed_files": sorted(recognized),
         "commands": initial_commands,
@@ -3448,13 +3442,9 @@ def direct_start(
         "behaviors": [],
         "limitations": [],
         "out_of_scope": [],
-        "blockers": escalation_reasons,
+        "blockers": [],
         "git_status": "clean" if not dirty_paths else "modified",
-        "next_action": (
-            "Executar /sdd-planning com este handoff compacto."
-            if mode == "escalated"
-            else "Implementar a menor sequência coerente e registrar checkpoint relevante."
-        ),
+        "next_action": "Implementar a menor sequência coerente e registrar checkpoint relevante.",
         "created_at": timestamp,
         "updated_at": timestamp,
     }
@@ -3527,6 +3517,8 @@ def direct_checkpoint(
     evidence: list[str],
 ) -> dict[str, Any]:
     root = direct_repo(repo)
+    if status not in {"completed", "blocked"}:
+        raise BMError("status terminal de execução direta deve ser completed ou blocked")
     state = read_direct_state(root, slug)
     ensure_direct_branch(root, state)
     if state["status"] != "active":
@@ -3720,8 +3712,6 @@ def direct_finish(
         for entry in current_evidence.values()
     ]
     state["status"] = status
-    if status == "escalated":
-        state["mode"] = "escalated"
     state["behaviors"] = behaviors
     state["verification_results"] = verification_results
     state["limitations"] = limitations
@@ -3743,8 +3733,7 @@ def direct_reopen(repo: Path, slug: str, next_action: str) -> dict[str, Any]:
         raise BMError("execução direta já está ativa; reabertura desnecessária")
     if state["status"] == "escalated":
         raise BMError(
-            "BLOQUEADO: execução escalada não pode ser reaberta nem concluída; "
-            "use um novo slug ou continue em /sdd-planning",
+            "BLOQUEADO: execução escalada histórica não pode ser reaberta; use um novo slug",
             EXIT_BLOCKED,
         )
     if state["status"] == "completed":
@@ -4168,9 +4157,7 @@ def parser() -> argparse.ArgumentParser:
     )
     direct.add_argument("--blocker", action="append", default=[])
     direct.add_argument("--next-action")
-    direct.add_argument(
-        "--status", choices=["completed", "blocked", "escalated"]
-    )
+    direct.add_argument("--status", choices=["completed", "blocked"])
     direct.add_argument("--behavior", action="append", default=[])
     direct.add_argument("--limitation", action="append", default=[])
     direct.add_argument("--evidence", action="append", default=[])

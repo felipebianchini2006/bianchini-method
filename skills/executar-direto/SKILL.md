@@ -7,7 +7,9 @@ description: Use para executar uma entrega coesa como quick normal ou protegido,
 
 **Anuncie:** "Classificando e executando este quick com Bianchini Method 0.4."
 
-Use somente por invocação explícita de `/executar-direto`. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Não acione outra metodologia.
+Use somente por invocação explícita de `/executar-direto`. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Não acione outra metodologia. A escolha explícita deste fluxo é a decisão de roteamento: o quick nunca aciona `/sdd-planning`, independentemente do score, dos hazards ou da complexidade encontrada.
+
+Planos, specs e decisões já existentes em `.bianchini/` são documentação e rastreio. Use-os como contexto confiável, sem exigir novo planejamento para executar a tarefa solicitada.
 
 O quick usa zero subagentes, não carrega o catálogo interno de agentes e faz uma única auto-revisão final. A intenção é manter baixo overhead sem reduzir os guards do risco real.
 
@@ -54,10 +56,9 @@ bm.py direct classify --repo <repo> \
 Roteamento retornado pelo CLI:
 
 - `0–2`: quick normal;
-- `3–6`: quick protegido;
-- `7–10`: `/sdd-planning`.
+- `3–10`: quick protegido.
 
-Overrides obrigatórios vencem o total: `scope=2`, migração destrutiva, concorrência não controlada, ownership indefinido, regra financeira ambígua, arquitetura material nova ou várias entregas independentes.
+Sinais críticos como `scope=2`, migração destrutiva, concorrência não controlada, ownership indefinido, regra financeira ambígua, arquitetura material nova ou várias entregas independentes tornam ou mantêm o quick protegido. Eles aumentam guards, pesquisa, checkpoints e evidências, mas nunca desviam o trabalho para outro fluxo.
 
 Pagamento e webhook não escalam pela palavra. Eles podem ser quick protegido quando formam um fluxo único, usam arquitetura conhecida e possuem guards completos.
 
@@ -98,7 +99,7 @@ Não impor fila ou outbox automaticamente. Use o padrão mais simples já susten
 
 Cobrança real, refund, operação paga, ativação externa ou outro efeito irreversível exige autoridade explícita no momento da ação. Sandbox aprovado não prova produção.
 
-Se um guard revelar ownership ambíguo, regra indefinida ou arquitetura nova, preserve o trabalho válido, finalize como `escalated` e encaminhe para `/sdd-planning`.
+Se um guard revelar ownership ambíguo, regra indefinida ou arquitetura nova, resolva a decisão mais simples sustentada pelo repositório, pela documentação vigente e pelo aceite. Se faltar autoridade ou informação impossível de obter, finalize como `blocked` com o impedimento específico. Complexidade, risco ou necessidade de investigação não são bloqueios por si só.
 
 ## 5. Implementar e comprovar
 
@@ -124,7 +125,7 @@ Antes de `direct finish`:
 5. atualizar spec, arquitetura ou `SYSTEM_MODEL.md` somente quando o comportamento aceito mudou;
 6. atualizar `STATE.md` atomicamente.
 
-`completed` exige comportamento entregue, evidência fresca e nenhum bloqueio. `blocked` exige condição externa específica. `escalated` preserva resultado e nunca vira concluído no mesmo quick.
+`completed` exige comportamento entregue, evidência fresca e nenhum bloqueio. `blocked` exige condição externa específica. O quick não possui saída `escalated`.
 
 O `RESULT.md` diferencia código, testes, sandbox, deploy, efeito em produção/provedor e homologação humana.
 

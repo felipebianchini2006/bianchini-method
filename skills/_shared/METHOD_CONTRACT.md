@@ -274,10 +274,9 @@ risk = scope + external_effect + migration + concurrency + money
 Cada dimensão vale `0..2`:
 
 - `0–2`: quick normal;
-- `3–6`: quick protegido;
-- `7–10`: planejamento.
+- `3–10`: quick protegido.
 
-Overrides obrigatórios para planejamento: `scope=2`, migração destrutiva, concorrência não controlada, ownership indefinido, regra financeira ambígua, arquitetura material nova ou várias entregas independentes.
+Sinais críticos como `scope=2`, migração destrutiva, concorrência não controlada, ownership indefinido, regra financeira ambígua, arquitetura material nova ou várias entregas independentes tornam ou mantêm o quick protegido. Eles reforçam guards e evidências sem trocar de fluxo.
 
 ```bash
 bm.py direct classify --repo <repo> \
@@ -291,6 +290,8 @@ bm.py direct classify --repo <repo> \
 ```
 
 Pagamento e webhook não escalam pela palavra. Quick protegido exige guards aplicáveis: documentação oficial, origem de verdade, idempotência, autenticidade, deduplicação, replay/ordem, timeout incerto, persistência, reconciliação, rollback, sandbox e checkpoint de produção. Cobrança real, refund, operação paga, ativação externa ou efeito irreversível exige autoridade explícita no momento do efeito.
+
+A invocação explícita de `/executar-direto` é definitiva para a tarefa atual. Score, hazard ou complexidade não acionam `/sdd-planning`. A documentação existente em `.bianchini/` serve como fonte de contexto e rastreio; ausência de resposta obtível ou de autoridade externa pode bloquear, mas não replanejar automaticamente.
 
 `direct start` inicializa o workspace 0.4 em projeto novo e persiste `BRIEF.md`,
 `PROGRESS.md` e `RESULT.md` em `.bianchini/quick/Qxxx-*`; score, overrides e digest

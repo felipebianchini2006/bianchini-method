@@ -2104,6 +2104,9 @@ class AgentContractScenarios(unittest.TestCase):
         direct = read(SKILLS["executar-direto"])
         self.assertIn("zero subagentes", direct)
         self.assertIn("não carrega o catálogo interno de agentes", direct)
+        self.assertIn("nunca aciona `/sdd-planning`", direct)
+        self.assertNotIn("encaminhe para `/sdd-planning`", direct)
+        self.assertNotIn("`7–10`: `/sdd-planning`", direct)
 
     def test_architecture_audit_requires_explicit_invocation(self) -> None:
         metadata = frontmatter(read(SKILLS["auditar-arquitetura"]))

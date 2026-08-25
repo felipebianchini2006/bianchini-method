@@ -282,9 +282,7 @@ def classify_quick_risk(
     }
     forced = sorted(set(overrides) | automatic_overrides)
     score = sum(values.values())
-    if forced or score >= 7:
-        route = "planning"
-    elif score >= 3:
+    if score >= 3 or forced:
         route = "protected"
     else:
         route = "normal"
@@ -366,7 +364,7 @@ def quick_start(
     brief = {
         "schema_version": 1,
         "id": work_id,
-        "status": "active" if risk["route"] != "planning" else "escalated",
+        "status": "active",
         "objective": objective,
         "scope": scope_text,
         "acceptance": acceptance,
@@ -391,32 +389,16 @@ def quick_start(
             "# Progresso\n\nNenhum checkpoint registrado.",
         ),
     )
-    if risk["route"] == "planning":
-        _atomic_write(
-            directory / "RESULT.md",
-            _frontmatter(
-                {"status": "escalated", "reason": "risk_route", "finished_at": _now()},
-                "# Resultado\n\nEscalado para /sdd-planning.",
-            ),
-        )
-        update_state(
-            root,
-            active_work=None,
-            status="idle",
-            last_completed={"kind": "quick", "id": work_id, "status": "escalated"},
-            next_action="Iniciar /sdd-planning usando o brief do quick escalado.",
-        )
-    else:
-        update_state(
-            root,
-            active_work={"kind": "quick", "id": work_id, "status": "active"},
-            status="active",
-            next_action=(
-                "Completar guards ausentes antes da implementação: " + ", ".join(missing)
-                if missing
-                else f"Executar e verificar {work_id}."
-            ),
-        )
+    update_state(
+        root,
+        active_work={"kind": "quick", "id": work_id, "status": "active"},
+        status="active",
+        next_action=(
+            "Completar guards ausentes durante a execução: " + ", ".join(missing)
+            if missing
+            else f"Executar e verificar {work_id}."
+        ),
+    )
     return {**brief, "path": str(directory)}
 
 
@@ -515,7 +497,7 @@ def quick_finish(
 ) -> dict[str, Any]:
     root = _repo_root(repo)
     directory = _quick_directory(root, work_id)
-    if status not in {"completed", "blocked", "escalated"}:
+    if status not in {"completed", "blocked"}:
         raise WorkflowError("MODEL_MISMATCH", "status terminal de quick inválido")
     if (directory / "RESULT.md").is_file():
         raise WorkflowError("ORDER_VIOLATION", "quick terminal é imutável")
@@ -552,7 +534,7 @@ def quick_finish(
                 "STALE_EVIDENCE", "código mudou após o último checkpoint"
             )
     elif not blockers:
-        raise WorkflowError("MODEL_MISMATCH", "quick bloqueado ou escalado exige motivo")
+        raise WorkflowError("MODEL_MISMATCH", "quick bloqueado exige motivo")
     result = {
         "schema_version": 1,
         "id": work_id,

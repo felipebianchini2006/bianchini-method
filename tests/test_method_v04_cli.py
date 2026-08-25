@@ -421,7 +421,7 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertRegex(result["id"], r"^Q001-")
             self.assertEqual(
                 (installed / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-                "0.4.2",
+                "0.4.3",
             )
             self.assertTrue((repo / ".bianchini/STATE.md").is_file())
             self.assertFalse((repo / ".superpowers").exists())
@@ -987,7 +987,7 @@ class MethodV04Scenarios(unittest.TestCase):
             "--money-score",
             "2",
         )
-        planning = cli_json(
+        critical = cli_json(
             "direct",
             "classify",
             "--scope-score",
@@ -1005,14 +1005,14 @@ class MethodV04Scenarios(unittest.TestCase):
 
         self.assertEqual((normal["score"], normal["route"]), (1, "normal"))
         self.assertEqual((protected["score"], protected["route"]), (6, "protected"))
-        self.assertEqual(planning["route"], "planning")
-        self.assertIn("destructive_migration", planning["overrides"])
+        self.assertEqual(critical["route"], "protected")
+        self.assertIn("destructive_migration", critical["overrides"])
 
         boundaries = (
             ((0, 1, 0, 0, 1), (2, "normal")),
             ((0, 1, 1, 0, 1), (3, "protected")),
             ((0, 2, 1, 1, 2), (6, "protected")),
-            ((1, 2, 1, 1, 2), (7, "planning")),
+            ((1, 2, 1, 1, 2), (7, "protected")),
         )
         for scores, expected in boundaries:
             arguments = ["direct", "classify"]
@@ -1038,7 +1038,56 @@ class MethodV04Scenarios(unittest.TestCase):
             for name, value in scores.items():
                 arguments.extend([f"--{name}-score", value])
             with self.subTest(automatic_override=dimension):
-                self.assertEqual(cli_json(*arguments)["route"], "planning")
+                classified = cli_json(*arguments)
+                self.assertEqual(classified["route"], "protected")
+                self.assertTrue(classified["overrides"])
+
+    def test_critical_direct_work_stays_active_without_planning_redirect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+
+            started = cli_json(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Executar migração concorrente com webhook",
+                "--scope",
+                "Entrega crítica já decidida e rastreada",
+                "--acceptance",
+                "Migração e webhook funcionam com segurança",
+                "--verification",
+                "pytest tests/integration.py",
+                "--scope-score",
+                "2",
+                "--external-effect-score",
+                "2",
+                "--migration-score",
+                "2",
+                "--concurrency-score",
+                "2",
+                "--money-score",
+                "2",
+                "--destructive-migration",
+                "--uncontrolled-concurrency",
+                "--webhook-flow",
+            )
+
+            quick_id = str(started["id"])
+            self.assertEqual(started["status"], "active")
+            self.assertEqual(started["risk"]["route"], "protected")
+            self.assertFalse((repo / f".bianchini/quick/{quick_id}/RESULT.md").exists())
+            state = (repo / ".bianchini/STATE.md").read_text(encoding="utf-8")
+            self.assertIn(quick_id, state)
+            self.assertNotIn("sdd-planning", state)
+
+    def test_direct_finish_rejects_escalated_status(self) -> None:
+        result = cli("direct", "finish", "--status", "escalated")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid choice", result.stderr)
 
     def test_protected_quick_persists_and_requires_production_checkpoint(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1443,10 +1492,10 @@ class MethodV04Scenarios(unittest.TestCase):
     def test_version_files_use_zero_four_lineage(self) -> None:
         self.assertEqual(
             (ROOT / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-            "0.4.2",
+            "0.4.3",
         )
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.2"', workflow)
+        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.3"', workflow)
         root_schema = (ROOT / "schemas/state-v04.schema.json").read_bytes()
         packaged_schema = (
             ROOT / "skills/_shared/schemas/state-v04.schema.json"
