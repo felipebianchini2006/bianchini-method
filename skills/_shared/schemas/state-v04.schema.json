@@ -40,6 +40,7 @@
       "enum": [
         "idle",
         "planning",
+        "scope_ready",
         "pending_approval",
         "approved",
         "approved_with_stale",
@@ -74,7 +75,8 @@
         "architecture": {"type": "string", "pattern": "^\\.bianchini/"},
         "system_model": {"type": "string", "pattern": "^\\.bianchini/"},
         "specs": {"type": "string", "pattern": "^\\.bianchini/"},
-        "coherence": {"type": ["string", "null"], "pattern": "^\\.bianchini/"}
+        "coherence": {"type": ["string", "null"], "pattern": "^\\.bianchini/"},
+        "scope": {"type": "string", "pattern": "^\\.bianchini/"}
       }
     },
     "digest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},

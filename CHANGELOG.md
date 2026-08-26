@@ -2,6 +2,14 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 0.4.5 — Intake de escopo em PDF
+
+- adiciona `/preparar-escopo` para converter PDF textual, escaneado ou misto em `SCOPE.md` estruturado;
+- exige rastreabilidade por página, aceite testável e fechamento de ambiguidades antes do selo;
+- adiciona `scope seal` e `scope verify` com digest da fonte, cobertura e escrita atômica;
+- faz o `sdd-planning` reutilizar o escopo selado e bloquear alterações posteriores;
+- preserva `.planning/` e mantém PDF, extrações e OCR fora do Git.
+
 ## 0.4.4 — Subagentes adaptativos na execução direta
 
 - permite subagentes em quick normal e protegido quando existirem frentes independentes;

@@ -91,6 +91,158 @@ def empty_model(**sections: object) -> dict[str, object]:
     return model
 
 
+def write_text_pdf(path: Path, pages: list[str]) -> None:
+    """Gera um PDF textual pequeno sem depender de biblioteca externa."""
+
+    objects: list[bytes] = []
+    page_ids = [3 + index * 2 for index in range(len(pages))]
+    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
+    objects.append(
+        f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>".encode()
+    )
+    for index, content in enumerate(pages):
+        page_id = page_ids[index]
+        stream_id = page_id + 1
+        objects.append(
+            (
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                f"/Resources << /Font << /F1 {2 + len(pages) * 2 + 1} 0 R >> >> "
+                f"/Contents {stream_id} 0 R >>"
+            ).encode()
+        )
+        escaped = content.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        stream = f"BT /F1 12 Tf 72 720 Td ({escaped}) Tj ET".encode()
+        objects.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    data = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for identifier, value in enumerate(objects, start=1):
+        offsets.append(len(data))
+        data.extend(f"{identifier} 0 obj\n".encode())
+        data.extend(value)
+        data.extend(b"\nendobj\n")
+    xref = len(data)
+    data.extend(f"xref\n0 {len(objects) + 1}\n".encode())
+    data.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        data.extend(f"{offset:010d} 00000 n \n".encode())
+    data.extend(
+        (
+            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref}\n%%EOF\n"
+        ).encode()
+    )
+    path.write_bytes(data)
+
+
+def detailed_scope_body(*, unsourced: bool = False, blocked: bool = False) -> str:
+    source = "" if unsourced else "- Fonte: PDF p. 1\n"
+    blockers = "- Definir quem pode cancelar uma solicitação.\n" if blocked else "Nenhuma.\n"
+    return f"""# Escopo — Portal de solicitações
+
+## Objetivo
+
+Permitir que clientes registrem e acompanhem solicitações de suporte.
+
+## Resultados esperados
+
+- Solicitação registrada com identificador público.
+- Histórico de estados consultável pelo cliente responsável.
+
+## Atores e perfis
+
+### ACT-001 — Cliente
+- Responsabilidade: registrar e consultar as próprias solicitações.
+{source}
+## Fluxos
+
+### FLW-001 — Registrar solicitação
+- Ator: Cliente autenticado.
+- Gatilho: envio do formulário de suporte.
+- Pré-condições: cliente possui sessão válida.
+- Caminho principal: informar assunto e descrição; confirmar envio.
+- Resultado: solicitação criada no estado recebida e identificador exibido.
+- Falhas: assunto vazio é recusado sem criar registro.
+{source}
+## Requisitos funcionais
+
+### REQ-001 — Registrar solicitação
+- Origem: explícito.
+{source}- Aceite:
+  - GIVEN cliente autenticado e assunto preenchido.
+  - WHEN confirmar o envio.
+  - THEN criar uma solicitação no estado recebida e exibir seu identificador.
+
+## Requisitos não funcionais
+
+Não especificado no PDF.
+
+## Regras de negócio
+
+### BR-001 — Isolamento por cliente
+- Regra: cliente consulta somente solicitações criadas por sua conta.
+{source}
+## Dados e estados
+
+### DAT-001 — Solicitação
+- Campos: identificador, cliente, assunto, descrição, estado e datas.
+- Estados: recebida, em atendimento e concluída.
+{source}
+## Integrações e efeitos externos
+
+Não aplicável: o PDF não exige integração externa.
+
+## Critérios gerais de aceite
+
+- O cliente conclui o FLW-001 sem acessar dados de outra conta.
+- Entrada inválida não cria uma solicitação parcial.
+
+## Comportamentos de erro
+
+### ERR-001 — Assunto ausente
+- Condição: assunto vazio no envio.
+- Resposta: recusar a entrada e preservar o formulário.
+{source}
+## Riscos e casos para o planejamento
+
+### RSK-001 — Concorrência de atualização
+- Avaliar: impedir perda de estado quando dois operadores atualizarem a mesma solicitação.
+- Efeito no escopo: risco para análise; não adiciona requisito funcional.
+{source}
+## Dentro do escopo
+
+- Cadastro de solicitação.
+- Consulta das próprias solicitações.
+- Transição entre os três estados declarados.
+
+## Fora do escopo
+
+- Chat em tempo real.
+- Integração com mensageria externa.
+
+## Decisões consolidadas
+
+Nenhuma.
+
+## Questões abertas
+
+Nenhuma.
+
+## Decisões bloqueantes
+
+{blockers}
+## Contradições
+
+Nenhuma.
+
+## Proveniência e cobertura
+
+- Páginas processadas: 1-2 de 2.
+"""
+
+
 class MethodV04Scenarios(unittest.TestCase):
     def test_first_quick_initializes_v04_without_legacy_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -421,7 +573,7 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertRegex(result["id"], r"^Q001-")
             self.assertEqual(
                 (installed / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-                "0.4.4",
+                "0.4.5",
             )
             self.assertTrue((repo / ".bianchini/STATE.md").is_file())
             self.assertFalse((repo / ".superpowers").exists())
@@ -1492,10 +1644,10 @@ class MethodV04Scenarios(unittest.TestCase):
     def test_version_files_use_zero_four_lineage(self) -> None:
         self.assertEqual(
             (ROOT / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-            "0.4.4",
+            "0.4.5",
         )
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.4"', workflow)
+        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.5"', workflow)
         root_schema = (ROOT / "schemas/state-v04.schema.json").read_bytes()
         packaged_schema = (
             ROOT / "skills/_shared/schemas/state-v04.schema.json"
@@ -1506,6 +1658,224 @@ class MethodV04Scenarios(unittest.TestCase):
         self.assertEqual(schema["properties"]["method"]["const"], "0.4")
         for forbidden in ("history", "ledger", "events", "results", "timeline"):
             self.assertNotIn(forbidden, schema["properties"])
+
+
+class ScopeIntakeScenarios(unittest.TestCase):
+    def prepare_change(self, root: Path) -> tuple[Path, str, Path]:
+        repo = root / "repo"
+        init_git(repo)
+        planning = repo / ".planning"
+        planning.mkdir()
+        (planning / "foreign.md").write_text("não tocar\n", encoding="utf-8")
+        cli_json("model", "init", "--repo", str(repo))
+        change = cli_json(
+            "model", "init", "--repo", str(repo), "--change", "portal suporte"
+        )
+        source = root / "escopo-cliente.pdf"
+        write_text_pdf(source, ["Portal de suporte", "Regras e aceite"])
+        return repo, str(change["change"]), source
+
+    def test_scope_seal_creates_verified_scope_and_preserves_foreign_planning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo, change, source = self.prepare_change(root)
+            planning_before = tree_digest(repo / ".planning")
+            draft = root / "scope-draft.md"
+            draft.write_text(detailed_scope_body(), encoding="utf-8")
+
+            sealed = cli_json(
+                "scope",
+                "seal",
+                "--repo",
+                str(repo),
+                "--change",
+                change,
+                "--source",
+                str(source),
+                "--draft",
+                str(draft),
+                "--pages",
+                "2",
+                "--extraction",
+                "native",
+            )
+
+            self.assertEqual(sealed["status"], "ready_for_sdd")
+            self.assertEqual(sealed["change"], change)
+            self.assertEqual(sealed["coverage"]["unsourced_items"], 0)
+            self.assertEqual(sealed["coverage"]["blocking_decisions"], 0)
+            self.assertRegex(str(sealed["scope_digest"]), r"^[0-9a-f]{64}$")
+            scope = repo / f".bianchini/changes/{change}/SCOPE.md"
+            content = scope.read_text(encoding="utf-8")
+            self.assertIn('"document": "bianchini-scope"', content)
+            self.assertIn('"status": "ready_for_sdd"', content)
+            self.assertIn("### REQ-001", content)
+            self.assertIn("- Itens sem fonte: 0", content)
+            self.assertNotIn(str(source.parent), content)
+
+            verified = cli_json(
+                "scope",
+                "verify",
+                "--repo",
+                str(repo),
+                "--change",
+                change,
+                "--source",
+                str(source),
+            )
+            self.assertEqual(verified["scope_digest"], sealed["scope_digest"])
+            state = (repo / ".bianchini/STATE.md").read_text(encoding="utf-8")
+            self.assertIn('"status":"scope_ready"', state)
+            self.assertIn('"current_unit":"scope"', state)
+            self.assertIn(f'"id":"{change}"', state)
+            self.assertIn(f".bianchini/changes/{change}/SCOPE.md", state)
+            self.assertEqual(tree_digest(repo / ".planning"), planning_before)
+
+    def test_scope_seal_rejects_unsourced_requirement_without_overwriting_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo, change, source = self.prepare_change(root)
+            scope = repo / f".bianchini/changes/{change}/SCOPE.md"
+            before = scope.read_bytes()
+            draft = root / "scope-draft.md"
+            draft.write_text(detailed_scope_body(unsourced=True), encoding="utf-8")
+
+            rejected = cli(
+                "scope",
+                "seal",
+                "--repo",
+                str(repo),
+                "--change",
+                change,
+                "--source",
+                str(source),
+                "--draft",
+                str(draft),
+                "--pages",
+                "2",
+                "--extraction",
+                "native",
+            )
+
+            self.assertEqual(rejected.returncode, 3)
+            self.assertIn("item sem fonte", rejected.stderr)
+            self.assertEqual(scope.read_bytes(), before)
+            self.assertNotIn(
+                '"status":"scope_ready"',
+                (repo / ".bianchini/STATE.md").read_text(encoding="utf-8"),
+            )
+
+    def test_scope_seal_rejects_open_decision_and_vague_placeholder(self) -> None:
+        cases = (
+            (detailed_scope_body(blocked=True), "decisão bloqueante"),
+            (detailed_scope_body().replace("Chat em tempo real.", "TBD."), "placeholder"),
+            (
+                detailed_scope_body().replace("Fonte: PDF p. 1", "Fonte: PDF p. 1 e memória", 1),
+                "fonte deve ser",
+            ),
+            (
+                detailed_scope_body().replace("### ACT-001", "### REQ-002", 1),
+                "seção incorreta",
+            ),
+            (
+                detailed_scope_body().replace("PDF p. 1", "PDF p. 3", 1),
+                "página 3 fora do PDF",
+            ),
+        )
+        for body, expected in cases:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                repo, change, source = self.prepare_change(root)
+                draft = root / "scope-draft.md"
+                draft.write_text(body, encoding="utf-8")
+                rejected = cli(
+                    "scope",
+                    "seal",
+                    "--repo",
+                    str(repo),
+                    "--change",
+                    change,
+                    "--source",
+                    str(source),
+                    "--draft",
+                    str(draft),
+                    "--pages",
+                    "2",
+                    "--extraction",
+                    "native",
+                )
+                self.assertEqual(rejected.returncode, 3)
+                self.assertIn(expected, rejected.stderr)
+
+    def test_scope_verify_detects_tampering_and_different_pdf(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo, change, source = self.prepare_change(root)
+            draft = root / "scope-draft.md"
+            draft.write_text(detailed_scope_body(), encoding="utf-8")
+            sealed = cli_json(
+                "scope",
+                "seal",
+                "--repo",
+                str(repo),
+                "--change",
+                change,
+                "--source",
+                str(source),
+                "--draft",
+                str(draft),
+                "--pages",
+                "2",
+                "--extraction",
+                "mixed",
+            )
+            other = root / "outro.pdf"
+            write_text_pdf(other, ["Outro documento", "Outro aceite"])
+            wrong_source = cli(
+                "scope",
+                "verify",
+                "--repo",
+                str(repo),
+                "--change",
+                change,
+                "--source",
+                str(other),
+            )
+            self.assertEqual(wrong_source.returncode, 3)
+            self.assertIn("fonte PDF diverge", wrong_source.stderr)
+
+            state_path = repo / ".bianchini/STATE.md"
+            original_state = state_path.read_text(encoding="utf-8")
+            state_path.write_text(
+                original_state.replace(str(sealed["scope_digest"]), "0" * 64),
+                encoding="utf-8",
+            )
+            stale_state = cli(
+                "scope", "verify", "--repo", str(repo), "--change", change
+            )
+            self.assertEqual(stale_state.returncode, 3)
+            self.assertIn("STATE.md diverge", stale_state.stderr)
+            state_path.write_text(original_state, encoding="utf-8")
+
+            scope = repo / f".bianchini/changes/{change}/SCOPE.md"
+            scope.write_text(
+                scope.read_text(encoding="utf-8").replace(
+                    "Chat em tempo real.", "Chat em tempo real e voz."
+                ),
+                encoding="utf-8",
+            )
+            tampered = cli(
+                "scope", "verify", "--repo", str(repo), "--change", change
+            )
+            self.assertEqual(tampered.returncode, 3)
+            self.assertIn("digest do SCOPE.md diverge", tampered.stderr)
+
+            planning = cli(
+                "model", "validate", "--repo", str(repo), "--change", change
+            )
+            self.assertEqual(planning.returncode, 3)
+            self.assertIn("STALE_EVIDENCE", planning.stderr)
+            self.assertIn("SCOPE_STALE", planning.stderr)
 
 
 if __name__ == "__main__":

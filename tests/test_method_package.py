@@ -18,6 +18,7 @@ CLI = ROOT / "scripts" / "bm.py"
 FIXTURES = ROOT / "tests" / "fixtures"
 PROJECT_FIXTURES = FIXTURES / "projects"
 SKILL_NAMES = (
+    "preparar-escopo",
     "design-projeto",
     "sdd-planning",
     "executar-plano",
@@ -188,6 +189,7 @@ class PackageIntegrityTests(unittest.TestCase):
     def test_sharded_runner_covers_every_test_class(self) -> None:
         runner = read(ROOT / "scripts/run_test_shards.py")
         for class_name in (
+            "ScopeIntakeScenarios",
             "PackageIntegrityTests",
             "StateValidationScenarios",
             "SnapshotScenarios",
@@ -2200,6 +2202,38 @@ class AgentContractScenarios(unittest.TestCase):
 
 
 class SkillBehaviorContracts(unittest.TestCase):
+    def test_pdf_scope_intake_is_traceable_strict_and_hands_off_to_sdd(self) -> None:
+        intake = read(SKILLS["preparar-escopo"])
+        contract = read(ROOT / "skills/preparar-escopo/references/scope-contract.md")
+        planning = read(SKILLS["sdd-planning"])
+        method = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
+        for expected in (
+            "textual, escaneado ou misto",
+            "todas as páginas",
+            "OCR somente",
+            "Fonte: PDF p.",
+            "não vira requisito",
+            "zero questões abertas",
+            "scope seal",
+            "scope verify",
+            "Não criar arquitetura, roadmap, fases",
+            "Nunca ler `.planning/`",
+        ):
+            self.assertIn(expected, intake)
+        for expected in (
+            "### REQ-001",
+            "### FLW-001",
+            "## Decisões bloqueantes",
+            "## Proveniência e cobertura",
+            "Não especificado no PDF.",
+        ):
+            self.assertIn(expected, contract)
+        self.assertIn("mudança ativa com status `scope_ready`", planning)
+        self.assertIn("bm.py scope verify", planning)
+        self.assertIn("não resumir novamente o PDF", planning)
+        self.assertIn("SCOPE.md` selado", method)
+        self.assertIn("ready_for_sdd", method)
+
     def test_executor_has_no_branch_fallback_or_task_minimum(self) -> None:
         executor = read(SKILLS["executar-plano"])
         planning = read(SKILLS["sdd-planning"])

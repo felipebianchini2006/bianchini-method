@@ -31,6 +31,7 @@ jobs:
             skills/_shared/scripts/bm_context.py \
             skills/_shared/scripts/bm_spec_diff.py \
             skills/_shared/scripts/bm_mutation.py \
+            skills/_shared/scripts/bm_scope.py \
             skills/_shared/scripts/bm_update.py \
             tests/test_method_package.py \
             tests/test_context_efficiency.py \
@@ -46,6 +47,9 @@ jobs:
           grep -q "spec-diff" /tmp/bm-help.txt
           grep -q "mutation-evidence" /tmp/bm-help.txt
           grep -q "update-bm" /tmp/bm-help.txt
+          grep -q "scope" /tmp/bm-help.txt
           python3 scripts/bm.py proof-map --help | grep -q "mutation-evidence"
+          python3 scripts/bm.py scope --help | grep -q "seal"
+          python3 scripts/bm.py scope --help | grep -q "verify"
           python3 scripts/bm.py update-bm --help | grep -q -- "--check"
-          test "$(cat skills/_shared/VERSION)" = "0.4.4"
+          test "$(cat skills/_shared/VERSION)" = "0.4.5"

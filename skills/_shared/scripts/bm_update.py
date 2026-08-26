@@ -27,6 +27,7 @@ LINEAGE_RESET_VERSION = "0.4.0"
 LINEAGE_RESET_MANIFEST = "_shared/releases/0.4.0.json"
 MANAGED_SKILL_DIRS = (
     "_shared",
+    "preparar-escopo",
     "design-projeto",
     "sdd-planning",
     "executar-plano",

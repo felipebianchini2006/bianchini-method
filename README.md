@@ -15,6 +15,7 @@ sistema atual
 ```text
 Bianchini Method
 ├── MethodWorkspace
+├── ScopeIntake
 ├── ProjectModel
 ├── CoherenceEngine
 │   ├── StructuralValidator
@@ -68,7 +69,8 @@ Bianchini Method
 ## Planejamento global
 
 ```text
-pesquisa
+PDF de escopo → SCOPE.md selado
+→ pesquisa
 → arquitetura global
 → SYSTEM_MODEL final
 → roadmap completo
@@ -198,6 +200,7 @@ Regressão é transversal. Não existe tarefa ou agente por camada de teste, met
 
 ## Skills
 
+- `preparar-escopo`: converte um PDF textual, escaneado ou misto em `SCOPE.md` rastreável, fechado e pronto para o SDD.
 - `design-projeto`: referência visual aprovada antes do planejamento quando necessária.
 - `sdd-planning`: pesquisa, ProjectModel, roadmap, planos e coerência global.
 - `executar-plano`: execução isolada com verificação de contratos e impacto.
@@ -213,6 +216,7 @@ Regressão é transversal. Não existe tarefa ou agente por camada de teste, met
 
 ```text
 model init|validate
+scope seal|verify
 coherence check|approve
 impact analyze --plan Pxx [--changed-contract ID]
 plan complete --change Cxxx --plan Pxx --actual-delta <json>
@@ -236,6 +240,8 @@ Exemplos:
 ```bash
 python3 skills/_shared/scripts/bm.py model init --repo .
 python3 skills/_shared/scripts/bm.py model init --repo . --change checkout
+python3 skills/_shared/scripts/bm.py scope seal --repo . --change C001-checkout --source escopo.pdf --draft /tmp/scope-draft.md --pages 12 --extraction native
+python3 skills/_shared/scripts/bm.py scope verify --repo . --change C001-checkout --source escopo.pdf
 python3 skills/_shared/scripts/bm.py model validate --repo . --change C001
 python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --structural-only
 python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --semantic-report semantic-review.json
@@ -269,6 +275,7 @@ Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem par
 ## Uso
 
 ```text
+/preparar-escopo escopo.pdf
 /design-projeto
 /sdd-planning
 /executar-direto
@@ -288,4 +295,4 @@ python3 scripts/run_test_shards.py
 python3 scripts/bm.py --help
 ```
 
-O CLI usa biblioteca padrão Python. Testes cobrem workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.
+O CLI usa biblioteca padrão Python. Testes cobrem intake de PDF, selo e rastreabilidade do `SCOPE.md`, workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.

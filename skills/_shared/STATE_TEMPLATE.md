@@ -45,11 +45,11 @@ Resumo humano curto e coerente com o frontmatter. Não adicionar ledger, histór
 - `method` é `0.4`; correções do pacote não alteram o contrato do projeto.
 - `active_work.kind`: `change | quick | debug | migration | null`.
 - IDs: `C001`, `P01`, `Q001` e `D001`.
-- `status`: `idle | planning | pending_approval | approved | active | executing | blocked | completed | escalated`.
+- `status`: `idle | planning | scope_ready | pending_approval | approved | approved_with_stale | active | executing | pending_close | blocked`.
 - `current_unit` é `null`, um estágio compacto (`intake`, `red`, `green`) ou um objeto com fase/plano/unidade/gate; nunca recebe histórico.
 - `blockers` contém somente bloqueios abertos e compactos.
 - `last_completed` contém somente ID, tipo, resultado e caminho do último trabalho; não é uma lista.
-- `pointers` contém somente `architecture`, `system_model`, `specs` e `coherence`, com caminhos relativos confinados a `.bianchini/`.
+- `pointers` contém `architecture`, `system_model`, `specs`, `coherence` e o `scope` opcional, com caminhos relativos confinados a `.bianchini/`.
 - `digest` repete somente o SHA-256 global vigente; aprovação, manifest e findings detalhados ficam em `COHERENCE.md`.
 - `updated_at` usa ISO 8601 UTC.
 - O corpo Markdown é opcional e curto.

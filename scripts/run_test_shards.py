@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 SHARDS = (
     "MethodV04Scenarios",
+    "ScopeIntakeScenarios",
     "PackageIntegrityTests",
     "StateValidationScenarios",
     "SnapshotScenarios",
@@ -65,7 +66,11 @@ def run_shard(module: str, shard: str, environment: dict[str, str]) -> int:
 def main() -> int:
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     for shard in SHARDS:
-        module = "test_method_v04_cli" if shard == "MethodV04Scenarios" else "test_method_package"
+        module = (
+            "test_method_v04_cli"
+            if shard in {"MethodV04Scenarios", "ScopeIntakeScenarios"}
+            else "test_method_package"
+        )
         if run_shard(module, shard, environment) != 0:
             return 1
     for shard in REVIEW_SHARDS:

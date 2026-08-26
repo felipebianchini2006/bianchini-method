@@ -21,6 +21,7 @@ from bm_coherence import (
     StructuralValidator,
 )
 from bm_project_model import PlanContract, ProjectModel, read_frontmatter
+import bm_scope
 from bm_workspace import MethodWorkspace
 
 
@@ -178,8 +179,21 @@ def _load_package(
     repo: Path, change: str
 ) -> tuple[MethodWorkspace, Path, ProjectModel, ProjectModel, list[PlanContract]]:
     workspace = MethodWorkspace(repo)
-    workspace.read_state()
+    state = workspace.read_state()
     directory = _change_directory(workspace, change)
+    active = state.get("active_work")
+    if (
+        isinstance(active, dict)
+        and active.get("id") == directory.name
+        and (
+            state.get("status") == "scope_ready"
+            or active.get("status") == "scope_ready"
+        )
+    ):
+        try:
+            bm_scope.verify_scope(repo, directory.name)
+        except bm_scope.ScopeError as error:
+            raise PlanningError("STALE_EVIDENCE", str(error)) from error
     try:
         current = ProjectModel.from_system_model(workspace.current_system_model)
         expected = ProjectModel.from_system_model(directory / "SYSTEM_MODEL.md")

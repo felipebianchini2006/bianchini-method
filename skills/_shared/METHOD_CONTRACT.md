@@ -44,6 +44,21 @@ formatos anteriores. O primeiro `direct start` ou `debug start` inicializa
 
 `MethodWorkspace` é a única interface para resolver caminhos, alocar IDs, escrever atomicamente e atualizar DocViva. Skills não criam estado manualmente quando existir comando equivalente.
 
+## Intake de escopo em PDF
+
+`/preparar-escopo` transforma um PDF local em `SCOPE.md` da mudança, sem criar arquitetura, roadmap ou planos. O PDF bruto, a extração por página e imagens temporárias não entram no Git. `.planning/` permanece fora de toda leitura e escrita.
+
+O documento só recebe status `ready_for_sdd` quando `bm.py scope seal` confirmar seções completas, IDs únicos, fontes por página, aceite observável, zero item sem fonte, zero questão aberta, zero decisão bloqueante e zero contradição. O frontmatter registra nome e SHA-256 do PDF, páginas, modo `native | ocr | mixed`, cobertura e digest do escopo.
+
+```bash
+bm.py scope seal --repo <repo> --change C001-slug \
+  --source <escopo.pdf> --draft <scope-draft.md> \
+  --pages <total> --extraction native|ocr|mixed
+bm.py scope verify --repo <repo> --change C001-slug [--source <escopo.pdf>]
+```
+
+O selo é fail-closed e grava o `SCOPE.md` atomicamente. Falha não substitui o documento anterior nem muda o estado para `scope_ready`. O `/sdd-planning` reutiliza o `SCOPE.md` selado da mudança ativa, verifica o digest e não reinterpreta o PDF como uma segunda fonte de escopo.
+
 `.bianchini/STATE.md` é o índice canônico e compacto. Seu frontmatter JSON contém somente:
 
 - `schema_version`;

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Preparar Escopo"
+  short_description: "Converte PDF em escopo rastreável para o SDD"
+  default_prompt: "Use $preparar-escopo para transformar este PDF em um SCOPE.md detalhado e pronto para o /sdd-planning."
+policy:
+  allow_implicit_invocation: true

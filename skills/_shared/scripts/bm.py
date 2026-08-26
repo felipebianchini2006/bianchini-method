@@ -37,6 +37,7 @@ from bm_update import (
 )
 import bm_v04_workflows as v04
 import bm_v04_planning as v04_planning
+import bm_scope
 
 
 EXIT_INVALID = 2
@@ -3922,6 +3923,15 @@ def parser() -> argparse.ArgumentParser:
     model.add_argument("--repo", type=Path, default=Path.cwd())
     model.add_argument("--change")
 
+    scope = commands.add_parser("scope")
+    scope.add_argument("action", choices=["seal", "verify"])
+    scope.add_argument("--repo", type=Path, default=Path.cwd())
+    scope.add_argument("--change", required=True)
+    scope.add_argument("--source", type=Path)
+    scope.add_argument("--draft", type=Path)
+    scope.add_argument("--pages", type=int)
+    scope.add_argument("--extraction", choices=["native", "ocr", "mixed"])
+
     coherence = commands.add_parser("coherence")
     coherence.add_argument("action", choices=["check", "approve"])
     coherence.add_argument("--repo", type=Path, default=Path.cwd())
@@ -4215,6 +4225,24 @@ def main() -> int:
                     emit(v04_planning.validate_change_model(args.repo, args.change))
                 else:
                     emit(v04.validate_workspace(args.repo))
+        elif args.command == "scope":
+            if args.action == "seal":
+                if not all((args.source, args.draft, args.pages, args.extraction)):
+                    raise BMError(
+                        "scope seal exige --source, --draft, --pages e --extraction"
+                    )
+                emit(
+                    bm_scope.seal_scope(
+                        args.repo,
+                        args.change,
+                        args.source,
+                        args.draft,
+                        args.pages,
+                        args.extraction,
+                    )
+                )
+            else:
+                emit(bm_scope.verify_scope(args.repo, args.change, args.source))
         elif args.command == "coherence":
             if args.action == "check":
                 emit(
@@ -4569,6 +4597,9 @@ def main() -> int:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
     except v04_planning.PlanningError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_BLOCKED
+    except bm_scope.ScopeError as error:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
     except (OSError, UnicodeError, subprocess.SubprocessError, KeyError, TypeError, ValueError) as error:

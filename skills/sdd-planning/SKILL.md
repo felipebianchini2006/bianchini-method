@@ -20,7 +20,10 @@ Esta skill planeja; não edita código de produção. Toda operação determiní
 3. Se existir documentação anterior do Bianchini, não adaptar nem importar durante o planejamento: instruir `/migrar-bianchini`.
 4. Nunca ler `.planning/` como estado, contexto ou fallback.
 5. Confirmar Git, stack, escopo e trabalho ativo. Mudança concorrente no mesmo workspace bloqueia.
-6. Iniciar a mudança com `bm.py model init --repo <repo> --change "<nome curto>"` e usar o ID `Cxxx-slug` retornado.
+6. Se houver mudança ativa com status `scope_ready`, executar `bm.py scope verify --repo <repo> --change Cxxx-slug`, reutilizar seu ID e não resumir novamente o PDF.
+7. Sem mudança ativa, iniciar com `bm.py model init --repo <repo> --change "<nome curto>"` e usar o ID `Cxxx-slug` retornado.
+
+Escopo vindo de PDF só entra quando `scope verify` retornar `verified: true` e `ready_for_sdd`. Digest inválido, fonte trocada ou `SCOPE.md` alterado bloqueia. Mudança ativa em outro estágio não é substituída.
 
 Uma interface nova, redesign ou fluxo visual material exige design aprovado antes da arquitetura. Mudança pequena preserva tokens e componentes existentes. Projeto sem interface não cria design artificial.
 
@@ -40,10 +43,10 @@ Pesquisa web usa fontes primárias oficiais. Registre somente decisões aplicada
 
 ## 3. Modelar o sistema completo
 
-Crie, nesta ordem:
+Crie, nesta ordem. Quando houver `SCOPE.md` selado pelo `/preparar-escopo`, preserve-o sem reescrever:
 
 ```text
-SCOPE.md         resultados, limites, aceite e ações externas
+SCOPE.md         resultados, limites, aceite e ações externas; criar somente sem intake selado
 ARCHITECTURE.md  decisões, stack, seams, trade-offs e alternativas
 SYSTEM_MODEL.md  módulos, contratos, ownership, dados, integrações e journeys
 ROADMAP.md       todas as fases e suas relações
