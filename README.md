@@ -73,8 +73,8 @@ PDF de escopo → SCOPE.md selado
 → pesquisa
 → arquitetura global
 → SYSTEM_MODEL final
-→ roadmap completo
-→ planos por contratos
+→ planos por fases e tarefas tipadas
+→ roadmap completo derivado
 → validação estrutural
 → impact radius
 → revisão semântica conjunta
@@ -82,7 +82,9 @@ PDF de escopo → SCOPE.md selado
 → checkpoint humano do digest global
 ```
 
-Cada plano declara `depends_on`, `provides`, `consumes`, ownership, interfaces, dados, migrações, efeitos, rollback, model delta, verificação e restrições futuras.
+Cada plano declara `depends_on`, `provides`, `consumes`, ownership, interfaces, dados, migrações, efeitos, rollback, model delta, verificação e restrições futuras. Cada tarefa `Txx` declara resultado, requisitos cobertos, dependências, arquivos, ação, prova, done condition e `risk_seam`.
+
+O CLI valida cobertura `SCOPE → fase → tarefa`, gera `ROADMAP.md` a partir dos planos e calcula ondas topológicas de fases e tarefas. O manifesto aprovado vincula todos os artefatos e o parecer semântico ao mesmo digest.
 
 O método simula:
 
@@ -217,6 +219,7 @@ Regressão é transversal. Não existe tarefa ou agente por camada de teste, met
 ```text
 model init|validate
 scope seal|verify
+roadmap sync
 coherence check|approve
 impact analyze --plan Pxx [--changed-contract ID]
 plan complete --change Cxxx --plan Pxx --actual-delta <json>
@@ -242,13 +245,14 @@ python3 skills/_shared/scripts/bm.py model init --repo .
 python3 skills/_shared/scripts/bm.py model init --repo . --change checkout
 python3 skills/_shared/scripts/bm.py scope seal --repo . --change C001-checkout --source escopo.pdf --draft /tmp/scope-draft.md --pages 12 --extraction native
 python3 skills/_shared/scripts/bm.py scope verify --repo . --change C001-checkout --source escopo.pdf
+python3 skills/_shared/scripts/bm.py roadmap sync --repo . --change C001
 python3 skills/_shared/scripts/bm.py model validate --repo . --change C001
 python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --structural-only
 python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --semantic-report semantic-review.json
 python3 skills/_shared/scripts/bm.py coherence approve --repo . --change C001 --digest <digest> --approved-by "<responsável>"
 python3 skills/_shared/scripts/bm.py impact analyze --repo . --change C001 --plan P02
 python3 skills/_shared/scripts/bm.py workspace create --repo . --change C001 --plan P01
-python3 skills/_shared/scripts/bm.py plan complete --repo . --change C001 --plan P01 --actual-delta actual-delta.json --result "<resultado>" --verification "<evidência>"
+python3 skills/_shared/scripts/bm.py plan complete --repo . --change C001 --plan P01 --actual-delta actual-delta.json --result "<resultado>" --verification "<evidência>" --completed-task T01
 python3 skills/_shared/scripts/bm.py cycle-close --repo . --change C001
 ```
 
@@ -295,4 +299,4 @@ python3 scripts/run_test_shards.py
 python3 scripts/bm.py --help
 ```
 
-O CLI usa biblioteca padrão Python. Testes cobrem intake de PDF, selo e rastreabilidade do `SCOPE.md`, workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.
+O CLI usa biblioteca padrão Python. Testes cobrem intake de PDF, selo e rastreabilidade do `SCOPE.md`, fases/tarefas tipadas, roadmap derivado, manifesto aprovado, workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.

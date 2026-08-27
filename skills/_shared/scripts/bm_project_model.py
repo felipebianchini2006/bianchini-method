@@ -27,6 +27,52 @@ MODEL_SECTIONS = (
 )
 MODEL_ID = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]*$")
 PLAN_ID = re.compile(r"^P[0-9]{2,}$")
+TASK_ID = re.compile(r"^T[0-9]{2,}$")
+PLAN_V2_FIELDS = frozenset(
+    {
+        "schema_version",
+        "id",
+        "status",
+        "result",
+        "requirements",
+        "acceptance",
+        "depends_on",
+        "provides",
+        "consumes",
+        "modules",
+        "interfaces",
+        "ownership",
+        "data",
+        "model_delta",
+        "migrations",
+        "effects",
+        "rollback",
+        "verifications",
+        "future_constraints",
+        "execution",
+        "review",
+        "tasks",
+    }
+)
+TASK_FIELDS = frozenset(
+    {
+        "id",
+        "name",
+        "result",
+        "covers",
+        "depends_on",
+        "files",
+        "action",
+        "verify",
+        "done",
+        "risk_seam",
+    }
+)
+EXECUTION_REVIEWS = {
+    "grouped": "plan_gate",
+    "slice": "per_slice",
+    "strict": "per_task",
+}
 
 
 def read_frontmatter(path: str | Path) -> dict[str, Any]:
@@ -205,10 +251,115 @@ class ProjectModel:
 
 
 @dataclass(frozen=True)
+class TaskVerification:
+    kind: str
+    run: str
+    proves: str
+
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any]) -> "TaskVerification":
+        if not isinstance(mapping, Mapping):
+            raise ValueError("verify exige objeto")
+        unknown = sorted(set(mapping) - {"kind", "run", "proves"})
+        missing = sorted({"kind", "run", "proves"} - set(mapping))
+        if unknown:
+            raise ValueError(f"campo desconhecido em verify: {unknown[0]}")
+        if missing:
+            raise ValueError(f"campo obrigatório ausente em verify: {missing[0]}")
+        kind = mapping.get("kind")
+        if kind not in {"command", "procedure"}:
+            raise ValueError("verify.kind exige command ou procedure")
+        run = _required_text(mapping.get("run"), "verify.run")
+        proves = _required_text(mapping.get("proves"), "verify.proves")
+        return cls(kind=str(kind), run=run, proves=proves)
+
+    def to_mapping(self) -> dict[str, str]:
+        return {"kind": self.kind, "run": self.run, "proves": self.proves}
+
+
+@dataclass(frozen=True)
+class TaskContract:
+    id: str
+    name: str
+    result: str
+    covers: tuple[str, ...]
+    depends_on: tuple[str, ...]
+    files: tuple[str, ...]
+    action: str
+    verification: TaskVerification
+    done: str
+    risk_seam: str
+
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any]) -> "TaskContract":
+        if not isinstance(mapping, Mapping):
+            raise ValueError("tarefa exige objeto")
+        unknown = sorted(set(mapping) - TASK_FIELDS)
+        missing = sorted(TASK_FIELDS - set(mapping))
+        if unknown:
+            raise ValueError(f"campo desconhecido na tarefa: {unknown[0]}")
+        if missing:
+            raise ValueError(f"campo obrigatório ausente na tarefa: {missing[0]}")
+        identifier = _required_text(mapping.get("id"), "tarefa.id")
+        files = _string_tuple(mapping.get("files"), f"{identifier}.files")
+        if not files:
+            raise ValueError(f"{identifier}.files exige ao menos um caminho provável")
+        for value in files:
+            candidate = Path(value)
+            if (
+                candidate.is_absolute()
+                or "\\" in value
+                or ".." in candidate.parts
+                or value.startswith("./")
+            ):
+                raise ValueError(f"{identifier}.files contém caminho inseguro: {value}")
+            if candidate.parts and candidate.parts[0] == ".planning":
+                raise ValueError(
+                    f"{identifier}.files referencia namespace estrangeiro: {value}"
+                )
+        covers = _string_tuple(mapping.get("covers"), f"{identifier}.covers")
+        if not covers:
+            raise ValueError(f"{identifier}.covers exige ao menos um item de escopo")
+        return cls(
+            id=identifier,
+            name=_required_text(mapping.get("name"), f"{identifier}.name"),
+            result=_required_text(mapping.get("result"), f"{identifier}.result"),
+            covers=covers,
+            depends_on=_string_tuple(
+                mapping.get("depends_on"), f"{identifier}.depends_on"
+            ),
+            files=files,
+            action=_required_text(mapping.get("action"), f"{identifier}.action"),
+            verification=TaskVerification.from_mapping(mapping.get("verify", {})),
+            done=_required_text(mapping.get("done"), f"{identifier}.done"),
+            risk_seam=_required_text(
+                mapping.get("risk_seam"), f"{identifier}.risk_seam"
+            ),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "result": self.result,
+            "covers": list(self.covers),
+            "depends_on": list(self.depends_on),
+            "files": list(self.files),
+            "action": self.action,
+            "verify": self.verification.to_mapping(),
+            "done": self.done,
+            "risk_seam": self.risk_seam,
+        }
+
+
+@dataclass(frozen=True)
 class PlanContract:
     """Contrato estrutural mínimo de uma fase/plano."""
 
     id: str
+    schema_version: int = 1
+    status: str | None = None
+    result: str | None = None
     depends_on: tuple[str, ...] = ()
     provides: tuple[str, ...] = ()
     consumes: tuple[str, ...] = ()
@@ -221,6 +372,13 @@ class PlanContract:
     migrations: tuple[dict[str, Any], ...] = ()
     external_effects: tuple[dict[str, Any], ...] = ()
     future_constraints: tuple[str, ...] = ()
+    modules: tuple[str, ...] = ()
+    interfaces: tuple[str, ...] = ()
+    data: tuple[str, ...] = ()
+    rollback: str | None = None
+    execution: str | None = None
+    review: str | None = None
+    tasks: tuple[TaskContract, ...] = ()
 
     @classmethod
     def from_markdown(cls, path: str | Path) -> "PlanContract":
@@ -236,8 +394,76 @@ class PlanContract:
         delta = mapping.get("model_delta", {})
         if not isinstance(delta, Mapping):
             raise ValueError(f"plano {identifier}: model_delta exige objeto")
+        schema_version = mapping.get("schema_version", 1)
+        if schema_version not in {1, 2}:
+            raise ValueError(f"plano {identifier}: schema_version exige 1 ou 2")
+        if schema_version == 2:
+            unknown = sorted(set(mapping) - PLAN_V2_FIELDS)
+            missing = sorted(PLAN_V2_FIELDS - set(mapping))
+            if unknown:
+                raise ValueError(f"campo desconhecido no plano v2: {unknown[0]}")
+            if missing:
+                raise ValueError(f"campo obrigatório ausente no plano v2: {missing[0]}")
+            if mapping.get("status") != "planned":
+                raise ValueError(f"plano {identifier}: status exige planned")
+            execution = mapping.get("execution")
+            review = mapping.get("review")
+            if execution not in EXECUTION_REVIEWS:
+                raise ValueError(f"plano {identifier}: execution inválido")
+            if EXECUTION_REVIEWS[execution] != review:
+                raise ValueError(
+                    f"plano {identifier}: combinação execution/review incompatível"
+                )
+            raw_tasks = mapping.get("tasks")
+            if not isinstance(raw_tasks, Sequence) or isinstance(
+                raw_tasks, (str, bytes, bytearray)
+            ):
+                raise ValueError(f"plano {identifier}: tasks exige lista")
+            tasks = tuple(TaskContract.from_mapping(value) for value in raw_tasks)
+            requirements = _string_tuple(
+                mapping.get("requirements"), "requirements"
+            )
+            if not requirements:
+                raise ValueError(f"plano {identifier}: requirements não pode ser vazio")
+            acceptance = _string_tuple(mapping.get("acceptance"), "acceptance")
+            if not acceptance:
+                raise ValueError(f"plano {identifier}: acceptance não pode ser vazio")
+            verifications = _string_tuple(
+                mapping.get("verifications"), "verifications"
+            )
+            if not verifications:
+                raise ValueError(f"plano {identifier}: verifications não pode ser vazio")
+            return cls(
+                id=identifier.strip(),
+                schema_version=2,
+                status="planned",
+                result=_required_text(mapping.get("result"), f"plano {identifier}.result"),
+                depends_on=_string_tuple(mapping.get("depends_on"), "depends_on"),
+                provides=_string_tuple(mapping.get("provides"), "provides"),
+                consumes=_string_tuple(mapping.get("consumes"), "consumes"),
+                owns=_string_tuple(mapping.get("ownership"), "ownership"),
+                requirements=requirements,
+                acceptance=acceptance,
+                verifications=verifications,
+                model_delta=copy.deepcopy(dict(delta)),
+                migrations=_mapping_tuple(mapping.get("migrations"), "migrations"),
+                external_effects=_mapping_tuple(mapping.get("effects"), "effects"),
+                future_constraints=_string_tuple(
+                    mapping.get("future_constraints"), "future_constraints"
+                ),
+                modules=_string_tuple(mapping.get("modules"), "modules"),
+                interfaces=_string_tuple(mapping.get("interfaces"), "interfaces"),
+                data=_string_tuple(mapping.get("data"), "data"),
+                rollback=_required_text(
+                    mapping.get("rollback"), f"plano {identifier}.rollback"
+                ),
+                execution=str(execution),
+                review=str(review),
+                tasks=tasks,
+            )
         return cls(
             id=identifier.strip(),
+            schema_version=1,
             depends_on=_string_tuple(mapping.get("depends_on", []), "depends_on"),
             provides=_string_tuple(mapping.get("provides", []), "provides"),
             consumes=_string_tuple(mapping.get("consumes", []), "consumes"),
@@ -258,6 +484,31 @@ class PlanContract:
         )
 
     def to_mapping(self) -> dict[str, Any]:
+        if self.schema_version == 2:
+            return {
+                "schema_version": 2,
+                "id": self.id,
+                "status": self.status,
+                "result": self.result,
+                "requirements": list(self.requirements),
+                "acceptance": list(self.acceptance),
+                "depends_on": list(self.depends_on),
+                "provides": list(self.provides),
+                "consumes": list(self.consumes),
+                "modules": list(self.modules),
+                "interfaces": list(self.interfaces),
+                "ownership": list(self.owns),
+                "data": list(self.data),
+                "model_delta": copy.deepcopy(self.model_delta),
+                "migrations": [copy.deepcopy(value) for value in self.migrations],
+                "effects": [copy.deepcopy(value) for value in self.external_effects],
+                "rollback": self.rollback,
+                "verifications": list(self.verifications),
+                "future_constraints": list(self.future_constraints),
+                "execution": self.execution,
+                "review": self.review,
+                "tasks": [task.to_mapping() for task in self.tasks],
+            }
         return {
             "id": self.id,
             "depends_on": list(self.depends_on),
@@ -336,6 +587,12 @@ def _string_tuple(raw: Any, label: str) -> tuple[str, ...]:
     if not all(isinstance(value, str) and value.strip() for value in values):
         raise ValueError(f"{label} exige lista de strings")
     return tuple(dict.fromkeys(value.strip() for value in values))
+
+
+def _required_text(raw: Any, label: str) -> str:
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError(f"{label} exige texto")
+    return raw.strip()
 
 
 def _mapping_tuple(raw: Any, label: str) -> tuple[dict[str, Any], ...]:
@@ -501,5 +758,8 @@ __all__ = [
     "PLAN_ID",
     "PlanContract",
     "ProjectModel",
+    "TASK_ID",
+    "TaskContract",
+    "TaskVerification",
     "read_frontmatter",
 ]

@@ -2241,6 +2241,26 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("entrega rejeitável ou verificável", planning)
         self.assertNotIn("4–10 tarefas", planning)
 
+    def test_typed_planning_contract_is_documented_end_to_end(self) -> None:
+        planning = read(SKILLS["sdd-planning"])
+        executor = read(SKILLS["executar-plano"])
+        contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
+        readme = read(ROOT / "README.md")
+        for expected in (
+            "schema_version: 2",
+            "requirements: [REQ-001, NFR-001]",
+            "tasks:",
+            "risk_seam",
+            "bm.py roadmap sync",
+            "review_input_digest",
+            "SCOPE → fase → tarefa",
+        ):
+            self.assertIn(expected, planning + contract)
+        self.assertIn("--completed-task T01", executor)
+        self.assertIn("tarefas da mesma onda", executor)
+        self.assertIn("roadmap sync", readme)
+        self.assertIn("manifesto aprovado", readme)
+
     def test_planning_commit_and_versioned_workspace_are_mandatory(self) -> None:
         executor = read(SKILLS["executar-plano"])
         planning = read(SKILLS["sdd-planning"])

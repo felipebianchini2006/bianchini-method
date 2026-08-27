@@ -49,21 +49,13 @@ Crie, nesta ordem. Quando houver `SCOPE.md` selado pelo `/preparar-escopo`, pres
 SCOPE.md         resultados, limites, aceite e ações externas; criar somente sem intake selado
 ARCHITECTURE.md  decisões, stack, seams, trade-offs e alternativas
 SYSTEM_MODEL.md  módulos, contratos, ownership, dados, integrações e journeys
-ROADMAP.md       todas as fases e suas relações
+plans/Pxx-*.md   fases e tarefas tipadas
+ROADMAP.md       visão derivada de todas as fases e suas relações
 ```
 
 `SYSTEM_MODEL.md` usa o frontmatter descrito em [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md). Ele descreve o estado final esperado, não o histórico de decisões.
 
-Antes dos planos detalhados, execute:
-
-```bash
-bm.py model validate --repo <repo> --change C001
-bm.py coherence check --repo <repo> --change C001 --structural-only
-```
-
-Substitua o ID pelo retornado pelo CLI. Corrija `ERROR` antes de decompor. Não use a LLM para decidir IDs, ordem topológica, referências ou ownership duplicado.
-
-Uma validação estrutural limpa retorna `structurally_valid`. Esse status confirma somente a parte determinística; ainda não autoriza aprovação nem execução.
+Não use a LLM para decidir ordem topológica, cobertura ou referências válidas. O CLI deriva e valida esses dados depois que os planos estiverem materializados.
 
 ## 4. Planejar por contratos
 
@@ -72,9 +64,11 @@ Cada plano em `plans/Pxx-entrega.md` representa uma entrega rejeitável ou verif
 O frontmatter de cada plano declara:
 
 ```yaml
+schema_version: 2
 id: P01
 status: planned
 result: <resultado observável>
+requirements: [REQ-001, NFR-001]
 acceptance: [<critério verificável>]
 depends_on: []
 provides: [<capability ou contrato>]
@@ -91,11 +85,35 @@ verifications: [<comando real e resultado esperado>]
 future_constraints: []
 execution: grouped | slice | strict
 review: plan_gate | per_slice | per_task
+tasks:
+  - id: T01
+    name: <ação curta>
+    result: <resultado observável>
+    covers: [REQ-001]
+    depends_on: []
+    files: [src/caminho.ext]
+    action: <mudança concreta no seam público>
+    verify:
+      kind: command | procedure
+      run: <comando ou procedimento determinístico>
+      proves: <o que a evidência demonstra>
+    done: <condição objetiva de conclusão>
+    risk_seam: <fronteira estável de risco>
 ```
 
-No corpo, detalhe tarefas, arquivos prováveis, seams públicos, estados de erro/recuperação e done conditions. Não usar `TBD`, "tratar erros" ou abstração para consumidor futuro inexistente.
+Cada `Txx` é uma unidade executável e verificável, não uma nota em prosa. A tarefa deve caber no contexto de execução, indicar arquivos confinados ao repositório, cobrir ao menos um ID rastreável do `SCOPE.md` e declarar suas dependências. Caminho absoluto, `..`, `./`, barra invertida e `.planning/` são proibidos.
+
+O modo define a granularidade obrigatória: `grouped → plan_gate`, `slice → per_slice`, `strict → per_task`. O CLI rejeita combinações incompatíveis, campos extras, IDs duplicados, dependência futura/cíclica, requisito sem tarefa e referência de módulo/interface/dado ausente no modelo.
+
+No corpo, registre apenas contexto complementar, estados de erro/recuperação e decisões úteis. Não usar `TBD`, "tratar erros" ou abstração para consumidor futuro inexistente.
 
 Preserve 100% do escopo. Setup, config e docs entram na primeira entrega que os consome. Ações externas declaram `needed_by`, fallback e checkpoint de autoridade.
+
+Depois de materializar todos os planos, gere o roadmap. Não o mantenha manualmente:
+
+```bash
+bm.py roadmap sync --repo <repo> --change C001
+```
 
 ## 5. Simular todas as fases
 
@@ -108,12 +126,13 @@ S0 atual → S1 após P01 → S2 após P02 → ... → Sn final
 Execute:
 
 ```bash
+bm.py roadmap sync --repo <repo> --change C001
 bm.py model validate --repo <repo> --change C001
 bm.py coherence check --repo <repo> --change C001 --structural-only
 bm.py impact analyze --repo <repo> --change C001 --plan <Pxx>
 ```
 
-O estrutural bloqueia ciclo, provider ausente, consumidor adiantado, ownership incompatível, migração fora de ordem, journey incompleta, efeito externo sem guard e divergência de `Sn`.
+O estrutural bloqueia ciclo de fase ou tarefa, cobertura faltante, referência desconhecida, provider ausente, consumidor adiantado, ownership incompatível, migração fora de ordem, journey incompleta, efeito externo sem guard e divergência de `Sn`. A resposta inclui ondas determinísticas de fases e tarefas executáveis em paralelo.
 
 Registre em `COHERENCE.md` findings e `Impact Radius` (`local | direct | transitive | global`). Um plano não pode parecer correto sozinho enquanto invalida outro.
 
@@ -127,14 +146,18 @@ Leia `SCOPE`, `RESEARCH`, `ARCHITECTURE`, `SYSTEM_MODEL`, `ROADMAP` e todos os p
 - conflito semântico entre decisões;
 - aderência à stack e documentação oficial;
 - jornada operacionalmente incoerente;
-- risco arquitetural omitido.
+- risco arquitetural omitido;
+- tarefa grande demais para um contexto seguro;
+- sobreposição de arquivos ou ownership entre tarefas paralelas;
+- lacuna entre requisito, tarefa, aceite e verificação;
+- ordem de tarefa que oculta dependência semântica.
 
 Formato mínimo, salvo temporariamente em `.bianchini/.runtime/semantic-review.json`:
 
 ```json
 {
   "prompt": "<identificador/versão do contrato de revisão>",
-  "inputs": "<digest ou lista das entradas revisadas>",
+  "inputs": "<review_input_digest retornado pelo check estrutural>",
   "sources": ["<fonte oficial aplicada>"],
   "findings": [
     {
@@ -158,6 +181,8 @@ Normalize pelo CLI:
 bm.py coherence check --repo <repo> --change C001 \
   --semantic-report <relatorio.json>
 ```
+
+`inputs` deve ser exatamente o `review_input_digest` retornado pelo check estrutural. Ele vincula o parecer aos hashes atuais de `SCOPE`, `RESEARCH`, `ARCHITECTURE`, `SYSTEM_MODEL`, `ROADMAP` e todos os planos. Qualquer alteração torna o parecer obsoleto.
 
 `ERROR` estrutural bloqueia. `WARNING` exige correção ou justificativa humana `accepted_with_justification` incluída no digest. `INFO` é observação. A revisão semântica indisponível não pode ser marcada como executada nem virar passe automático.
 
@@ -184,7 +209,7 @@ bm.py coherence approve --repo <repo> --change C001 \
   --approved-by "<responsável>"
 ```
 
-O CLI revalida o pacote, exige revisão semântica disponível e grava `approved_by`, horário e digest em `COHERENCE.md`; somente então `STATE.md` passa a `approved`. Digest divergente ou evidência obsoleta bloqueia.
+O CLI revalida o manifesto completo, exige revisão semântica disponível e grava `approved_by`, horário e digest em `COHERENCE.md`; somente então `STATE.md` passa a `approved`. Mudança posterior em qualquer artefato bloqueia workspace, conclusão e fechamento até nova revisão e aprovação.
 
 Não inventar autoridade nem executar `coherence approve` antes de uma aprovação humana explícita. Depois do checkpoint, criar commit local atômico do pacote; não implementar, fazer push ou deploy nesta skill.
 

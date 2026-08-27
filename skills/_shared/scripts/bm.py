@@ -3932,6 +3932,11 @@ def parser() -> argparse.ArgumentParser:
     scope.add_argument("--pages", type=int)
     scope.add_argument("--extraction", choices=["native", "ocr", "mixed"])
 
+    roadmap = commands.add_parser("roadmap")
+    roadmap.add_argument("action", choices=["sync"])
+    roadmap.add_argument("--repo", type=Path, default=Path.cwd())
+    roadmap.add_argument("--change", required=True)
+
     coherence = commands.add_parser("coherence")
     coherence.add_argument("action", choices=["check", "approve"])
     coherence.add_argument("--repo", type=Path, default=Path.cwd())
@@ -3964,6 +3969,7 @@ def parser() -> argparse.ArgumentParser:
     plan_result.add_argument("--actual-delta", type=Path, required=True)
     plan_result.add_argument("--result", required=True)
     plan_result.add_argument("--verification", action="append", default=[])
+    plan_result.add_argument("--completed-task", action="append", default=[])
 
     debug = commands.add_parser("debug")
     debug.add_argument(
@@ -4243,6 +4249,8 @@ def main() -> int:
                 )
             else:
                 emit(bm_scope.verify_scope(args.repo, args.change, args.source))
+        elif args.command == "roadmap":
+            emit(v04_planning.sync_roadmap(args.repo, args.change))
         elif args.command == "coherence":
             if args.action == "check":
                 emit(
@@ -4290,6 +4298,7 @@ def main() -> int:
                     actual_delta=args.actual_delta,
                     result=args.result,
                     verification=args.verification,
+                    completed_tasks=args.completed_task,
                 )
             )
         elif args.command == "migrate":

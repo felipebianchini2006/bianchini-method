@@ -91,6 +91,74 @@ def empty_model(**sections: object) -> dict[str, object]:
     return model
 
 
+def planning_scope(*identifiers: str) -> str:
+    items = "\n\n".join(
+        f"### {identifier} — Comportamento {identifier}\n\nResultado observável de {identifier}."
+        for identifier in identifiers
+    )
+    return f"# Escopo\n\n## Itens rastreáveis\n\n{items}\n"
+
+
+def typed_task(
+    identifier: str,
+    *,
+    covers: list[str],
+    depends_on: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "id": identifier,
+        "name": f"Entregar {identifier}",
+        "result": f"Resultado observável de {identifier}",
+        "covers": covers,
+        "depends_on": depends_on or [],
+        "files": [f"src/{identifier.lower()}.py"],
+        "action": "Implementar pelo seam público existente.",
+        "verify": {
+            "kind": "command",
+            "run": f"python3 -m unittest tests.test_{identifier.lower()}",
+            "proves": f"{identifier} entrega o item rastreado.",
+        },
+        "done": f"{identifier} passa pela interface pública.",
+        "risk_seam": "typed-planning",
+    }
+
+
+def typed_plan(
+    identifier: str,
+    *,
+    requirements: list[str],
+    tasks: list[dict[str, object]],
+    depends_on: list[str] | None = None,
+    provides: list[str] | None = None,
+    consumes: list[str] | None = None,
+    model_delta: dict[str, object] | None = None,
+) -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "id": identifier,
+        "status": "planned",
+        "result": f"Resultado observável de {identifier}",
+        "requirements": requirements,
+        "acceptance": [f"Aceite observável de {identifier}"],
+        "depends_on": depends_on or [],
+        "provides": provides or [],
+        "consumes": consumes or [],
+        "modules": [],
+        "interfaces": [],
+        "ownership": [],
+        "data": [],
+        "model_delta": model_delta or {},
+        "migrations": [],
+        "effects": [],
+        "rollback": f"Reverter o commit de {identifier}.",
+        "verifications": [f"python3 -m unittest tests.test_{identifier.lower()}"],
+        "future_constraints": [],
+        "execution": "slice",
+        "review": "per_slice",
+        "tasks": tasks,
+    }
+
+
 def write_text_pdf(path: Path, pages: list[str]) -> None:
     """Gera um PDF textual pequeno sem depender de biblioteca externa."""
 
@@ -244,6 +312,348 @@ Nenhuma.
 
 
 class MethodV04Scenarios(unittest.TestCase):
+    def test_typed_planning_binds_scope_roadmap_tasks_semantic_review_and_package(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            repo = base / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            change_id = str(
+                cli_json("model", "init", "--repo", str(repo), "--change", "typed")[
+                    "change"
+                ]
+            )
+            change_root = repo / ".bianchini/changes" / change_id
+            coherence_initial = json.loads(
+                (change_root / "COHERENCE.md").read_text(encoding="utf-8").split("---", 2)[1]
+            )
+            self.assertEqual(coherence_initial["planning_contract"], 2)
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001", "REQ-002"), encoding="utf-8"
+            )
+            target = empty_model(
+                contracts=[{"id": "payment_created"}, {"id": "order_paid"}]
+            )
+            (change_root / "SYSTEM_MODEL.md").write_text(
+                markdown_document(target, "Sistema final"), encoding="utf-8"
+            )
+            plans = [
+                typed_plan(
+                    "P01",
+                    requirements=["REQ-001"],
+                    tasks=[typed_task("T01", covers=["REQ-001"])],
+                    provides=["payment_created"],
+                    model_delta={
+                        "contracts": {"add": [{"id": "payment_created"}]}
+                    },
+                ),
+                typed_plan(
+                    "P02",
+                    requirements=["REQ-002"],
+                    tasks=[typed_task("T01", covers=["REQ-002"])],
+                    depends_on=["P01"],
+                    consumes=["payment_created"],
+                    provides=["order_paid"],
+                    model_delta={"contracts": {"add": [{"id": "order_paid"}]}},
+                ),
+            ]
+            for plan in plans:
+                (change_root / "plans" / f"{plan['id']}.md").write_text(
+                    markdown_document(plan, str(plan["id"])), encoding="utf-8"
+                )
+
+            roadmap = cli_json(
+                "roadmap", "sync", "--repo", str(repo), "--change", change_id
+            )
+            self.assertEqual(roadmap["phases"], ["P01", "P02"])
+            structural = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--structural-only",
+            )
+            self.assertEqual(structural["status"], "structurally_valid")
+            self.assertRegex(str(structural["review_input_digest"]), r"^[0-9a-f]{64}$")
+            self.assertEqual(structural["schedule"]["plan_waves"], [["P01"], ["P02"]])
+            self.assertEqual(
+                structural["schedule"]["task_waves"],
+                {"P01": [["T01"]], "P02": [["T01"]]},
+            )
+            self.assertIn("SCOPE.md", structural["artifact_manifest"])
+            self.assertIn("plans/P01.md", structural["artifact_manifest"])
+
+            report = base / "semantic.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "prompt": "semantic-v2",
+                        "inputs": "wrong-digest",
+                        "sources": [],
+                        "findings": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            stale = cli(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--semantic-report",
+                str(report),
+            )
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("STALE_EVIDENCE", stale.stderr)
+
+            report.write_text(
+                json.dumps(
+                    {
+                        "prompt": "semantic-v2",
+                        "inputs": structural["review_input_digest"],
+                        "sources": [],
+                        "findings": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            checked = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--semantic-report",
+                str(report),
+            )
+            self.assertEqual(checked["status"], "ready_for_approval")
+            cli_json(
+                "coherence",
+                "approve",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--digest",
+                str(checked["digest"]),
+                "--approved-by",
+                "human:test",
+            )
+            git(repo, "add", ".")
+            git(repo, "commit", "-m", "approve typed package")
+
+            with (change_root / "ARCHITECTURE.md").open("a", encoding="utf-8") as stream:
+                stream.write("\nDecisão alterada depois da aprovação.\n")
+            git(repo, "add", ".")
+            git(repo, "commit", "-m", "tamper approved architecture")
+            workspace = cli(
+                "workspace",
+                "create",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--plan",
+                "P01",
+                "--target",
+                str(base / "worktree"),
+            )
+            self.assertNotEqual(workspace.returncode, 0)
+            self.assertIn("STALE_EVIDENCE", workspace.stderr)
+
+    def test_typed_plan_completion_requires_every_task(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            repo = base / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            change_id = str(
+                cli_json("model", "init", "--repo", str(repo), "--change", "tasks")[
+                    "change"
+                ]
+            )
+            change_root = repo / ".bianchini/changes" / change_id
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001"), encoding="utf-8"
+            )
+            delta = {"contracts": {"add": [{"id": "task_contract"}]}}
+            (change_root / "SYSTEM_MODEL.md").write_text(
+                markdown_document(
+                    empty_model(contracts=[{"id": "task_contract"}]), "Sistema final"
+                ),
+                encoding="utf-8",
+            )
+            plan = typed_plan(
+                "P01",
+                requirements=["REQ-001"],
+                tasks=[
+                    typed_task("T01", covers=["REQ-001"]),
+                    typed_task("T02", covers=["REQ-001"], depends_on=["T01"]),
+                ],
+                provides=["task_contract"],
+                model_delta=delta,
+            )
+            (change_root / "plans/P01.md").write_text(
+                markdown_document(plan, "P01"), encoding="utf-8"
+            )
+            cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
+            structural = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--structural-only",
+            )
+            report = base / "semantic.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "prompt": "semantic-v2",
+                        "inputs": structural["review_input_digest"],
+                        "sources": [],
+                        "findings": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            checked = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--semantic-report",
+                str(report),
+            )
+            cli_json(
+                "coherence",
+                "approve",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--digest",
+                str(checked["digest"]),
+                "--approved-by",
+                "human:test",
+            )
+            actual_delta = base / "actual.json"
+            actual_delta.write_text(json.dumps(delta), encoding="utf-8")
+            architecture_path = change_root / "ARCHITECTURE.md"
+            approved_architecture = architecture_path.read_text(encoding="utf-8")
+            architecture_path.write_text(
+                approved_architecture + "\nDrift posterior.\n", encoding="utf-8"
+            )
+            stale = cli(
+                "plan",
+                "complete",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--plan",
+                "P01",
+                "--actual-delta",
+                str(actual_delta),
+                "--result",
+                "entregue",
+                "--verification",
+                "passed",
+                "--completed-task",
+                "T01",
+                "--completed-task",
+                "T02",
+            )
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("STALE_EVIDENCE", stale.stderr)
+            architecture_path.write_text(approved_architecture, encoding="utf-8")
+            incomplete = cli(
+                "plan",
+                "complete",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--plan",
+                "P01",
+                "--actual-delta",
+                str(actual_delta),
+                "--result",
+                "entregue",
+                "--verification",
+                "passed",
+                "--completed-task",
+                "T01",
+            )
+            self.assertNotEqual(incomplete.returncode, 0)
+            self.assertIn("DOCVIVA_INCOMPLETE", incomplete.stderr)
+            completed = cli_json(
+                "plan",
+                "complete",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--plan",
+                "P01",
+                "--actual-delta",
+                str(actual_delta),
+                "--result",
+                "entregue",
+                "--verification",
+                "passed",
+                "--completed-task",
+                "T01",
+                "--completed-task",
+                "T02",
+            )
+            self.assertEqual(completed["completed_tasks"], ["T01", "T02"])
+
+    def test_legacy_change_without_contract_marker_remains_compatible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            change_id = str(
+                cli_json("model", "init", "--repo", str(repo), "--change", "legacy")[
+                    "change"
+                ]
+            )
+            change_root = repo / ".bianchini/changes" / change_id
+            coherence_path = change_root / "COHERENCE.md"
+            header = json.loads(coherence_path.read_text(encoding="utf-8").split("---", 2)[1])
+            header.pop("planning_contract")
+            coherence_path.write_text(
+                markdown_document(header, "Coerência legada"), encoding="utf-8"
+            )
+            legacy = {
+                "id": "P01",
+                "acceptance": ["legado preservado"],
+                "verifications": ["test_legacy"],
+            }
+            (change_root / "plans/P01.md").write_text(
+                markdown_document(legacy, "P01"), encoding="utf-8"
+            )
+
+            checked = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--structural-only",
+            )
+            self.assertEqual(checked["status"], "structurally_valid")
+            self.assertEqual(checked["planning_contract"], 1)
     def test_first_quick_initializes_v04_without_legacy_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -573,7 +983,7 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertRegex(result["id"], r"^Q001-")
             self.assertEqual(
                 (installed / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-                "0.4.5",
+                "0.4.6",
             )
             self.assertTrue((repo / ".bianchini/STATE.md").is_file())
             self.assertFalse((repo / ".superpowers").exists())
@@ -622,32 +1032,36 @@ class MethodV04Scenarios(unittest.TestCase):
             (change_root / "SYSTEM_MODEL.md").write_text(
                 markdown_document(target, "Sistema final"), encoding="utf-8"
             )
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001", "REQ-002"), encoding="utf-8"
+            )
             plans = [
-                {
-                    "id": "P01",
-                    "provides": ["payment_created"],
-                    "acceptance": ["pagamento persistido"],
-                    "verifications": ["test_payment"],
-                    "model_delta": {
+                typed_plan(
+                    "P01",
+                    requirements=["REQ-001"],
+                    tasks=[typed_task("T01", covers=["REQ-001"])],
+                    provides=["payment_created"],
+                    model_delta={
                         "contracts": {"add": [{"id": "payment_created"}]}
                     },
-                },
-                {
-                    "id": "P02",
-                    "depends_on": ["P01"],
-                    "consumes": ["payment_created"],
-                    "provides": ["order_paid"],
-                    "acceptance": ["pedido atualizado"],
-                    "verifications": ["test_order"],
-                    "model_delta": {
+                ),
+                typed_plan(
+                    "P02",
+                    requirements=["REQ-002"],
+                    tasks=[typed_task("T01", covers=["REQ-002"])],
+                    depends_on=["P01"],
+                    consumes=["payment_created"],
+                    provides=["order_paid"],
+                    model_delta={
                         "contracts": {"add": [{"id": "order_paid"}]}
                     },
-                },
+                ),
             ]
             for plan in plans:
                 (change_root / "plans" / f"{plan['id']}.md").write_text(
                     markdown_document(plan, str(plan["id"])), encoding="utf-8"
                 )
+            cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
 
             coherent = cli_json(
                 "coherence",
@@ -694,20 +1108,33 @@ class MethodV04Scenarios(unittest.TestCase):
                 ]
             )
             change_root = repo / ".bianchini/changes" / change_id
-            plan = {
-                "id": "P01",
-                "acceptance": ["entrega"],
-                "verifications": ["test"],
-            }
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001"), encoding="utf-8"
+            )
+            plan = typed_plan(
+                "P01",
+                requirements=["REQ-001"],
+                tasks=[typed_task("T01", covers=["REQ-001"])],
+            )
             (change_root / "plans/P01.md").write_text(
                 markdown_document(plan, "P01"), encoding="utf-8"
+            )
+            cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
+            structural = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--structural-only",
             )
             report = repo / "semantic.json"
             report.write_text(
                 json.dumps(
                     {
                         "prompt": "revise",
-                        "inputs": "digest-bound",
+                        "inputs": structural["review_input_digest"],
                         "sources": ["official"],
                         "findings": [
                             {
@@ -756,43 +1183,56 @@ class MethodV04Scenarios(unittest.TestCase):
             (change_root / "SYSTEM_MODEL.md").write_text(
                 markdown_document(target_model, "Sistema final"), encoding="utf-8"
             )
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001", "REQ-002", "REQ-003"), encoding="utf-8"
+            )
             plans = [
-                {
-                    "id": "P01",
-                    "provides": ["shared_contract"],
-                    "acceptance": ["provider pronto"],
-                    "verifications": ["test_provider"],
-                    "model_delta": {
+                typed_plan(
+                    "P01",
+                    requirements=["REQ-001"],
+                    tasks=[typed_task("T01", covers=["REQ-001"])],
+                    provides=["shared_contract"],
+                    model_delta={
                         "contracts": {"add": [{"id": "shared_contract"}]}
                     },
-                },
-                {
-                    "id": "P02",
-                    "depends_on": ["P01"],
-                    "consumes": ["shared_contract"],
-                    "acceptance": ["consumer pronto"],
-                    "verifications": ["test_consumer"],
-                },
-                {
-                    "id": "P03",
-                    "provides": ["independent_contract"],
-                    "acceptance": ["fluxo independente pronto"],
-                    "verifications": ["test_independent"],
-                    "model_delta": {
+                ),
+                typed_plan(
+                    "P02",
+                    requirements=["REQ-002"],
+                    tasks=[typed_task("T01", covers=["REQ-002"])],
+                    depends_on=["P01"],
+                    consumes=["shared_contract"],
+                ),
+                typed_plan(
+                    "P03",
+                    requirements=["REQ-003"],
+                    tasks=[typed_task("T01", covers=["REQ-003"])],
+                    provides=["independent_contract"],
+                    model_delta={
                         "contracts": {"add": [{"id": "independent_contract"}]}
                     },
-                },
+                ),
             ]
             for plan in plans:
                 (change_root / "plans" / f"{plan['id']}.md").write_text(
                     markdown_document(plan, str(plan["id"])), encoding="utf-8"
                 )
+            cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
+            structural = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--structural-only",
+            )
             report = base / "semantic.json"
             report.write_text(
                 json.dumps(
                     {
                         "prompt": "revisar impacto",
-                        "inputs": "pacote global",
+                        "inputs": structural["review_input_digest"],
                         "sources": ["official"],
                         "findings": [],
                     }
@@ -887,14 +1327,18 @@ class MethodV04Scenarios(unittest.TestCase):
                 ]
             )
             change_root = repo / ".bianchini/changes" / change_id
-            plan = {
-                "id": "P01",
-                "acceptance": ["entrega"],
-                "verifications": ["test"],
-            }
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001"), encoding="utf-8"
+            )
+            plan = typed_plan(
+                "P01",
+                requirements=["REQ-001"],
+                tasks=[typed_task("T01", covers=["REQ-001"])],
+            )
             (change_root / "plans/P01.md").write_text(
                 markdown_document(plan, "P01"), encoding="utf-8"
             )
+            cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
             structural = cli_json(
                 "coherence",
                 "check",
@@ -925,7 +1369,7 @@ class MethodV04Scenarios(unittest.TestCase):
                 json.dumps(
                     {
                         "prompt": "revisão arquitetural",
-                        "inputs": "pacote global",
+                        "inputs": structural["review_input_digest"],
                         "sources": ["official"],
                         "findings": [],
                     }
@@ -1024,25 +1468,38 @@ class MethodV04Scenarios(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001"), encoding="utf-8"
+            )
             (change_root / "plans/P01.md").write_text(
                 markdown_document(
-                    {
-                        "id": "P01",
-                        "provides": ["invoice_created"],
-                        "acceptance": ["fatura persistida"],
-                        "verifications": ["test_invoice"],
-                        "model_delta": delta,
-                    },
+                    typed_plan(
+                        "P01",
+                        requirements=["REQ-001"],
+                        tasks=[typed_task("T01", covers=["REQ-001"])],
+                        provides=["invoice_created"],
+                        model_delta=delta,
+                    ),
                     "P01",
                 ),
                 encoding="utf-8",
+            )
+            cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
+            structural = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--structural-only",
             )
             report = base / "semantic.json"
             report.write_text(
                 json.dumps(
                     {
                         "prompt": "revisar",
-                        "inputs": "pacote",
+                        "inputs": structural["review_input_digest"],
                         "sources": ["official"],
                         "findings": [],
                     }
@@ -1088,6 +1545,8 @@ class MethodV04Scenarios(unittest.TestCase):
                 "Fatura entregue conforme contrato",
                 "--verification",
                 "test_invoice passou",
+                "--completed-task",
+                "T01",
             )
             self.assertEqual(completed["status"], "completed")
             self.assertTrue((change_root / "results/P01.md").is_file())
@@ -1644,10 +2103,10 @@ class MethodV04Scenarios(unittest.TestCase):
     def test_version_files_use_zero_four_lineage(self) -> None:
         self.assertEqual(
             (ROOT / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-            "0.4.5",
+            "0.4.6",
         )
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.5"', workflow)
+        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.4.6"', workflow)
         root_schema = (ROOT / "schemas/state-v04.schema.json").read_bytes()
         packaged_schema = (
             ROOT / "skills/_shared/schemas/state-v04.schema.json"

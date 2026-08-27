@@ -14,7 +14,7 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_sha
 ## 1. Preflight
 
 1. Ler `.bianchini/STATE.md`; sem ele, bloquear e orientar `/migrar-bianchini` ou `/sdd-planning` conforme o projeto.
-2. Confirmar `status: approved|executing`, digest vigente, `COHERENCE.md` em `approved` e planos solicitados aprovados.
+2. Confirmar `status: approved|executing`, digest vigente, `COHERENCE.md` em `approved` e planos solicitados aprovados. Ler `schedule.plan_waves` e `schedule.task_waves` do checkpoint.
 3. Validar o modelo sem reabrir a auditoria aprovada:
 
 ```bash
@@ -34,7 +34,7 @@ Criar o workspace por plano somente a partir do repositório fonte limpo:
 bm.py workspace create --repo <repo> --change C001 --plan P01
 ```
 
-O comando bloqueia pacote sem `COHERENCE.md` aprovado, plano `stale`, artefato divergente do `HEAD`, Git sujo ou ID inválido. Para retomar, use `workspace locate|resume --repo <repo> --change C001 --plan P01`; dentro do workspace, use `workspace check --repo <workspace>`.
+O comando bloqueia pacote sem `COHERENCE.md` aprovado, plano `stale`, qualquer artefato do manifesto divergente do checkpoint ou do `HEAD`, Git sujo ou ID inválido. Para retomar, use `workspace locate|resume --repo <repo> --change C001 --plan P01`; dentro do workspace, use `workspace check --repo <workspace>`.
 
 Branch esperada: `bm/c001-p01`. `main`, `master`, detached HEAD e worktree primária são proibidos. Não existe fallback para editar na branch principal.
 
@@ -46,6 +46,7 @@ Carregue somente:
 
 - índice atual;
 - plano ativo;
+- tarefa ativa e suas dependências `Txx`;
 - partes do `SYSTEM_MODEL.md` tocadas;
 - providers, consumers e restrições futuras do plano;
 - specs e decisões referenciadas;
@@ -75,6 +76,8 @@ Não redesenhar por preferência de nome, arquivo, comando equivalente ou soluç
 ## 5. Executar pela política
 
 Fix round é hipótese, não entrega. Identifique o `risk_seam` estável; renomear a tarefa não reinicia sua contagem. Passe `--risk-seam` e `--consecutive-seam-findings` à política. Ao atingir o breaker, pare patches locais e redesenhe o seam.
+
+Execute somente tarefas declaradas no frontmatter do plano. Respeite `task_waves`: tarefas da mesma onda podem avançar separadamente apenas quando não houver sobreposição real de arquivos, ownership ou efeitos. O orquestrador integra os resultados e mantém a ordem determinística dos IDs.
 
 ### Grouped
 
@@ -138,8 +141,12 @@ bm.py impact analyze --repo <repo> --change C001 --plan P01 \
 bm.py plan complete --repo <repo> --change C001 --plan P01 \
   --actual-delta <delta-real.json> \
   --result "<resultado>" \
-  --verification "<evidência>"
+  --verification "<evidência>" \
+  --completed-task T01 \
+  --completed-task T02
 ```
+
+Repita `--completed-task` para todos os `Txx`, na ordem aprovada. O CLI rejeita tarefa ausente, desconhecida ou reordenada e revalida o pacote completo antes de aceitar a conclusão.
 
 8. confirmar o resultado em `.bianchini/changes/Cxxx-*/results/` e o `STATE.md` atualizado.
 

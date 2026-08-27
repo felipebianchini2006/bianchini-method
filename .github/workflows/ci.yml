@@ -48,8 +48,10 @@ jobs:
           grep -q "mutation-evidence" /tmp/bm-help.txt
           grep -q "update-bm" /tmp/bm-help.txt
           grep -q "scope" /tmp/bm-help.txt
+          grep -q "roadmap" /tmp/bm-help.txt
           python3 scripts/bm.py proof-map --help | grep -q "mutation-evidence"
           python3 scripts/bm.py scope --help | grep -q "seal"
           python3 scripts/bm.py scope --help | grep -q "verify"
+          python3 scripts/bm.py roadmap --help | grep -q "sync"
           python3 scripts/bm.py update-bm --help | grep -q -- "--check"
-          test "$(cat skills/_shared/VERSION)" = "0.4.5"
+          test "$(cat skills/_shared/VERSION)" = "0.4.6"

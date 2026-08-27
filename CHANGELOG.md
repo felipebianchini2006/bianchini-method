@@ -2,6 +2,16 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 0.4.6 — Fases e tarefas tipadas
+
+- adiciona `planning_contract: 2` para mudanças novas, preservando mudanças anteriores no contrato 1;
+- estrutura cada fase `Pxx` com requisitos rastreáveis e tarefas `Txx` executáveis, verificáveis e fail-closed;
+- valida cobertura `SCOPE → fase → tarefa`, dependências, ciclos, ordem, referências de modelo, paths e compatibilidade entre modo e revisão;
+- deriva `ROADMAP.md` e ondas topológicas de fases/tarefas pelo CLI;
+- vincula a revisão semântica ao manifesto completo dos artefatos;
+- bloqueia aprovação, workspace, conclusão e fechamento quando o pacote aprovado sofre drift;
+- exige comprovação explícita de todas as tarefas para concluir uma fase.
+
 ## 0.4.5 — Intake de escopo em PDF
 
 - adiciona `/preparar-escopo` para converter PDF textual, escaneado ou misto em `SCOPE.md` estruturado;

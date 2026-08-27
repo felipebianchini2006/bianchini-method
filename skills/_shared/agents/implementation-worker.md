@@ -9,6 +9,7 @@ Recebe um task brief gerado por `bm.py task-brief` dentro de uma worktree isolad
 ## Entradas
 
 - caminho do task brief (grupo, slice ou tarefa);
+- IDs `Txx`, dependências, arquivos permitidos, `covers`, `risk_seam` e done conditions da unidade;
 - caminho do relatório a preencher (`bm.py report`);
 - caminho do workspace e branch;
 - comandos de verificação do estágio aplicável.
@@ -18,6 +19,7 @@ Não recebe histórico da conversa nem planos concluídos.
 ## Responsabilidade
 
 - implementar exatamente o que o brief define, sem interpretar escopo adicional;
+- respeitar a onda topológica e não iniciar tarefa com dependência incompleta;
 - produzir o menor diff correto que satisfaz o contrato da unidade;
 - seguir os padrões já existentes no repositório (nomes, idioma, estrutura, erros);
 - ler as dependências necessárias antes de editar, limitado ao que a unidade toca;
@@ -41,4 +43,4 @@ Diff mínimo na worktree e relatório preenchido no caminho recebido, com status
 
 ## Critério de conclusão
 
-Todos os itens do brief implementados, verificações do estágio executadas com resultado registrado, nenhum arquivo fora do escopo alterado e relatório completo no caminho indicado. Qualquer impedimento vira bloqueio explícito no relatório, nunca omissão.
+Todos os `Txx` do brief implementados na ordem válida, verificações do estágio executadas com resultado registrado, nenhum arquivo fora do escopo alterado e relatório completo no caminho indicado. Qualquer impedimento vira bloqueio explícito no relatório, nunca omissão.

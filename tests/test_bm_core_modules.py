@@ -20,8 +20,9 @@ from bm_coherence import (  # noqa: E402
     SemanticReviewer,
     Severity,
     StructuralValidator,
+    TaskDependencyGraph,
 )
-from bm_project_model import PlanContract, ProjectModel  # noqa: E402
+from bm_project_model import PlanContract, ProjectModel, TaskContract  # noqa: E402
 from bm_workspace import MethodWorkspace  # noqa: E402
 
 
@@ -64,6 +65,60 @@ def model_mapping() -> dict[str, object]:
         "invariants": [{"id": "single_payment_owner", "value": "payments"}],
         "effects": [{"id": "charge_customer", "owner": "payments"}],
     }
+
+
+def typed_task(
+    identifier: str,
+    *,
+    covers: list[str],
+    depends_on: list[str] | None = None,
+    files: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "id": identifier,
+        "name": f"Entregar {identifier}",
+        "result": f"Resultado observável de {identifier}",
+        "covers": covers,
+        "depends_on": depends_on or [],
+        "files": files or [f"src/{identifier.lower()}.py"],
+        "action": "Implementar pelo seam público já definido.",
+        "verify": {
+            "kind": "command",
+            "run": f"python3 -m unittest tests.test_{identifier.lower()}",
+            "proves": f"{identifier} entrega o comportamento declarado.",
+        },
+        "done": f"{identifier} passa pela interface pública.",
+        "risk_seam": "checkout-payment",
+    }
+
+
+def typed_plan(**overrides: object) -> dict[str, object]:
+    value: dict[str, object] = {
+        "schema_version": 2,
+        "id": "P01",
+        "status": "planned",
+        "result": "Pagamento persistido e observável.",
+        "requirements": ["REQ-001"],
+        "acceptance": ["Pagamento aprovado fica persistido."],
+        "depends_on": [],
+        "provides": ["payment_created"],
+        "consumes": ["payment_gateway"],
+        "modules": ["payments"],
+        "interfaces": ["payment_gateway"],
+        "ownership": ["payment_status"],
+        "data": ["payment_intent"],
+        "model_delta": {},
+        "migrations": [],
+        "effects": [],
+        "rollback": "Reverter o commit e preservar as intenções existentes.",
+        "verifications": ["python3 -m unittest tests.test_payment"],
+        "future_constraints": [],
+        "execution": "slice",
+        "review": "per_slice",
+        "tasks": [typed_task("T01", covers=["REQ-001"])],
+    }
+    value.update(overrides)
+    return value
 
 
 class MethodWorkspaceTests(unittest.TestCase):
@@ -314,6 +369,34 @@ class ProjectModelTests(unittest.TestCase):
             self.assertEqual(plan.id, "P01")
             self.assertIn("refund_created", final.contracts)
 
+    def test_plan_contract_v2_parses_typed_tasks_and_rejects_unknown_fields(self) -> None:
+        plan = PlanContract.from_mapping(typed_plan())
+
+        self.assertEqual(plan.schema_version, 2)
+        self.assertEqual(plan.result, "Pagamento persistido e observável.")
+        self.assertEqual(plan.execution, "slice")
+        self.assertEqual(plan.tasks[0].id, "T01")
+        self.assertEqual(plan.tasks[0].verification.kind, "command")
+        self.assertEqual(plan.tasks[0].covers, ("REQ-001",))
+        self.assertEqual(plan.to_mapping(), typed_plan())
+
+        with self.assertRaisesRegex(ValueError, "campo desconhecido no plano v2"):
+            PlanContract.from_mapping({**typed_plan(), "surprise": True})
+        with self.assertRaisesRegex(ValueError, "combinação execution/review"):
+            PlanContract.from_mapping(typed_plan(review="per_task"))
+        with self.assertRaisesRegex(ValueError, "campo desconhecido na tarefa"):
+            TaskContract.from_mapping(
+                {**typed_task("T01", covers=["REQ-001"]), "surprise": True}
+            )
+        with self.assertRaisesRegex(ValueError, "caminho inseguro"):
+            TaskContract.from_mapping(
+                typed_task("T01", covers=["REQ-001"], files=["../outside.py"])
+            )
+        with self.assertRaisesRegex(ValueError, "namespace estrangeiro"):
+            TaskContract.from_mapping(
+                typed_task("T01", covers=["REQ-001"], files=[".planning/STATE.md"])
+            )
+
 
 class CoherenceTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -374,6 +457,65 @@ class CoherenceTests(unittest.TestCase):
         self.assertEqual(graph.topological_order(), ["P01", "P02", "P03"])
         self.assertEqual(graph.direct_dependents("P01"), {"P02"})
         self.assertEqual(graph.transitive_dependents({"P01"}), {"P02", "P03"})
+
+    def test_task_graph_builds_waves_and_validator_enforces_scope_coverage(self) -> None:
+        tasks = [
+            TaskContract.from_mapping(typed_task("T01", covers=["REQ-001"])),
+            TaskContract.from_mapping(
+                typed_task("T02", covers=["NFR-001"], depends_on=["T01"])
+            ),
+            TaskContract.from_mapping(typed_task("T03", covers=["ERR-001"])),
+        ]
+        graph = TaskDependencyGraph(tasks)
+
+        self.assertEqual(graph.topological_order(), ["T01", "T02", "T03"])
+        self.assertEqual(graph.execution_waves(), [["T01", "T03"], ["T02"]])
+
+        cyclic = [
+            TaskContract.from_mapping(
+                typed_task("T01", covers=["REQ-001"], depends_on=["T02"])
+            ),
+            TaskContract.from_mapping(
+                typed_task("T02", covers=["REQ-001"], depends_on=["T01"])
+            ),
+        ]
+        with self.assertRaisesRegex(ValueError, "ciclo"):
+            TaskDependencyGraph(cyclic).execution_waves()
+
+        plan = PlanContract.from_mapping(
+            typed_plan(
+                requirements=["REQ-001", "NFR-001", "ERR-001", "INT-001"],
+                tasks=[task.to_mapping() for task in tasks],
+            )
+        )
+        findings = StructuralValidator().validate(
+            self.current,
+            [plan],
+            requirements=["REQ-001", "NFR-001", "ERR-001", "INT-001"],
+            require_typed_tasks=True,
+        )
+        codes = {item.code for item in findings}
+
+        self.assertIn("TASK_REQUIREMENT_UNCOVERED", codes)
+
+        invalid = PlanContract.from_mapping(
+            typed_plan(
+                requirements=["REQ-001"],
+                modules=["missing_module"],
+                tasks=[typed_task("T01", covers=["REQ-999"], depends_on=["T02"])],
+            )
+        )
+        invalid_findings = StructuralValidator().validate(
+            self.current,
+            [invalid],
+            requirements=["REQ-001"],
+            require_typed_tasks=True,
+        )
+        invalid_codes = {item.code for item in invalid_findings}
+
+        self.assertIn("TASK_COVERS_UNKNOWN_REQUIREMENT", invalid_codes)
+        self.assertIn("UNKNOWN_TASK_DEPENDENCY", invalid_codes)
+        self.assertIn("UNKNOWN_MODEL_REFERENCE", invalid_codes)
 
     def test_structural_validator_is_deterministic_for_valid_package(self) -> None:
         plans = self.valid_plans()

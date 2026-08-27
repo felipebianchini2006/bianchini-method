@@ -170,8 +170,8 @@ estado atual
 → pesquisa da stack e fontes oficiais proporcionais
 → arquitetura global
 → SYSTEM_MODEL final
-→ roadmap de todas as fases
 → planos detalhados
+→ roadmap derivado de todas as fases
 → validação estrutural
 → impact radius
 → revisão semântica conjunta
@@ -179,9 +179,32 @@ estado atual
 → aprovação do digest global
 ```
 
-Cada plano `Pxx` declara resultado, aceite, `depends_on`, `provides`, `consumes`, módulos/interfaces, ownership, delta do ProjectModel, dados/migrações, efeitos externos, rollback, verificações e restrições futuras.
+Mudanças novas usam `planning_contract: 2`. Mudanças anteriores sem esse marcador continuam no contrato 1 e não são reescritas automaticamente.
+
+Cada plano `Pxx` usa `schema_version: 2` e declara resultado, IDs rastreáveis de escopo, aceite, `depends_on`, `provides`, `consumes`, módulos/interfaces, ownership, delta do ProjectModel, dados/migrações, efeitos externos, rollback, verificações, restrições futuras e tarefas tipadas.
+
+Cada tarefa `Txx` declara:
+
+```text
+id, name, result, covers, depends_on, files, action,
+verify.kind, verify.run, verify.proves, done, risk_seam
+```
+
+`covers` aponta para itens `FLW`, `REQ`, `NFR`, `BR`, `DAT`, `INT`, `ERR` ou `RSK` existentes no `SCOPE.md`. A cadeia obrigatória é `SCOPE → fase → tarefa`: todo item rastreável pertence a ao menos uma fase; todo requisito da fase pertence a ao menos uma tarefa. O parser é fail-closed: campos extras, paths inseguros, referência desconhecida, dependência futura ou ciclo bloqueiam.
+
+O modo e o gate de revisão formam um contrato único: `grouped → plan_gate`, `slice → per_slice`, `strict → per_task`. O grafo deriva ondas topológicas de fases e tarefas. Paralelismo é permitido somente dentro de uma onda e continua sujeito a conflito semântico de arquivos, ownership e efeitos.
+
+`ROADMAP.md` não é uma segunda fonte manual. Ele é gerado deterministicamente dos planos:
+
+```bash
+bm.py roadmap sync --repo <repo> --change C001
+```
+
+O check exige igualdade byte a byte com essa projeção. Assim, editar fase, dependência, resultado, requisito, modo ou lista de tarefas sem sincronizar o roadmap falha.
 
 O pacote aprovado é imutável. Detalhe interno reversível continua. Mudança em contrato, ownership, dado, migração, journey ou invariante recalcula o impacto e torna somente os planos afetados `stale`.
+
+O manifesto do contrato 2 inclui `SCOPE.md`, `RESEARCH.md`, `ARCHITECTURE.md`, `SYSTEM_MODEL.md`, `ROADMAP.md` e todos os planos. A revisão semântica recebe o digest exato desse manifesto. Aprovação, criação de workspace, conclusão de plano e fechamento recalculam o pacote; qualquer drift retorna `STALE_EVIDENCE`.
 
 ## Impact radius
 
@@ -249,10 +272,11 @@ Após cada plano, registrar o delta real, comparar `provides/consumes`, aplicar 
 bm.py plan complete --repo <repo> --change C001 --plan P01 \
   --actual-delta <delta-real.json> \
   --result "<resultado entregue>" \
-  --verification "<evidência vigente>"
+  --verification "<evidência vigente>" \
+  --completed-task T01 [--completed-task T02 ...]
 ```
 
-O comando exige dependências concluídas, contratos consumidos presentes, delta real equivalente ao aprovado e evidência. Drift material retorna `IMPACT_STALE` para replanejamento; não altera silenciosamente o pacote.
+O comando exige pacote vigente, dependências concluídas, contratos consumidos presentes, todos os `Txx` na ordem aprovada, delta real equivalente ao aprovado e evidência. Drift material retorna `IMPACT_STALE`; drift documental retorna `STALE_EVIDENCE`. Nenhum dos dois altera silenciosamente o pacote.
 
 ## Gates adaptativos
 

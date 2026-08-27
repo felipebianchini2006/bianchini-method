@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
-from bm_project_model import PLAN_ID, PlanContract, ProjectModel
+from bm_project_model import PLAN_ID, TASK_ID, PlanContract, ProjectModel, TaskContract
 
 
 class Severity(str, Enum):
@@ -132,6 +132,32 @@ class DependencyGraph:
                 dependencies.difference_update(ready)
         return result
 
+    def execution_waves(self) -> list[list[str]]:
+        unknown = sorted(
+            dependency
+            for dependencies in self.dependencies.values()
+            for dependency in dependencies
+            if dependency not in self.plan_by_id
+        )
+        if unknown:
+            raise ValueError(f"dependência inexistente: {unknown[0]}")
+        position = {identifier: index for index, identifier in enumerate(self.order)}
+        remaining = {key: set(value) for key, value in self.dependencies.items()}
+        waves: list[list[str]] = []
+        while remaining:
+            ready = sorted(
+                (identifier for identifier, deps in remaining.items() if not deps),
+                key=lambda identifier: (position.get(identifier, len(position)), identifier),
+            )
+            if not ready:
+                raise ValueError("grafo contém ciclo")
+            waves.append(ready)
+            for identifier in ready:
+                del remaining[identifier]
+            for dependencies in remaining.values():
+                dependencies.difference_update(ready)
+        return waves
+
     def direct_dependents(self, plan_id: str) -> set[str]:
         return {
             identifier
@@ -159,6 +185,69 @@ class DependencyGraph:
         return result
 
 
+class TaskDependencyGraph:
+    """Grafo local das tarefas tipadas de um plano."""
+
+    def __init__(self, tasks: Iterable[TaskContract]) -> None:
+        self.tasks = tuple(tasks)
+        self.order = tuple(task.id for task in self.tasks)
+        self.task_by_id: dict[str, TaskContract] = {}
+        for task in self.tasks:
+            self.task_by_id.setdefault(task.id, task)
+        self.dependencies = {
+            identifier: set(task.depends_on)
+            for identifier, task in self.task_by_id.items()
+        }
+
+    def topological_order(self) -> list[str]:
+        self._reject_unknown()
+        position = {identifier: index for index, identifier in enumerate(self.order)}
+        remaining = {key: set(value) for key, value in self.dependencies.items()}
+        result: list[str] = []
+        while remaining:
+            ready = sorted(
+                (identifier for identifier, deps in remaining.items() if not deps),
+                key=lambda identifier: (position.get(identifier, len(position)), identifier),
+            )
+            if not ready:
+                raise ValueError("grafo de tarefas contém ciclo")
+            identifier = ready[0]
+            result.append(identifier)
+            del remaining[identifier]
+            for dependencies in remaining.values():
+                dependencies.discard(identifier)
+        return result
+
+    def execution_waves(self) -> list[list[str]]:
+        self._reject_unknown()
+        position = {identifier: index for index, identifier in enumerate(self.order)}
+        remaining = {key: set(value) for key, value in self.dependencies.items()}
+        waves: list[list[str]] = []
+        while remaining:
+            ready = sorted(
+                (identifier for identifier, deps in remaining.items() if not deps),
+                key=lambda identifier: (position.get(identifier, len(position)), identifier),
+            )
+            if not ready:
+                raise ValueError("grafo de tarefas contém ciclo")
+            waves.append(ready)
+            for identifier in ready:
+                del remaining[identifier]
+            for dependencies in remaining.values():
+                dependencies.difference_update(ready)
+        return waves
+
+    def _reject_unknown(self) -> None:
+        unknown = sorted(
+            dependency
+            for dependencies in self.dependencies.values()
+            for dependency in dependencies
+            if dependency not in self.task_by_id
+        )
+        if unknown:
+            raise ValueError(f"dependência de tarefa inexistente: {unknown[0]}")
+
+
 class StructuralValidator:
     """Valida invariantes objetivas sem qualquer decisão de uma LLM."""
 
@@ -169,6 +258,7 @@ class StructuralValidator:
         expected: ProjectModel | None = None,
         *,
         requirements: Iterable[str] = (),
+        require_typed_tasks: bool = False,
     ) -> list[Finding]:
         plan_values = tuple(_plan(value) for value in plans)
         findings: list[Finding] = []
@@ -197,6 +287,15 @@ class StructuralValidator:
                 )
 
         for plan in plan_values:
+            if require_typed_tasks and plan.schema_version != 2:
+                findings.append(
+                    self._error(
+                        "LEGACY_PLAN_CONTRACT",
+                        f"{plan.id} usa contrato legado sem tarefas tipadas.",
+                        "Reescrever o plano com schema_version 2 e tarefas Txx.",
+                        phases=(plan.id,),
+                    )
+                )
             if not plan.acceptance:
                 findings.append(
                     self._error(
@@ -243,6 +342,29 @@ class StructuralValidator:
                             phases=(plan.id, dependency),
                         )
                     )
+
+            if plan.schema_version == 2:
+                findings.extend(self._validate_tasks(plan))
+                model_references = (
+                    ("modules", plan.modules),
+                    ("interfaces", plan.interfaces),
+                    ("data", plan.data),
+                )
+                for section, references in model_references:
+                    available_references = set(getattr(current, section))
+                    if expected is not None:
+                        available_references.update(getattr(expected, section))
+                    for reference in references:
+                        if reference not in available_references:
+                            findings.append(
+                                self._error(
+                                    "UNKNOWN_MODEL_REFERENCE",
+                                    f"{plan.id} referencia {section}.{reference}, ausente em S0 e Sn.",
+                                    "Corrigir a referência ou declarar o item no SYSTEM_MODEL.",
+                                    phases=(plan.id,),
+                                    contracts=(reference,),
+                                )
+                            )
 
         graph = DependencyGraph(plan_values)
         try:
@@ -331,6 +453,15 @@ class StructuralValidator:
         findings.extend(self._validate_migrations(plan_values, order))
         required = {value for value in requirements if isinstance(value, str) and value}
         covered = {requirement for plan in plan_values for requirement in plan.requirements}
+        for unknown in sorted(covered - required) if required else []:
+            findings.append(
+                self._error(
+                    "PLAN_REQUIREMENT_UNKNOWN",
+                    f"Plano referencia item ausente do escopo: {unknown}.",
+                    "Corrigir requirements ou incluir o item no SCOPE.md.",
+                    contracts=(unknown,),
+                )
+            )
         for missing in sorted(required - covered):
             findings.append(
                 self._error(
@@ -385,6 +516,105 @@ class StructuralValidator:
                 )
             )
         return _sorted_findings(findings, order)
+
+    @staticmethod
+    def _validate_tasks(plan: PlanContract) -> list[Finding]:
+        findings: list[Finding] = []
+        if not plan.tasks:
+            return [
+                StructuralValidator._error(
+                    "MISSING_TASKS",
+                    f"{plan.id} não declara tarefas tipadas.",
+                    "Declarar ao menos uma tarefa Txx verificável.",
+                    phases=(plan.id,),
+                )
+            ]
+        identifiers = [task.id for task in plan.tasks]
+        identifier_set = set(identifiers)
+        position = {identifier: index for index, identifier in enumerate(identifiers)}
+        for task in plan.tasks:
+            phase = f"{plan.id}/{task.id}"
+            if not TASK_ID.fullmatch(task.id):
+                findings.append(
+                    StructuralValidator._error(
+                        "INVALID_TASK_ID",
+                        f"ID de tarefa inválido: {phase}.",
+                        "Usar T seguido por ao menos dois dígitos.",
+                        phases=(plan.id,),
+                    )
+                )
+            if identifiers.count(task.id) > 1:
+                findings.append(
+                    StructuralValidator._error(
+                        "DUPLICATE_TASK_ID",
+                        f"ID de tarefa repetido em {plan.id}: {task.id}.",
+                        "Atribuir ID único dentro do plano.",
+                        phases=(plan.id,),
+                    )
+                )
+            unknown_coverage = sorted(set(task.covers) - set(plan.requirements))
+            if unknown_coverage:
+                findings.append(
+                    StructuralValidator._error(
+                        "TASK_COVERS_UNKNOWN_REQUIREMENT",
+                        f"{phase} cobre item não declarado no plano: {unknown_coverage[0]}.",
+                        "Adicionar o item ao plano ou corrigir covers.",
+                        phases=(plan.id,),
+                        contracts=(unknown_coverage[0],),
+                    )
+                )
+            for dependency in task.depends_on:
+                if dependency == task.id:
+                    findings.append(
+                        StructuralValidator._error(
+                            "TASK_SELF_DEPENDENCY",
+                            f"{phase} depende de si mesma.",
+                            "Remover a dependência circular.",
+                            phases=(plan.id,),
+                        )
+                    )
+                elif dependency not in identifier_set:
+                    findings.append(
+                        StructuralValidator._error(
+                            "UNKNOWN_TASK_DEPENDENCY",
+                            f"{phase} depende da tarefa inexistente {dependency}.",
+                            "Corrigir depends_on ou adicionar a tarefa.",
+                            phases=(plan.id,),
+                        )
+                    )
+                elif position[dependency] > position[task.id]:
+                    findings.append(
+                        StructuralValidator._error(
+                            "TASK_ORDER_VIOLATION",
+                            f"{phase} aparece antes de sua dependência {dependency}.",
+                            "Reordenar as tarefas para refletir a execução.",
+                            phases=(plan.id,),
+                        )
+                    )
+        covered = {item for task in plan.tasks for item in task.covers}
+        for missing in sorted(set(plan.requirements) - covered):
+            findings.append(
+                StructuralValidator._error(
+                    "TASK_REQUIREMENT_UNCOVERED",
+                    f"{plan.id} não liga {missing} a nenhuma tarefa.",
+                    "Associar o item a uma tarefa com verificação e done.",
+                    phases=(plan.id,),
+                    contracts=(missing,),
+                )
+            )
+        try:
+            TaskDependencyGraph(plan.tasks).topological_order()
+        except ValueError as error:
+            if "ciclo" in str(error):
+                findings.append(
+                    StructuralValidator._error(
+                        "TASK_DEPENDENCY_CYCLE",
+                        f"{plan.id} possui ciclo entre tarefas.",
+                        "Romper o ciclo e declarar uma ordem executável.",
+                        phases=(plan.id,),
+                    )
+                )
+        return findings
 
     @staticmethod
     def _validate_journeys(model: ProjectModel, label: str) -> list[Finding]:
@@ -696,7 +926,15 @@ def _guards(effect: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _plan_resources(plan: PlanContract) -> set[str]:
-    resources = set(plan.provides) | set(plan.consumes) | set(plan.owns) | set(plan.touches)
+    resources = (
+        set(plan.provides)
+        | set(plan.consumes)
+        | set(plan.owns)
+        | set(plan.touches)
+        | set(plan.modules)
+        | set(plan.interfaces)
+        | set(plan.data)
+    )
     resources.update(
         str(value["id"])
         for value in (*plan.migrations, *plan.external_effects)

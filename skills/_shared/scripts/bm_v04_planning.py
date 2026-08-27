@@ -19,6 +19,7 @@ from bm_coherence import (
     SemanticReviewer,
     Severity,
     StructuralValidator,
+    TaskDependencyGraph,
 )
 from bm_project_model import PlanContract, ProjectModel, read_frontmatter
 import bm_scope
@@ -29,6 +30,13 @@ class PlanningError(Exception):
     def __init__(self, code: str, message: str):
         super().__init__(f"{code}: {message}")
         self.code = code
+
+
+PLANNING_CONTRACT_VERSION = 2
+TRACEABLE_SCOPE_PREFIXES = frozenset(
+    {"FLW", "REQ", "NFR", "BR", "DAT", "INT", "ERR", "RSK"}
+)
+SCOPE_ITEM = re.compile(r"(?m)^### ([A-Z]+-[0-9]{3})\b")
 
 
 def _now() -> str:
@@ -65,18 +73,139 @@ def _package_digest(
     plans: Iterable[PlanContract],
     findings: Iterable[dict[str, Any]],
     semantic: dict[str, Any] | None,
+    *,
+    planning_contract: int = 1,
+    artifact_manifest: dict[str, str] | None = None,
 ) -> str:
     """Digest estável do pacote que será submetido ao checkpoint humano."""
 
+    payload = {
+        "current": current.to_mapping(),
+        "expected": expected.to_mapping(),
+        "plans": [plan.to_mapping() for plan in plans],
+        "findings": list(findings),
+        "semantic": semantic,
+    }
+    if planning_contract >= 2:
+        payload.update(
+            {
+                "planning_contract": planning_contract,
+                "artifact_manifest": artifact_manifest or {},
+            }
+        )
+    return _digest(payload)
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _planning_contract_version(directory: Path) -> int:
+    try:
+        value = read_frontmatter(directory / "COHERENCE.md").get(
+            "planning_contract", 1
+        )
+    except ValueError as error:
+        raise PlanningError("COHERENCE_ERROR", str(error)) from error
+    if value not in {1, 2}:
+        raise PlanningError("COHERENCE_ERROR", "planning_contract inválido")
+    return int(value)
+
+
+def _artifact_manifest(directory: Path) -> dict[str, str]:
+    paths = [
+        directory / name
+        for name in (
+            "SCOPE.md",
+            "RESEARCH.md",
+            "ARCHITECTURE.md",
+            "SYSTEM_MODEL.md",
+            "ROADMAP.md",
+        )
+    ]
+    paths.extend(sorted((directory / "plans").glob("P*.md")))
+    manifest: dict[str, str] = {}
+    for path in paths:
+        if path.is_symlink() or not path.is_file():
+            raise PlanningError(
+                "COHERENCE_ERROR", f"artefato obrigatório ausente ou symlink: {path.name}"
+            )
+        relative = path.relative_to(directory).as_posix()
+        manifest[relative] = _sha256_bytes(path.read_bytes())
+    return manifest
+
+
+def _review_input_digest(
+    planning_contract: int, artifact_manifest: dict[str, str]
+) -> str:
     return _digest(
         {
-            "current": current.to_mapping(),
-            "expected": expected.to_mapping(),
-            "plans": [plan.to_mapping() for plan in plans],
-            "findings": list(findings),
-            "semantic": semantic,
+            "planning_contract": planning_contract,
+            "artifact_manifest": artifact_manifest,
         }
     )
+
+
+def _scope_requirements(directory: Path) -> list[str]:
+    scope = directory / "SCOPE.md"
+    if scope.is_symlink() or not scope.is_file():
+        raise PlanningError("COHERENCE_ERROR", "SCOPE.md ausente")
+    identifiers = []
+    for identifier in SCOPE_ITEM.findall(scope.read_text(encoding="utf-8")):
+        prefix = identifier.split("-", 1)[0]
+        if prefix in TRACEABLE_SCOPE_PREFIXES and identifier not in identifiers:
+            identifiers.append(identifier)
+    if not identifiers:
+        raise PlanningError(
+            "COHERENCE_ERROR",
+            "SCOPE.md não possui itens rastreáveis FLW/REQ/NFR/BR/DAT/INT/ERR/RSK",
+        )
+    return identifiers
+
+
+def _roadmap_document(plans: Iterable[PlanContract]) -> str:
+    plan_values = list(plans)
+    payload = {
+        "schema_version": 1,
+        "planning_contract": PLANNING_CONTRACT_VERSION,
+        "phases": [
+            {
+                "id": plan.id,
+                "result": plan.result,
+                "depends_on": list(plan.depends_on),
+                "requirements": list(plan.requirements),
+                "execution": plan.execution,
+                "tasks": [task.id for task in plan.tasks],
+            }
+            for plan in plan_values
+        ],
+    }
+    body = ["# Roadmap", "", "Gerado deterministicamente a partir dos planos."]
+    for plan in plan_values:
+        body.extend(
+            [
+                "",
+                f"## {plan.id} — {plan.result or 'Entrega planejada'}",
+                "",
+                f"- Depende de: {', '.join(plan.depends_on) or 'nenhum'}",
+                f"- Escopo: {', '.join(plan.requirements) or 'legado'}",
+                f"- Tarefas: {', '.join(task.id for task in plan.tasks) or 'legado'}",
+            ]
+        )
+    return _document(payload, "\n".join(body))
+
+
+def _schedule(plans: Iterable[PlanContract]) -> dict[str, Any]:
+    plan_values = list(plans)
+    graph = DependencyGraph(plan_values)
+    return {
+        "plan_waves": graph.execution_waves(),
+        "task_waves": {
+            plan.id: TaskDependencyGraph(plan.tasks).execution_waves()
+            for plan in plan_values
+            if plan.schema_version == 2
+        },
+    }
 
 
 def _git(root: Path, *args: str) -> str:
@@ -138,6 +267,7 @@ def create_change(repo: Path, name: str) -> dict[str, Any]:
             _document(
                 {
                     "schema_version": 1,
+                    "planning_contract": PLANNING_CONTRACT_VERSION,
                     "change": work_id,
                     "status": "pending",
                     "findings": [],
@@ -173,6 +303,28 @@ def create_change(repo: Path, name: str) -> dict[str, Any]:
         shutil.rmtree(directory, ignore_errors=True)
         raise
     return {"method": "0.4", "change": work_id, "status": "planning", "path": str(directory)}
+
+
+def sync_roadmap(repo: Path, change: str) -> dict[str, Any]:
+    workspace, directory, _, _, plans = _load_package(repo, change)
+    planning_contract = _planning_contract_version(directory)
+    if planning_contract < 2:
+        raise PlanningError(
+            "COHERENCE_ERROR", "roadmap sync exige planning_contract 2"
+        )
+    if any(plan.schema_version != 2 for plan in plans):
+        raise PlanningError(
+            "COHERENCE_ERROR", "roadmap v2 exige todos os planos em schema_version 2"
+        )
+    content = _roadmap_document(plans)
+    workspace.atomic_write(directory / "ROADMAP.md", content)
+    return {
+        "change": directory.name,
+        "planning_contract": planning_contract,
+        "phases": [plan.id for plan in plans],
+        "roadmap": str(directory / "ROADMAP.md"),
+        "digest": _sha256_bytes(content.encode("utf-8")),
+    }
 
 
 def _load_package(
@@ -222,7 +374,12 @@ def validate_change_model(repo: Path, change: str) -> dict[str, Any]:
     }
 
 
-def _read_semantic_report(path: Path, reviewer: SemanticReviewer) -> dict[str, Any]:
+def _read_semantic_report(
+    path: Path,
+    reviewer: SemanticReviewer,
+    *,
+    expected_inputs: str | None = None,
+) -> dict[str, Any]:
     if path.is_symlink() or not path.is_file():
         raise PlanningError("COHERENCE_ERROR", f"relatório semântico ausente: {path}")
     try:
@@ -233,6 +390,11 @@ def _read_semantic_report(path: Path, reviewer: SemanticReviewer) -> dict[str, A
         ) from error
     if not isinstance(value, dict) or not isinstance(value.get("findings", []), list):
         raise PlanningError("COHERENCE_ERROR", "relatório semântico exige findings")
+    if expected_inputs is not None and value.get("inputs") != expected_inputs:
+        raise PlanningError(
+            "STALE_EVIDENCE",
+            "relatório semântico não corresponde ao manifest atual do pacote",
+        )
     try:
         review = reviewer.normalize(
             value.get("findings", []),
@@ -245,6 +407,44 @@ def _read_semantic_report(path: Path, reviewer: SemanticReviewer) -> dict[str, A
     return review.to_mapping()
 
 
+def _assert_approved_package_current(
+    directory: Path,
+    current: ProjectModel,
+    expected: ProjectModel,
+    plans: Iterable[PlanContract],
+    coherence: dict[str, Any],
+) -> dict[str, str]:
+    """Recalcula o pacote v2 aprovado antes de executar ou concluir trabalho."""
+
+    planning_contract = int(coherence.get("planning_contract", 1))
+    if planning_contract < 2:
+        return {}
+    findings = coherence.get("findings")
+    semantic = coherence.get("semantic")
+    if not isinstance(findings, list) or not isinstance(semantic, dict):
+        raise PlanningError("COHERENCE_ERROR", "pacote aprovado está incompleto")
+    manifest = _artifact_manifest(directory)
+    review_input_digest = _review_input_digest(planning_contract, manifest)
+    package_digest = _package_digest(
+        current,
+        expected,
+        plans,
+        findings,
+        semantic,
+        planning_contract=planning_contract,
+        artifact_manifest=manifest,
+    )
+    if (
+        manifest != coherence.get("artifact_manifest")
+        or review_input_digest != coherence.get("review_input_digest")
+        or package_digest != coherence.get("digest")
+    ):
+        raise PlanningError(
+            "STALE_EVIDENCE", "pacote aprovado mudou depois do checkpoint"
+        )
+    return manifest
+
+
 def coherence_check(
     repo: Path,
     change: str,
@@ -253,7 +453,45 @@ def coherence_check(
     semantic_report: Path | None,
 ) -> dict[str, Any]:
     workspace, directory, current, expected, plans = _load_package(repo, change)
-    findings = StructuralValidator().validate(current, plans, expected)
+    planning_contract = _planning_contract_version(directory)
+    requirements: list[str] = []
+    artifact_manifest: dict[str, str] = {}
+    review_input_digest: str | None = None
+    schedule: dict[str, Any] | None = None
+    if planning_contract >= 2:
+        if any(plan.schema_version != 2 for plan in plans):
+            raise PlanningError(
+                "COHERENCE_ERROR",
+                "mudança v2 exige todos os planos em schema_version 2",
+            )
+        expected_roadmap = _roadmap_document(plans)
+        roadmap_path = directory / "ROADMAP.md"
+        if roadmap_path.is_symlink() or not roadmap_path.is_file():
+            raise PlanningError("COHERENCE_ERROR", "ROADMAP.md ausente")
+        if roadmap_path.read_text(encoding="utf-8") != expected_roadmap:
+            raise PlanningError(
+                "COHERENCE_ERROR",
+                "ROADMAP.md diverge dos planos; execute roadmap sync",
+            )
+        requirements = _scope_requirements(directory)
+        artifact_manifest = _artifact_manifest(directory)
+        review_input_digest = _review_input_digest(
+            planning_contract, artifact_manifest
+        )
+    findings = StructuralValidator().validate(
+        current,
+        plans,
+        expected,
+        requirements=requirements,
+        require_typed_tasks=planning_contract >= 2,
+    )
+    if planning_contract >= 2:
+        try:
+            schedule = _schedule(plans)
+        except ValueError:
+            # O StructuralValidator já materializa o erro de grafo. Não deixe
+            # uma projeção derivada esconder os findings acionáveis.
+            schedule = None
     semantic: dict[str, Any] | None
     if structural_only:
         semantic = None
@@ -262,7 +500,11 @@ def coherence_check(
             "Relatório semântico não foi fornecido."
         ).to_mapping()
     else:
-        semantic = _read_semantic_report(semantic_report, SemanticReviewer())
+        semantic = _read_semantic_report(
+            semantic_report,
+            SemanticReviewer(),
+            expected_inputs=review_input_digest if planning_contract >= 2 else None,
+        )
     mappings = [finding.to_mapping() for finding in findings]
     if semantic is not None:
         mappings.extend(semantic["findings"])
@@ -278,9 +520,18 @@ def coherence_check(
         status = "structurally_valid"
     else:
         status = "ready_for_approval"
-    package_digest = _package_digest(current, expected, plans, mappings, semantic)
+    package_digest = _package_digest(
+        current,
+        expected,
+        plans,
+        mappings,
+        semantic,
+        planning_contract=planning_contract,
+        artifact_manifest=artifact_manifest,
+    )
     payload = {
         "schema_version": 1,
+        "planning_contract": planning_contract,
         "change": directory.name,
         "status": status,
         "structural_only": structural_only,
@@ -291,6 +542,9 @@ def coherence_check(
             "expected": expected.digest(),
         },
         "plans": [plan.to_mapping() for plan in plans],
+        "artifact_manifest": artifact_manifest,
+        "review_input_digest": review_input_digest,
+        "schedule": schedule,
         "impact": None,
         "stale_plans": [],
         "approval": None,
@@ -333,11 +587,15 @@ def coherence_check(
     workspace.write_state(state)
     return {
         "change": directory.name,
+        "planning_contract": planning_contract,
         "status": status,
         "digest": payload["digest"],
         "findings": mappings,
         "structural_findings": len(findings),
         "semantic_available": semantic.get("available") if semantic else None,
+        "artifact_manifest": artifact_manifest,
+        "review_input_digest": review_input_digest,
+        "schedule": schedule,
     }
 
 
@@ -379,7 +637,31 @@ def coherence_approve(
         raise PlanningError(
             "WARNING_UNRESOLVED", "ERRORs e WARNINGs abertos impedem aprovação"
         )
-    current_digest = _package_digest(current, expected, plans, findings, semantic)
+    planning_contract = int(payload.get("planning_contract", 1))
+    artifact_manifest = (
+        _artifact_manifest(directory) if planning_contract >= 2 else {}
+    )
+    if planning_contract >= 2:
+        if artifact_manifest != payload.get("artifact_manifest"):
+            raise PlanningError(
+                "STALE_EVIDENCE", "artefatos mudaram depois da revisão semântica"
+            )
+        expected_review_input = _review_input_digest(
+            planning_contract, artifact_manifest
+        )
+        if payload.get("review_input_digest") != expected_review_input:
+            raise PlanningError(
+                "STALE_EVIDENCE", "manifest revisado diverge do pacote atual"
+            )
+    current_digest = _package_digest(
+        current,
+        expected,
+        plans,
+        findings,
+        semantic,
+        planning_contract=planning_contract,
+        artifact_manifest=artifact_manifest,
+    )
     if digest != payload.get("digest") or digest != current_digest:
         raise PlanningError(
             "STALE_EVIDENCE", "digest informado não corresponde ao pacote atual"
@@ -572,16 +854,39 @@ def plan_complete(
     actual_delta: Path,
     result: str,
     verification: Iterable[str],
+    completed_tasks: Iterable[str] = (),
 ) -> dict[str, Any]:
     """Registra a entrega real e rejeita drift silencioso do contrato aprovado."""
 
-    workspace, directory, current, _, plans = _load_package(repo, change)
+    workspace, directory, current, expected, plans = _load_package(repo, change)
     coherence = read_frontmatter(directory / "COHERENCE.md")
     if coherence.get("status") not in {"approved", "approved_with_stale"}:
         raise PlanningError("COHERENCE_ERROR", "plano exige pacote global aprovado")
+    _assert_approved_package_current(directory, current, expected, plans, coherence)
     if plan_id in coherence.get("stale_plans", []):
         raise PlanningError("IMPACT_STALE", f"{plan_id} está stale")
     plan = _plan_by_id(plans, plan_id)
+    completed_task_ids = list(
+        dict.fromkeys(value.strip() for value in completed_tasks if value.strip())
+    )
+    if plan.schema_version == 2:
+        expected_tasks = [task.id for task in plan.tasks]
+        if completed_task_ids != expected_tasks:
+            missing = [task for task in expected_tasks if task not in completed_task_ids]
+            unknown = [task for task in completed_task_ids if task not in expected_tasks]
+            details = []
+            if missing:
+                details.append("ausentes: " + ", ".join(missing))
+            if unknown:
+                details.append("desconhecidas: " + ", ".join(unknown))
+            if not details:
+                details.append("ordem divergente do plano")
+            raise PlanningError(
+                "DOCVIVA_INCOMPLETE",
+                "conclusão exige todas as tarefas na ordem aprovada ("
+                + "; ".join(details)
+                + ")",
+            )
     results = _result_payloads(directory)
     if plan_id in results:
         raise PlanningError("COHERENCE_ERROR", f"{plan_id} já possui resultado")
@@ -633,6 +938,7 @@ def plan_complete(
         "model_before_digest": effective_before.digest(),
         "model_after_digest": effective_after.digest(),
         "verification": evidence,
+        "completed_tasks": completed_task_ids,
         "impact": {
             "radius": "local",
             "stale_plans": [],
@@ -670,6 +976,7 @@ def plan_complete(
         "plan": plan.id,
         "status": "completed",
         "model_digest": effective_after.digest(),
+        "completed_tasks": completed_task_ids,
         "next_plan": pending[0] if pending else None,
     }
 
@@ -692,11 +999,15 @@ def execution_workspace_create(
         raise PlanningError("DIRTY_WORKSPACE", f"--repo deve apontar para {root}")
     if _git(root, "status", "--porcelain"):
         raise PlanningError("DIRTY_WORKSPACE", "workspace de execução exige Git limpo")
-    workspace, directory, current, _, plans = _load_package(root, change)
+    workspace, directory, current, expected, plans = _load_package(root, change)
     state = workspace.read_state()
     coherence = read_frontmatter(directory / "COHERENCE.md")
     if coherence.get("status") not in {"approved", "approved_with_stale"}:
         raise PlanningError("COHERENCE_ERROR", "planejamento exige COHERENCE approved")
+    planning_contract = int(coherence.get("planning_contract", 1))
+    manifest = _assert_approved_package_current(
+        directory, current, expected, plans, coherence
+    )
     if plan in coherence.get("stale_plans", []):
         raise PlanningError("IMPACT_STALE", f"{plan} está stale")
     contract = _plan_by_id(plans, plan)
@@ -720,7 +1031,12 @@ def execution_workspace_create(
     if len(plan_matches) != 1:
         raise PlanningError("MODEL_MISMATCH", f"{plan} deve localizar exatamente um plano")
     head = _git(root, "rev-parse", "HEAD")
-    for required in (directory / "COHERENCE.md", directory / "SYSTEM_MODEL.md", plan_matches[0]):
+    required_paths = [directory / "COHERENCE.md"]
+    if planning_contract >= 2:
+        required_paths.extend(directory / relative for relative in manifest)
+    else:
+        required_paths.extend((directory / "SYSTEM_MODEL.md", plan_matches[0]))
+    for required in required_paths:
         relative = required.relative_to(root).as_posix()
         if not _git(root, "ls-files", "--error-unmatch", relative):
             raise PlanningError("COHERENCE_ERROR", f"pacote não commitado: {relative}")
@@ -864,8 +1180,20 @@ def close_change(repo: Path, change: str) -> dict[str, Any]:
     semantic = coherence.get("semantic")
     if not isinstance(findings, list) or not isinstance(semantic, dict):
         raise PlanningError("COHERENCE_ERROR", "auditoria global está incompleta")
-    package_digest = _package_digest(current, expected, plans, findings, semantic)
-    if package_digest != coherence.get("digest"):
+    planning_contract = int(coherence.get("planning_contract", 1))
+    artifact_manifest = _assert_approved_package_current(
+        directory, current, expected, plans, coherence
+    )
+    package_digest = _package_digest(
+        current,
+        expected,
+        plans,
+        findings,
+        semantic,
+        planning_contract=planning_contract,
+        artifact_manifest=artifact_manifest,
+    )
+    if planning_contract < 2 and package_digest != coherence.get("digest"):
         raise PlanningError("STALE_EVIDENCE", "pacote aprovado mudou após o checkpoint")
     results = _result_payloads(directory)
     missing = [plan.id for plan in plans if plan.id not in results]
@@ -879,13 +1207,28 @@ def close_change(repo: Path, change: str) -> dict[str, Any]:
             raise PlanningError("IMPACT_STALE", f"resultado de {plan.id} diverge do delta aprovado")
         if not result.get("verification"):
             raise PlanningError("STALE_EVIDENCE", f"resultado de {plan.id} não possui verificação")
+        if plan.schema_version == 2 and result.get("completed_tasks") != [
+            task.id for task in plan.tasks
+        ]:
+            raise PlanningError(
+                "DOCVIVA_INCOMPLETE",
+                f"resultado de {plan.id} não comprova todas as tarefas",
+            )
     calculated = _effective_model(current, plans, results)
     differences = calculated.differences(expected)
     if differences:
         raise PlanningError(
             "MODEL_MISMATCH", "modelo entregue diverge do SYSTEM_MODEL final"
         )
-    closing_findings = StructuralValidator().validate(current, plans, expected)
+    closing_findings = StructuralValidator().validate(
+        current,
+        plans,
+        expected,
+        requirements=(
+            _scope_requirements(directory) if planning_contract >= 2 else ()
+        ),
+        require_typed_tasks=planning_contract >= 2,
+    )
     if any(finding.severity is Severity.ERROR for finding in closing_findings):
         raise PlanningError("COHERENCE_ERROR", "auditoria estrutural final encontrou ERROR")
     archive = workspace.archive_dir / directory.name
@@ -965,6 +1308,7 @@ __all__ = [
     "create_change",
     "impact_analyze",
     "plan_complete",
+    "sync_roadmap",
     "execution_workspace_check",
     "execution_workspace_create",
     "execution_workspace_locate",
