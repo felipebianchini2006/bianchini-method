@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -127,6 +128,40 @@ func TestReleaseCommitMustResolveToCurrentHead(t *testing.T) {
 	}
 	if resolved != head {
 		t.Fatalf("resolved=%s, esperado %s", resolved, head)
+	}
+}
+
+func TestReleaseBuilderMustBeClean(t *testing.T) {
+	root := t.TempDir()
+	builder := filepath.Join(root, "tools", "bm-release", "main.go")
+	if err := os.MkdirAll(filepath.Dir(builder), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(builder, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, arguments := range [][]string{
+		{"init", "-b", "main"},
+		{"config", "user.name", "BM Release Test"},
+		{"config", "user.email", "release@example.invalid"},
+		{"add", "tools/bm-release/main.go"},
+		{"commit", "-m", "initial builder"},
+	} {
+		command := exec.Command("git", arguments...)
+		command.Dir = root
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", arguments, err, output)
+		}
+	}
+	if err := requireCleanReleaseInputs(root); err != nil {
+		t.Fatalf("builder limpo foi rejeitado: %v", err)
+	}
+	if err := os.WriteFile(builder, []byte("package main\n// dirty\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := requireCleanReleaseInputs(root)
+	if err == nil || !strings.Contains(err.Error(), "tools/bm-release/main.go") {
+		t.Fatalf("builder alterado não foi rejeitado: %v", err)
 	}
 }
 

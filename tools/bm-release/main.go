@@ -262,7 +262,7 @@ func resolveReleaseCommit(root, requested string) (string, error) {
 
 func requireCleanReleaseInputs(root string) error {
 	status, err := gitOutput(root, "status", "--porcelain=v1", "--untracked-files=all", "--",
-		"cmd", "internal", "go.mod", "go.sum", "skills", "LICENSE", "THIRD_PARTY_NOTICES.md")
+		"cmd", "internal", "tools/bm-release", "go.mod", "go.sum", "skills", "LICENSE", "THIRD_PARTY_NOTICES.md")
 	if err != nil {
 		return err
 	}
