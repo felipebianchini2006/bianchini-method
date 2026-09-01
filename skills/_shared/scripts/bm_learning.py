@@ -10,7 +10,7 @@ import re
 import subprocess
 import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 from bm_project_model import read_frontmatter
@@ -163,7 +163,9 @@ def _text_list(value: Any, label: str, *, required: bool = False) -> list[str]:
     return result
 
 
-def _extract_candidate(root: Path, source: Path) -> dict[str, Any] | None:
+def _extract_candidate(
+    root: Path, source: Path, *, source_identity: str | None = None
+) -> dict[str, Any] | None:
     try:
         payload = read_frontmatter(source)
     except (OSError, UnicodeError, ValueError) as error:
@@ -197,7 +199,7 @@ def _extract_candidate(root: Path, source: Path) -> dict[str, Any] | None:
         _fail("LEARNING_CANDIDATE_INVALID", "validity obrigatória")
     tags = _text_list(raw.get("tags"), "tags", required=True)
     conflicts = _text_list(raw.get("conflicts"), "conflicts")
-    relative = source.relative_to(root).as_posix()
+    relative = source_identity or source.relative_to(root).as_posix()
     source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
     base = {
         "schema_version": 1,
@@ -215,6 +217,26 @@ def _extract_candidate(root: Path, source: Path) -> dict[str, Any] | None:
     candidate = {"id": identifier, **base}
     candidate["digest"] = _digest(candidate)
     return candidate
+
+
+def candidate_from_source(
+    repo: str | Path, source: str | Path, *, source_identity: str | None = None
+) -> dict[str, Any] | None:
+    """Reconstrói o candidato sem persistência e com identidade histórica opcional."""
+
+    root = _repo_root(repo)
+    path = Path(source)
+    if not path.is_absolute():
+        path = root / path
+    path = path.absolute()
+    if path.is_symlink() or not path.is_file():
+        _fail("LEARNING_PATH_INVALID", "fonte governada inválida")
+    path = path.resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        _fail("LEARNING_PATH_INVALID", "fonte governada fora do repo")
+    return _extract_candidate(root, path, source_identity=source_identity)
 
 
 def propose_learning(repo: str | Path, since: str | None = None) -> dict[str, Any]:
@@ -273,7 +295,59 @@ def _load_candidate(root: Path, candidate: str) -> tuple[Path, dict[str, Any]]:
     unsigned = {key: item for key, item in value.items() if key != "digest"}
     if stored_digest != _digest(unsigned):
         _fail("STALE_EVIDENCE", "digest interno do candidato divergiu")
+    expected_fields = {
+        "id",
+        "schema_version",
+        "status",
+        "classification",
+        "statement",
+        "tags",
+        "validity",
+        "conflicts",
+        "evidence",
+        "source",
+        "source_digest",
+        "digest",
+    }
+    if set(value) != expected_fields or value.get("schema_version") != 1:
+        _fail("STALE_EVIDENCE", "schema do candidato divergiu")
+    if value.get("status") != "pending" or value.get("classification") not in CLASSIFICATIONS:
+        _fail("STALE_EVIDENCE", "estado do candidato divergiu")
+    base = {key: item for key, item in unsigned.items() if key != "id"}
+    expected_id = "L" + _digest(base)[:12].upper()
+    if value.get("id") != candidate or expected_id != candidate:
+        _fail("STALE_EVIDENCE", "ID não deriva do conteúdo do candidato")
+    for field in ("tags", "conflicts", "evidence"):
+        _text_list(value.get(field), field, required=field != "conflicts")
+    for field in ("statement", "validity", "source"):
+        if not isinstance(value.get(field), str) or not value[field].strip():
+            _fail("STALE_EVIDENCE", f"{field} inválido no candidato")
+    if not isinstance(value.get("source_digest"), str) or not re.fullmatch(
+        r"[0-9a-f]{64}", value["source_digest"]
+    ):
+        _fail("STALE_EVIDENCE", "source_digest inválido no candidato")
     return path, value
+
+
+def _safe_source(root: Path, value: str) -> Path:
+    if "\\" in value:
+        _fail("LEARNING_PATH_INVALID", "source contém barra invertida")
+    relative = PurePosixPath(value)
+    if (
+        relative.is_absolute()
+        or value != relative.as_posix()
+        or any(part in {"", ".", ".."} for part in relative.parts)
+        or any(part.casefold() == ".planning" for part in relative.parts)
+    ):
+        _fail("LEARNING_PATH_INVALID", "source deve ser path relativo confinado")
+    candidate = root
+    for part in relative.parts:
+        candidate = candidate / part
+        if candidate.is_symlink():
+            _fail("LEARNING_PATH_INVALID", "source não aceita symlink")
+    if not candidate.is_file():
+        _fail("STALE_EVIDENCE", "fonte do candidato desapareceu")
+    return candidate
 
 
 def approve_learning(
@@ -290,11 +364,14 @@ def approve_learning(
             "LEARNING_DESTINATION_REQUIRED",
             "classificação pertence a outro mecanismo de verdade",
         )
-    original = root / str(value.get("source"))
-    if original.is_symlink() or not original.is_file():
-        _fail("STALE_EVIDENCE", "fonte do candidato desapareceu")
+    original = _safe_source(root, str(value.get("source")))
+    if original not in _source_paths(root, None):
+        _fail("LEARNING_PATH_INVALID", "source não pertence ao conjunto governado")
     if hashlib.sha256(original.read_bytes()).hexdigest() != value.get("source_digest"):
         _fail("STALE_EVIDENCE", "fonte do candidato mudou")
+    expected = _extract_candidate(root, original)
+    if expected is None or _canonical(expected) != _canonical(value):
+        _fail("STALE_EVIDENCE", "candidato não deriva da fonte governada atual")
     approved = {
         **{key: item for key, item in value.items() if key != "digest"},
         "status": "approved",
@@ -314,6 +391,55 @@ def approve_learning(
         "status": "approved",
         "path": target.relative_to(root).as_posix(),
         "digest": digest,
+    }
+
+
+def deactivate_learning(
+    repo: str | Path, candidate: str, reason: str, deactivated_by: str
+) -> dict[str, Any]:
+    """Desativa uma lição sem apagar sua aprovação nem seu histórico."""
+
+    root = _repo_root(repo)
+    if not CANDIDATE_ID.fullmatch(candidate):
+        _fail("LEARNING_CANDIDATE_INVALID", "ID de lição inválido")
+    if not isinstance(reason, str) or not reason.strip():
+        _fail("LEARNING_DEACTIVATION_INVALID", "desativação exige motivo")
+    if not isinstance(deactivated_by, str) or not re.fullmatch(
+        r"human:[^\s:][^\s]*", deactivated_by
+    ):
+        _fail("HUMAN_APPROVAL_REQUIRED", "deactivated_by exige identidade human:<id>")
+    lessons = _fixed_dir(root, ".bianchini/current/lessons", create=False)
+    path = lessons / f"{candidate}.json"
+    if path.is_symlink() or not path.is_file():
+        _fail("LEARNING_CANDIDATE_INVALID", f"lição ausente: {candidate}")
+    raw = path.read_bytes()
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as error:
+        _fail("STALE_EVIDENCE", f"lição corrompida: {error}")
+    if not isinstance(value, dict) or _canonical(value) != raw:
+        _fail("STALE_EVIDENCE", "lição não está em forma canônica")
+    if (
+        value.get("id") != candidate
+        or value.get("status") != "approved"
+        or value.get("active", True) is False
+        or not isinstance(value.get("approved_by"), str)
+        or not isinstance(value.get("approved_digest"), str)
+    ):
+        _fail("STALE_EVIDENCE", "lição aprovada possui estado inválido")
+    deactivated = {
+        **value,
+        "active": False,
+        "deactivated_by": deactivated_by,
+        "deactivated_at": _now(),
+        "deactivation_reason": reason.strip(),
+    }
+    _atomic_write(path, _canonical(deactivated))
+    return {
+        "id": candidate,
+        "status": "approved",
+        "active": False,
+        "path": path.relative_to(root).as_posix(),
     }
 
 
@@ -377,6 +503,8 @@ def list_learning(repo: str | Path) -> dict[str, Any]:
 __all__ = [
     "LearningError",
     "approve_learning",
+    "candidate_from_source",
+    "deactivate_learning",
     "list_learning",
     "propose_learning",
     "reject_learning",

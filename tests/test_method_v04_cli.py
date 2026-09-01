@@ -7,13 +7,20 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI = ROOT / "scripts" / "bm.py"
+SCRIPTS = ROOT / "skills/_shared/scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+import bm_close  # noqa: E402
 
 
 def cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -365,6 +372,111 @@ Nenhuma.
 
 
 class MethodV04Scenarios(unittest.TestCase):
+    def test_new_change_rejects_symlinked_current_spec_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            repo = base / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            current_specs = repo / ".bianchini/current/specs"
+            external = base / "external.md"
+            external.write_text(
+                "# Externo\n\n## SPEC-001: Não importar\n\nBytes externos.\n",
+                encoding="utf-8",
+            )
+            (current_specs / "system.md").symlink_to(external)
+            (current_specs / "MANIFEST.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "spec_contract": 1,
+                        "specs": [
+                            {
+                                "id": "system",
+                                "path": "system.md",
+                                "requirements": [
+                                    {"id": "SPEC-001", "scope": ["REQ-001"]}
+                                ],
+                            }
+                        ],
+                        "risk_coverage": [],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = repo / ".bianchini/STATE.md"
+            changes = repo / ".bianchini/changes"
+            counter = repo / ".bianchini/.runtime/id-counters.json"
+            state_before = state_path.read_bytes()
+            changes_before = tree_digest(changes)
+            counter_before = counter.read_bytes() if counter.exists() else None
+
+            completed = cli(
+                "model",
+                "init",
+                "--repo",
+                str(repo),
+                "--change",
+                "must-not-import-symlink",
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("SPEC_SYMLINK", completed.stderr)
+            self.assertEqual(state_path.read_bytes(), state_before)
+            self.assertEqual(tree_digest(changes), changes_before)
+            self.assertEqual(
+                counter.read_bytes() if counter.exists() else None,
+                counter_before,
+            )
+
+    def test_new_change_snapshots_valid_managed_current_specs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            current_specs = repo / ".bianchini/current/specs"
+            content = b"# Sistema\n\n## SPEC-001: Contrato atual\n\nPreservar bytes.\n"
+            (current_specs / "system.md").write_bytes(content)
+            (current_specs / "MANIFEST.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "spec_contract": 1,
+                        "specs": [
+                            {
+                                "id": "system",
+                                "path": "system.md",
+                                "requirements": [
+                                    {"id": "SPEC-001", "scope": ["REQ-001"]}
+                                ],
+                            }
+                        ],
+                        "risk_coverage": [],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            change = cli_json(
+                "model", "init", "--repo", str(repo), "--change", "safe-snapshot"
+            )
+
+            expected = (
+                repo
+                / ".bianchini/changes"
+                / str(change["change"])
+                / "specs/expected/system.md"
+            )
+            self.assertEqual(expected.read_bytes(), content)
+
     def test_new_change_declares_managed_spec_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -1662,11 +1774,46 @@ class MethodV04Scenarios(unittest.TestCase):
             git(repo, "add", ".")
             git(repo, "commit", "-m", "complete billing plan")
 
+            original_atomic_write = bm_close._atomic_write
+            crashed = False
+
+            def crash_during_inputs(path: Path, content: bytes) -> None:
+                nonlocal crashed
+                original_atomic_write(path, content)
+                if (
+                    not crashed
+                    and path.parent.name == "inputs"
+                    and path.name == "SYSTEM_MODEL.md"
+                ):
+                    crashed = True
+                    raise bm_close.SimulatedCloseCrash("INPUTS_MATERIALIZED")
+
+            with mock.patch.object(
+                bm_close, "_atomic_write", side_effect=crash_during_inputs
+            ):
+                with self.assertRaises(bm_close.SimulatedCloseCrash):
+                    bm_close.crash_recoverable_close(
+                        repo.resolve(),
+                        change_id,
+                        specs_source=(change_root / "specs/expected").resolve(),
+                        specs_manifest=(change_root / "specs/MANIFEST.json").resolve(),
+                        summary=b"interrupted-summary\n",
+                        next_state=b"interrupted-state\n",
+                    )
+            pending = bm_close.pending_close(repo)
+            self.assertIsNotNone(pending)
+            assert pending is not None
+            self.assertEqual(pending["phase"], "PREPARING")
+
             closed = cli_json(
                 "cycle-close", "--repo", str(repo), "--change", change_id
             )
 
             self.assertEqual(closed["status"], "completed")
+            self.assertTrue(closed["recovered"])
+            self.assertTrue(closed["specs_promoted"])
+            self.assertEqual(closed["specs_status"], "managed")
+            self.assertIn("model_digest", closed)
             self.assertFalse(change_root.exists())
             archive = repo / ".bianchini/archive" / change_id
             self.assertTrue((archive / "SUMMARY.md").is_file())
@@ -1717,12 +1864,12 @@ class MethodV04Scenarios(unittest.TestCase):
                 coherence_path.read_text(encoding="utf-8").split("---", 2)[1]
             )
             coherence_header["schema_version"] = 1
-            coherence_header.pop("planning_contract")
             coherence_header.pop("spec_contract")
             coherence_path.write_text(
                 markdown_document(coherence_header, "Coerência legada"),
                 encoding="utf-8",
             )
+            shutil.rmtree(change_root / "specs")
             delta = {"contracts": {"add": [{"id": "legacy_contract"}]}}
             (change_root / "SYSTEM_MODEL.md").write_text(
                 markdown_document(
@@ -1733,16 +1880,26 @@ class MethodV04Scenarios(unittest.TestCase):
             )
             (change_root / "plans/P01.md").write_text(
                 markdown_document(
-                    {
-                        "id": "P01",
-                        "acceptance": ["legado preservado"],
-                        "verifications": ["test_legacy"],
-                        "model_delta": delta,
-                    },
+                    typed_plan(
+                        "P01",
+                        requirements=["REQ-001"],
+                        tasks=[typed_task("T01", covers=["REQ-001"])],
+                        provides=["legacy_contract"],
+                        model_delta=delta,
+                    ),
                     "P01",
                 ),
                 encoding="utf-8",
             )
+            (change_root / "SCOPE.md").write_text(
+                planning_scope("REQ-001"), encoding="utf-8"
+            )
+            cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
+            validated = cli_json(
+                "model", "validate", "--repo", str(repo), "--change", change_id
+            )
+            self.assertTrue(validated["valid"])
+            self.assertNotIn("spec_contract", validated)
             structural = cli_json(
                 "coherence",
                 "check",
@@ -1774,7 +1931,8 @@ class MethodV04Scenarios(unittest.TestCase):
                 "--semantic-report",
                 str(semantic),
             )
-            self.assertEqual(checked["planning_contract"], 1)
+            self.assertEqual(checked["planning_contract"], 2)
+            self.assertNotIn("spec_contract", checked)
             cli_json(
                 "coherence",
                 "approve",
@@ -1804,6 +1962,8 @@ class MethodV04Scenarios(unittest.TestCase):
                 "Contrato legado entregue",
                 "--verification",
                 "test_legacy passou",
+                "--completed-task",
+                "T01",
             )
             git(repo, "add", ".")
             git(repo, "commit", "-m", "complete legacy change")
@@ -1813,6 +1973,9 @@ class MethodV04Scenarios(unittest.TestCase):
             )
 
             self.assertEqual(closed["status"], "completed")
+            self.assertEqual(
+                set(closed), {"change", "status", "archive", "model_digest"}
+            )
             self.assertEqual(tree_digest(current_specs), specs_before)
             summary = json.loads(
                 (
@@ -1821,6 +1984,7 @@ class MethodV04Scenarios(unittest.TestCase):
             )
             self.assertNotIn("spec_contract", summary)
             self.assertNotIn("specs_promoted", summary)
+            self.assertNotIn("specs_status", summary)
 
     def test_direct_risk_classification_is_deterministic(self) -> None:
         normal = cli_json(

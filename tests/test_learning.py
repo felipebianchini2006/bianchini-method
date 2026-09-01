@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -17,6 +18,7 @@ if str(SCRIPTS) not in sys.path:
 from bm_learning import (  # noqa: E402
     LearningError,
     approve_learning,
+    deactivate_learning,
     list_learning,
     propose_learning,
     reject_learning,
@@ -124,6 +126,94 @@ class GovernedLearningScenarios(unittest.TestCase):
             self.assertFalse((repo / "skills").exists())
             self.assertFalse((repo / "schemas").exists())
 
+    def test_forged_candidate_and_source_escape_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            repo = self.make_repo(base)
+            outside = base / "outside.md"
+            outside.write_text("evidência externa\n", encoding="utf-8")
+            self.write_source(repo)
+            candidate = propose_learning(repo)["candidates"][0]
+            pending = repo / str(candidate["path"])
+            value = json.loads(pending.read_text(encoding="utf-8"))
+            value["source"] = "../outside.md"
+            unsigned = {key: item for key, item in value.items() if key != "digest"}
+            value["digest"] = hashlib.sha256(
+                (json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
+            ).hexdigest()
+            pending.write_text(
+                json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(LearningError, "STALE_EVIDENCE|LEARNING_PATH_INVALID"):
+                approve_learning(repo, str(candidate["id"]), str(value["digest"]), "human:test")
+
+            base_value = {
+                key: item
+                for key, item in value.items()
+                if key not in {"id", "digest"}
+            }
+            base_value["source"] = "README.md"
+            base_value["source_digest"] = hashlib.sha256(
+                (repo / "README.md").read_bytes()
+            ).hexdigest()
+            base_bytes = (
+                json.dumps(
+                    base_value,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
+            ).encode()
+            forged_id = "L" + hashlib.sha256(base_bytes).hexdigest()[:12].upper()
+            forged = {"id": forged_id, **base_value}
+            forged["digest"] = hashlib.sha256(
+                (
+                    json.dumps(
+                        forged,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                ).encode()
+            ).hexdigest()
+            forged_path = pending.parent / f"{forged_id}.json"
+            forged_path.write_text(
+                json.dumps(
+                    forged,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(LearningError, "LEARNING_PATH_INVALID"):
+                approve_learning(
+                    repo, forged_id, str(forged["digest"]), "human:test"
+                )
+
+    def test_approved_lesson_can_be_deactivated_without_deleting_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            self.write_source(repo)
+            candidate = propose_learning(repo)["candidates"][0]
+            approved = approve_learning(
+                repo, candidate["id"], candidate["digest"], "human:felipe"
+            )
+            result = deactivate_learning(
+                repo, candidate["id"], "contrato substituído", "human:felipe"
+            )
+            self.assertFalse(result["active"])
+            value = json.loads((repo / approved["path"]).read_text(encoding="utf-8"))
+            self.assertEqual(value["status"], "approved")
+            self.assertFalse(value["active"])
+            self.assertEqual(value["deactivation_reason"], "contrato substituído")
+            self.assertEqual(value["approved_by"], "human:felipe")
+
     def test_rejection_preserves_history_without_active_lesson(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = self.make_repo(Path(temp))
@@ -135,7 +225,7 @@ class GovernedLearningScenarios(unittest.TestCase):
             self.assertTrue((repo / rejected["path"]).is_file())
             self.assertEqual(list((repo / ".bianchini/current/lessons").glob("*")), [])
 
-    def test_cli_exposes_opt_in_propose_list_approve_and_reject(self) -> None:
+    def test_cli_exposes_opt_in_propose_list_approve_reject_and_deactivate(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = self.make_repo(Path(temp))
             self.write_source(repo)
@@ -159,6 +249,20 @@ class GovernedLearningScenarios(unittest.TestCase):
             )
             self.assertEqual(approved.returncode, 0, approved.stderr)
             self.assertEqual(json.loads(approved.stdout)["status"], "approved")
+            deactivated = self.run_bm(
+                "learn",
+                "deactivate",
+                "--repo",
+                str(repo),
+                "--candidate",
+                candidate["id"],
+                "--reason",
+                "contrato substituído",
+                "--approved-by",
+                "human:felipe",
+            )
+            self.assertEqual(deactivated.returncode, 0, deactivated.stderr)
+            self.assertFalse(json.loads(deactivated.stdout)["active"])
 
     def test_normal_workspace_initialization_creates_no_approved_lesson(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

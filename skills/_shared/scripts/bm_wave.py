@@ -9,8 +9,9 @@ import re
 from pathlib import Path
 from typing import Any
 
+import bm_spec_package
 from bm_coherence import DependencyGraph, TaskDependencyGraph
-from bm_project_model import PlanContract
+from bm_project_model import PlanContract, ProjectModel
 
 
 CHANGE_PREFIX = re.compile(r"^C[0-9]{3}$")
@@ -19,6 +20,38 @@ PLAN_ID = re.compile(r"^P[0-9]{2,}$")
 TASK_ID = re.compile(r"^T[0-9]{2,}$")
 APPROVED_STATUSES = frozenset({"approved", "approved_with_stale"})
 BLOCKING_SEVERITIES = frozenset({"ERROR", "WARNING"})
+PLAN_RESULT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "change",
+        "plan",
+        "status",
+        "result",
+        "promised_delta_digest",
+        "actual_delta",
+        "actual_delta_digest",
+        "model_before_digest",
+        "model_after_digest",
+        "verification",
+        "completed_tasks",
+        "impact",
+        "completed_at",
+    }
+)
+TASK_RESULT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "change",
+        "plan",
+        "task",
+        "status",
+        "expected_result",
+        "result",
+        "covers",
+        "verification",
+        "completed_at",
+    }
+)
 
 
 class WaveError(ValueError):
@@ -32,6 +65,26 @@ class WaveError(ValueError):
 
 def _fail(code: str, message: str) -> None:
     raise WaveError(code, message)
+
+
+def _stable_digest(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _nonempty_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip()) and value == value.strip()
+
+
+def _evidence(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(_nonempty_text(item) for item in value)
+    )
 
 
 def _root(repo: str | Path) -> Path:
@@ -211,6 +264,10 @@ def _validate_approval(coherence: dict[str, Any]) -> tuple[str, set[str]]:
     approval = coherence.get("approval")
     if not isinstance(approval, dict) or approval.get("digest") != digest:
         _fail("WAVE_INCOMPLETE", "COHERENCE.md não vincula aprovação ao pacote")
+    if not _nonempty_text(approval.get("approved_by")) or not _nonempty_text(
+        approval.get("approved_at")
+    ):
+        _fail("WAVE_INCOMPLETE", "COHERENCE.md possui aprovação incompleta")
     stale = coherence.get("stale_plans", [])
     if not isinstance(stale, list) or not all(isinstance(value, str) for value in stale):
         _fail("WAVE_INCOMPLETE", "COHERENCE.md.stale_plans exige lista")
@@ -222,25 +279,156 @@ def _validate_artifact_manifest(
     change: Path,
     coherence: dict[str, Any],
     plan_ids: list[str],
-) -> None:
+) -> dict[str, str]:
     manifest = coherence.get("artifact_manifest")
     if not isinstance(manifest, dict):
         _fail("WAVE_INCOMPLETE", "pacote aprovado exige artifact_manifest")
-    required = ["ROADMAP.md", *(f"plans/{identifier}.md" for identifier in plan_ids)]
-    missing = [relative for relative in required if relative not in manifest]
-    if missing:
+    required = [
+        "SCOPE.md",
+        "RESEARCH.md",
+        "ARCHITECTURE.md",
+        "SYSTEM_MODEL.md",
+        "ROADMAP.md",
+        *(f"plans/{identifier}.md" for identifier in plan_ids),
+    ]
+    if set(manifest) != set(required):
+        missing = sorted(set(required) - set(manifest))
+        extra = sorted(set(manifest) - set(required))
+        details = []
+        if missing:
+            details.append("ausentes: " + ", ".join(missing))
+        if extra:
+            details.append("desconhecidos: " + ", ".join(extra))
         _fail(
             "WAVE_INCOMPLETE",
-            "artifact_manifest não contém: " + ", ".join(missing),
+            "artifact_manifest diverge do pacote (" + "; ".join(details) + ")",
         )
+    actual_manifest: dict[str, str] = {}
     for relative in required:
         expected = manifest.get(relative)
         if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
             _fail("WAVE_INCOMPLETE", f"digest inválido no artifact_manifest: {relative}")
         path = _safe_file(root, change / relative, f"artefato {relative}")
-        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        try:
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as error:
+            _fail("WAVE_INCOMPLETE", f"artefato {relative} não pode ser lido: {error}")
         if actual != expected:
             _fail("WAVE_INCOMPLETE", f"pacote aprovado sofreu drift: {relative}")
+        actual_manifest[relative] = actual
+    return actual_manifest
+
+
+def _spec_digest_payload(spec_package: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "spec_contract": spec_package["spec_contract"],
+        "spec_base_digest": spec_package["base_digest"],
+        "spec_target_digest": spec_package["target_digest"],
+        "spec_manifest_digest": spec_package["manifest_digest"],
+        "spec_diff_digest": spec_package["diff_digest"],
+    }
+
+
+def _validate_current_package(
+    root: Path,
+    change: Path,
+    coherence: dict[str, Any],
+    plans: list[PlanContract],
+    artifact_manifest: dict[str, str],
+) -> str:
+    if (
+        coherence.get("schema_version") != 2
+        or coherence.get("planning_contract") != 2
+        or coherence.get("spec_contract") != 1
+        or coherence.get("change") != change.name
+    ):
+        _fail(
+            "WAVE_INCOMPLETE",
+            "próxima onda exige COHERENCE schema 2, planning_contract 2 e spec_contract 1",
+        )
+    findings = coherence.get("findings")
+    semantic = coherence.get("semantic")
+    if not isinstance(findings, list) or not isinstance(semantic, dict):
+        _fail("WAVE_INCOMPLETE", "pacote aprovado possui revisão incompleta")
+    try:
+        current_path = _safe_file(
+            root, root / ".bianchini/current/SYSTEM_MODEL.md", "SYSTEM_MODEL atual"
+        )
+        expected_path = _safe_file(
+            root, change / "SYSTEM_MODEL.md", "SYSTEM_MODEL esperado"
+        )
+        current = ProjectModel.from_system_model(current_path)
+        expected = ProjectModel.from_system_model(expected_path)
+    except (OSError, UnicodeError, ValueError) as error:
+        _fail("WAVE_INCOMPLETE", f"ProjectModel inválido: {error}")
+    try:
+        spec_package = bm_spec_package.load_spec_package(
+            change_dir=change,
+            current_specs=root / ".bianchini/current/specs",
+            scope_path=change / "SCOPE.md",
+            coherence=coherence,
+        )
+    except bm_spec_package.SpecPackageError as error:
+        _fail("WAVE_INCOMPLETE", str(error))
+    if spec_package.get("managed") is not True:
+        _fail("WAVE_INCOMPLETE", "próxima onda exige pacote de specs gerenciado")
+    spec_digests = _spec_digest_payload(spec_package)
+    if any(coherence.get(key) != value for key, value in spec_digests.items()):
+        _fail("WAVE_INCOMPLETE", "digests do pacote de specs sofreram drift")
+    expected_review_input = _stable_digest(
+        {
+            "planning_contract": 2,
+            "artifact_manifest": artifact_manifest,
+            "spec_package": spec_digests,
+        }
+    )
+    if coherence.get("review_input_digest") != expected_review_input:
+        _fail("WAVE_INCOMPLETE", "entrada aprovada de revisão sofreu drift")
+    package_digest = _stable_digest(
+        {
+            "current": current.to_mapping(),
+            "expected": expected.to_mapping(),
+            "plans": [plan.to_mapping() for plan in plans],
+            "findings": findings,
+            "semantic": semantic,
+            "planning_contract": 2,
+            "artifact_manifest": artifact_manifest,
+            "spec_package": spec_digests,
+        }
+    )
+    if coherence.get("digest") != package_digest:
+        _fail("WAVE_INCOMPLETE", "digest aprovado não corresponde ao pacote atual")
+    return package_digest
+
+
+def _validate_state_approval(
+    root: Path, state: dict[str, Any], change: Path, package_digest: str
+) -> None:
+    if state.get("schema_version") != 1 or state.get("method") != "0.4":
+        _fail("WAVE_INCOMPLETE", "STATE.md possui contrato inválido")
+    if state.get("digest") != package_digest:
+        _fail("WAVE_INCOMPLETE", "STATE.md não referencia o pacote aprovado atual")
+    active = state.get("active_work")
+    if not isinstance(active, dict) or active.get("kind") != "change" or active.get(
+        "id"
+    ) != change.name:
+        _fail("WAVE_INCOMPLETE", "STATE.md não referencia a mudança aprovada")
+    approved_lifecycle = {
+        "approved",
+        "approved_with_stale",
+        "executing",
+        "blocked",
+        "pending_close",
+    }
+    if state.get("status") not in approved_lifecycle or active.get(
+        "status"
+    ) not in approved_lifecycle:
+        _fail("WAVE_NOT_APPROVED", "STATE.md não está no ciclo do pacote aprovado")
+    pointers = state.get("pointers")
+    expected_pointer = f".bianchini/changes/{change.name}/COHERENCE.md"
+    if not isinstance(pointers, dict) or pointers.get("coherence") != expected_pointer:
+        _fail("WAVE_INCOMPLETE", "STATE.md não aponta para o COHERENCE aprovado")
+    _safe_file(root, root / expected_pointer, "COHERENCE apontado por STATE.md")
 
 
 def _completed_results(
@@ -251,6 +439,8 @@ def _completed_results(
     known_plans = {plan.id: plan for plan in plans}
     completed_plans: set[str] = set()
     completed_tasks: dict[str, set[str]] = {plan.id: set() for plan in plans}
+    plan_results: dict[str, dict[str, Any]] = {}
+    task_results: dict[tuple[str, str], dict[str, Any]] = {}
     results_dir = change / "results"
     for child in _children(root, results_dir, "results"):
         if not child.is_file() or not PLAN_ID.fullmatch(child.stem):
@@ -258,16 +448,9 @@ def _completed_results(
         if child.stem not in known_plans:
             _fail("WAVE_INCOMPLETE", f"resultado pertence a plano desconhecido: {child.stem}")
         value = _frontmatter(root, child, f"resultado {child.stem}")
-        if value.get("status") != "completed" or value.get("plan") != child.stem:
-            _fail("WAVE_INCOMPLETE", f"resultado inválido de {child.stem}")
         contract = known_plans[child.stem]
-        if contract.schema_version == 2 and value.get("completed_tasks") != [
-            task.id for task in contract.tasks
-        ]:
-            _fail(
-                "WAVE_INCOMPLETE",
-                f"resultado de {child.stem} não comprova todas as tarefas",
-            )
+        _validate_plan_result(value, contract, change.name)
+        plan_results[child.stem] = value
         completed_plans.add(child.stem)
 
     tasks_root = results_dir / "tasks"
@@ -278,7 +461,8 @@ def _completed_results(
                     "WAVE_INCOMPLETE",
                     f"resultado de tarefa pertence a plano desconhecido: {plan_dir.name}",
                 )
-            known_tasks = {task.id for task in known_plans[plan_dir.name].tasks}
+            contract = known_plans[plan_dir.name]
+            known_tasks = {task.id: task for task in contract.tasks}
             for child in _children(root, plan_dir, f"tarefas de {plan_dir.name}"):
                 if not child.is_file() or not TASK_ID.fullmatch(child.stem):
                     _fail("WAVE_INCOMPLETE", f"resultado de tarefa inválido: {child.name}")
@@ -290,17 +474,109 @@ def _completed_results(
                 value = _frontmatter(
                     root, child, f"resultado {plan_dir.name}/{child.stem}"
                 )
-                if (
-                    value.get("status") != "completed"
-                    or value.get("plan") != plan_dir.name
-                    or value.get("task") != child.stem
-                ):
+                _validate_task_result(
+                    value,
+                    change.name,
+                    plan_dir.name,
+                    known_tasks[child.stem],
+                )
+                task_results[(plan_dir.name, child.stem)] = value
+                completed_tasks[plan_dir.name].add(child.stem)
+
+    for plan_id, plan_result in plan_results.items():
+        contract = known_plans[plan_id]
+        if contract.schema_version != 2:
+            continue
+        missing = [
+            task.id
+            for task in contract.tasks
+            if (plan_id, task.id) not in task_results
+        ]
+        if missing:
+            _fail(
+                "WAVE_INCOMPLETE",
+                f"resultado de {plan_id} não possui evidência das tarefas: {', '.join(missing)}",
+            )
+        for task in contract.tasks:
+            task_result = task_results[(plan_id, task.id)]
+            for field in ("result", "verification", "completed_at"):
+                if task_result.get(field) != plan_result.get(field):
                     _fail(
                         "WAVE_INCOMPLETE",
-                        f"resultado inválido de {plan_dir.name}/{child.stem}",
+                        f"resultado de {plan_id}/{task.id} diverge do plano em {field}",
                     )
-                completed_tasks[plan_dir.name].add(child.stem)
     return completed_plans, completed_tasks
+
+
+def _validate_plan_result(
+    value: dict[str, Any], contract: PlanContract, change_name: str
+) -> None:
+    if set(value) != PLAN_RESULT_FIELDS:
+        _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} possui shape não canônico")
+    if (
+        type(value.get("schema_version")) is not int
+        or value.get("schema_version") != 1
+        or value.get("change") != change_name
+        or value.get("plan") != contract.id
+        or value.get("status") != "completed"
+        or not _nonempty_text(value.get("result"))
+        or not _nonempty_text(value.get("completed_at"))
+    ):
+        _fail("WAVE_INCOMPLETE", f"resultado inválido de {contract.id}")
+    if not _evidence(value.get("verification")):
+        _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} não possui verificação")
+    actual_delta = value.get("actual_delta")
+    if not isinstance(actual_delta, dict) or actual_delta != contract.model_delta:
+        _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} diverge do delta aprovado")
+    promised_digest = _stable_digest(contract.model_delta)
+    if value.get("promised_delta_digest") != promised_digest:
+        _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} alterou o delta prometido")
+    if value.get("actual_delta_digest") != _stable_digest(actual_delta):
+        _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} possui digest de delta inválido")
+    for field in ("model_before_digest", "model_after_digest"):
+        if not isinstance(value.get(field), str) or not re.fullmatch(
+            r"[0-9a-f]{64}", value[field]
+        ):
+            _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} possui {field} inválido")
+    if not actual_delta and value.get("model_before_digest") != value.get(
+        "model_after_digest"
+    ):
+        _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} forjou mudança de modelo")
+    expected_tasks = [task.id for task in contract.tasks]
+    if value.get("completed_tasks") != expected_tasks:
+        _fail(
+            "WAVE_INCOMPLETE",
+            f"resultado de {contract.id} não comprova todas as tarefas",
+        )
+    if value.get("impact") != {
+        "radius": "local",
+        "stale_plans": [],
+        "reason": "entrega equivalente ao delta aprovado",
+    }:
+        _fail("WAVE_INCOMPLETE", f"resultado de {contract.id} possui impacto não canônico")
+
+
+def _validate_task_result(
+    value: dict[str, Any], change_name: str, plan_id: str, task: Any
+) -> None:
+    identity = f"{plan_id}/{task.id}"
+    if set(value) != TASK_RESULT_FIELDS:
+        _fail("WAVE_INCOMPLETE", f"resultado de {identity} possui shape não canônico")
+    if (
+        type(value.get("schema_version")) is not int
+        or value.get("schema_version") != 1
+        or value.get("change") != change_name
+        or value.get("plan") != plan_id
+        or value.get("task") != task.id
+        or value.get("status") != "completed"
+        or value.get("expected_result") != task.result
+        or value.get("covers") != list(task.covers)
+        or not _nonempty_text(value.get("result"))
+        or not _nonempty_text(value.get("completed_at"))
+    ):
+        _fail("WAVE_INCOMPLETE", f"resultado inválido de {identity}")
+    if not _evidence(value.get("verification")):
+        _fail("WAVE_INCOMPLETE", f"resultado de {identity} não possui verificação")
 
 
 def _blocking_findings(
@@ -357,9 +633,17 @@ def next_wave(repo: str | Path, change: str) -> dict[str, Any]:
     unknown_stale = stale_plans - set(plan_ids)
     if unknown_stale:
         _fail("WAVE_INCOMPLETE", "stale_plans referencia plano inexistente")
-    _validate_artifact_manifest(root, directory, coherence, plan_ids)
+    artifact_manifest = _validate_artifact_manifest(
+        root, directory, coherence, plan_ids
+    )
+    current_package_digest = _validate_current_package(
+        root, directory, coherence, plans, artifact_manifest
+    )
+    if current_package_digest != package_digest:
+        _fail("WAVE_INCOMPLETE", "aprovação diverge do pacote recalculado")
 
     state = _frontmatter(root, root / ".bianchini/STATE.md", "STATE.md")
+    _validate_state_approval(root, state, directory, package_digest)
     state_blockers = state.get("blockers", [])
     if not isinstance(state_blockers, list) or not all(
         isinstance(value, str) for value in state_blockers

@@ -2,6 +2,7 @@
   "schema_version": 1,
   "phase": 2,
   "measured_at": "2026-09-01",
+  "remeasured_after_audit": true,
   "context": {
     "measurement": "bytes de SKILL.md mais pack compilado em fixture versionada",
     "default_max_bytes": 16384,
@@ -12,26 +13,26 @@
         "unit": "C001/P01/T01",
         "before_bytes": 35309,
         "before_files": 3,
-        "skill_bytes_after": 9409,
+        "skill_bytes_after": 9607,
         "pack_bytes": 5924,
-        "after_bytes": 15333,
+        "after_bytes": 15531,
         "after_files": 2,
         "pack_sources": 15,
-        "reduction_bytes": 19976,
-        "reduction_percent": 56.57
+        "reduction_bytes": 19778,
+        "reduction_percent": 56.01
       },
       {
         "skill": "executar-direto",
         "unit": "Q012",
         "before_bytes": 28559,
         "before_files": 2,
-        "skill_bytes_after": 8259,
+        "skill_bytes_after": 8808,
         "pack_bytes": 1432,
-        "after_bytes": 9691,
+        "after_bytes": 10240,
         "after_files": 2,
         "pack_sources": 3,
-        "reduction_bytes": 18868,
-        "reduction_percent": 66.07
+        "reduction_bytes": 18319,
+        "reduction_percent": 64.14
       },
       {
         "skill": "corrigir-bug",
@@ -51,13 +52,13 @@
         "unit": "RC:build-a",
         "before_bytes": 30528,
         "before_files": 2,
-        "skill_bytes_after": 10190,
-        "pack_bytes": 1789,
-        "after_bytes": 11979,
+        "skill_bytes_after": 10727,
+        "pack_bytes": 1865,
+        "after_bytes": 12592,
         "after_files": 2,
         "pack_sources": 3,
-        "reduction_bytes": 18549,
-        "reduction_percent": 60.76
+        "reduction_bytes": 17936,
+        "reduction_percent": 58.75
       },
       {
         "skill": "status-projeto",

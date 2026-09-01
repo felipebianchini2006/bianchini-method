@@ -290,12 +290,84 @@ def _change_directory(workspace: MethodWorkspace, reference: str) -> Path:
     return directory
 
 
+def _current_spec_snapshot(
+    workspace: MethodWorkspace,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Valida a base gerenciada inteira antes de reservar ID ou criar change."""
+
+    current_specs = workspace.current_specs
+    manifest_path = current_specs / "MANIFEST.json"
+    try:
+        trusted_specs = bm_spec_package.confined_no_symlink(
+            workspace.root,
+            current_specs,
+            "base de specs",
+        )
+        if not trusted_specs.is_dir():
+            raise bm_spec_package.SpecPackageError(
+                "SPEC_PATH_INVALID", "base de specs não é diretório"
+            )
+        entries: list[Path] = []
+        for candidate in sorted(
+            trusted_specs.rglob("*"), key=lambda item: item.as_posix()
+        ):
+            inspected = bm_spec_package.confined_no_symlink(
+                workspace.root,
+                candidate,
+                "entrada da base de specs",
+            )
+            if not inspected.is_dir() and not inspected.is_file():
+                raise bm_spec_package.SpecPackageError(
+                    "SPEC_PATH_INVALID",
+                    f"entrada de spec inválida: {candidate}",
+                )
+            entries.append(inspected)
+        if manifest_path.exists():
+            manifest = bm_spec_package.validate_manifest(
+                manifest_path,
+                trusted_root=workspace.root,
+            )
+        else:
+            if any(candidate.is_file() for candidate in entries):
+                raise bm_spec_package.SpecPackageError(
+                    "SPEC_BASE_MANIFEST_MISSING",
+                    "specs atuais legadas exigem manifesto explícito antes de change schema 2",
+                )
+            manifest = {
+                "schema_version": 1,
+                "spec_contract": SPEC_CONTRACT_VERSION,
+                "specs": [],
+                "risk_coverage": [],
+            }
+        if manifest["specs"]:
+            tree = bm_spec_package.inspect_spec_tree(
+                current_specs,
+                trusted_root=workspace.root,
+                required=True,
+                allow_root_manifest=True,
+            )
+            manifest_paths = [item["path"] for item in manifest["specs"]]
+            tree_paths = sorted(tree["requirements"])
+            if manifest_paths != tree_paths:
+                raise bm_spec_package.SpecPackageError(
+                    "SPEC_BASE_MANIFEST_MISMATCH",
+                    "paths do manifesto da base não correspondem às specs aceitas",
+                )
+            bm_spec_package._validate_target_requirements(manifest, tree)
+        else:
+            tree = {"files": {}, "requirements": {}}
+    except bm_spec_package.SpecPackageError as error:
+        raise PlanningError(error.code, str(error).split(": ", 1)[-1]) from error
+    return manifest, tree
+
+
 def create_change(repo: Path, name: str) -> dict[str, Any]:
     workspace = MethodWorkspace(repo)
     state = workspace.read_state()
     if state.get("active_work"):
         raise PlanningError("COHERENCE_ERROR", "já existe trabalho ativo")
     slug = _slug(name)
+    current_manifest, current_tree = _current_spec_snapshot(workspace)
     identifier = workspace.allocate_id("change")
     work_id = f"{identifier}-{slug}"
     directory = workspace.changes_dir / work_id
@@ -320,14 +392,6 @@ def create_change(repo: Path, name: str) -> dict[str, Any]:
         current_specs = workspace.current_specs
         base_manifest_path = current_specs / "MANIFEST.json"
         if not base_manifest_path.exists():
-            existing_spec_files = [
-                path for path in current_specs.rglob("*") if path.is_file()
-            ]
-            if existing_spec_files:
-                raise PlanningError(
-                    "SPEC_BASE_MANIFEST_MISSING",
-                    "specs atuais legadas exigem manifesto explícito antes de change schema 2",
-                )
             workspace.atomic_write(
                 base_manifest_path,
                 json.dumps(
@@ -343,15 +407,10 @@ def create_change(repo: Path, name: str) -> dict[str, Any]:
                 )
                 + "\n",
             )
-        current_manifest = bm_spec_package.validate_manifest(
-            base_manifest_path,
-            trusted_root=workspace.root,
-        )
         for spec in current_manifest["specs"]:
-            source = current_specs / spec["path"]
             destination = expected_specs / spec["path"]
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, destination)
+            workspace.atomic_write(destination, current_tree["files"][spec["path"]])
         workspace.atomic_write(
             directory / "specs" / "MANIFEST.json",
             json.dumps(
@@ -1340,10 +1399,26 @@ def execution_workspace_check(repo: Path) -> dict[str, Any]:
     return {"valid": True, "branch": branch, "workspace": str(root), "metadata": value}
 
 
+def _public_close_result(
+    result: dict[str, Any],
+    *,
+    model_digest: str,
+    specs_promoted: bool,
+    specs_status: str,
+) -> dict[str, Any]:
+    return {
+        **result,
+        "model_digest": model_digest,
+        "specs_promoted": specs_promoted,
+        "specs_status": specs_status,
+    }
+
+
 def close_change(repo: Path, change: str) -> dict[str, Any]:
     """Promove o modelo final para ``current`` e arquiva o ciclo completo."""
 
     root = repo.resolve()
+    preparing_recovered = False
     try:
         pending = bm_close.pending_close(root)
         if pending is not None:
@@ -1355,7 +1430,20 @@ def close_change(repo: Path, change: str) -> dict[str, Any]:
             recovered = bm_close.recover_pending_close(root)
             if recovered is None:
                 raise PlanningError("JOURNAL_CORRUPT", "journal desapareceu durante recovery")
-            return recovered
+            if recovered.get("status") != "restored":
+                try:
+                    recovered_model = ProjectModel.from_system_model(
+                        MethodWorkspace(root).current_system_model
+                    )
+                except ValueError as error:
+                    raise PlanningError("MODEL_MISMATCH", str(error)) from error
+                return _public_close_result(
+                    recovered,
+                    model_digest=recovered_model.digest(),
+                    specs_promoted=True,
+                    specs_status="managed",
+                )
+            preparing_recovered = True
     except bm_close.CloseRecoveryError as error:
         raise PlanningError(error.code, str(error).split(": ", 1)[-1]) from error
     if _git(root, "status", "--porcelain"):
@@ -1500,12 +1588,14 @@ def close_change(repo: Path, change: str) -> dict[str, Any]:
             )
         except bm_close.CloseRecoveryError as error:
             raise PlanningError(error.code, str(error).split(": ", 1)[-1]) from error
-        return {
-            **result,
-            "model_digest": expected.digest(),
-            "specs_promoted": True,
-            "specs_status": "managed",
-        }
+        if preparing_recovered:
+            result = {**result, "recovered": True}
+        return _public_close_result(
+            result,
+            model_digest=expected.digest(),
+            specs_promoted=True,
+            specs_status="managed",
+        )
     workspace.atomic_write(
         directory / "SUMMARY.md",
         summary_document,

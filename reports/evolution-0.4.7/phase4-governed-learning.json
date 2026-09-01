@@ -5,7 +5,8 @@
     "bm learn propose --repo <repo> [--since <ref>]",
     "bm learn list --repo <repo>",
     "bm learn approve --repo <repo> --candidate <id> --digest <digest> --approved-by human:<id>",
-    "bm learn reject --repo <repo> --candidate <id> --reason <texto>"
+    "bm learn reject --repo <repo> --candidate <id> --reason <texto>",
+    "bm learn deactivate --repo <repo> --candidate <id> --reason <texto> --approved-by human:<id>"
   ],
   "opt_in": true,
   "automatic_approval": false,

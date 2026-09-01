@@ -49,7 +49,7 @@ def verify() -> dict[str, Any]:
 
     _error(errors, registry["schema_version"] == 1, "schema_version deve ser 1")
     _error(errors, len(registry["commands"]) == 31, "registry deve conter 31 comandos")
-    _error(errors, len(surfaces) == 57, "registry deve conter 57 superfícies")
+    _error(errors, len(surfaces) == 58, "registry deve conter 58 superfícies")
     _error(errors, registry["command_count"] == len(parser), "command_count divergente")
     actual_surface_count = sum(len(value["actions"]) for value in parser.values())
     _error(errors, registry["surface_count"] == actual_surface_count, "surface_count divergente")

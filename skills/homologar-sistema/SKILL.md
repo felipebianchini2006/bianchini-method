@@ -24,9 +24,10 @@ Automação reduz repetição, mas não elimina o passe real. Um E2E pode servir
 
 1. Ler `.bianchini/STATE.md` e executar `bm.py model validate --repo <repo>`.
 2. Confirmar mudança, planos e resultados concluídos, além do fingerprint completo do RC: `id`, `revision`, `build`, `checksum`.
-3. Compilar `bm.py context pack --repo <repo> --unit RC:<fingerprint>` e usar somente suas referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a homologação; não montar contexto manual.
-4. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
-5. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
+3. Localizar a raiz única do ciclo do RC em `.bianchini/changes/Cxxx-*` ou, após o `cycle-close`, em `.bianchini/archive/Cxxx-*`. Criar ali `results/HOMOLOGATION.md` com frontmatter mínimo `schema_version: 1`, `fingerprint`, `change`, `status: running`, listas vazias de `gates`, `blockers`, `findings` e `required_refs` apontando somente para resultados já existentes do mesmo ciclo. Não sobrescrever uma homologação existente.
+4. Compilar `bm.py context pack --repo <repo> --unit RC:<fingerprint>` e usar somente suas referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a homologação; não montar contexto manual.
+5. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
+6. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
 
 Não homologar árvore fonte quando a entrega é outro artefato. Se uma plataforma com interface não puder ser iniciada e operada, registrar `not_run` e declarar `BLOQUEADO`; nunca inferir aprovação pelo código.
 
@@ -50,7 +51,7 @@ Não iniciar novo planejamento, campanha de arquitetura ou redesign durante homo
 
 Ler critérios e jornadas das specs, plataformas/perfis do escopo, contratos dos planos e resultados registrados. Depois, inspecionar a navegação do RC para inventariar telas, menus, rotas e ações expostas.
 
-Criar `.bianchini/changes/Cxxx-*/results/HOMOLOGATION.md`:
+Completar o `results/HOMOLOGATION.md` inicial na raiz do ciclo já localizada, em `changes` ou `archive`, sem apagar o frontmatter e as evidências anteriores:
 
 ```markdown
 | ID | Plataforma | Perfil | Jornada ou ação | Automação | Execução real | Visual | Resultado | Evidência |

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -21,6 +22,7 @@ from bm_context import (  # noqa: E402
     compile_context_pack,
     verify_context_pack,
 )
+from bm_learning import approve_learning, propose_learning  # noqa: E402
 
 
 def frontmatter(value: dict[str, object], title: str) -> str:
@@ -409,6 +411,18 @@ class ContextPackScenarios(unittest.TestCase):
             self.assertEqual(rc_payload["context"]["release_candidate"]["fingerprint"], "build-a")
             self.assertIn("release-candidate:build-a", rc_payload["required_refs"])
 
+            change = root / ".bianchini/changes/C001-context"
+            archived = root / ".bianchini/archive/C001-context"
+            change.replace(archived)
+            archived_pack = compile_context_pack(root, "RC:build-a")
+            archived_payload = json.loads(
+                (root / str(archived_pack["path"])).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                archived_payload["context"]["source"],
+                ".bianchini/archive/C001-context/results/HOMOLOGATION.md",
+            )
+
     def test_cache_and_verify_bind_identity_head_and_source_digests(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = self.make_repo(Path(temp))
@@ -434,53 +448,205 @@ class ContextPackScenarios(unittest.TestCase):
             after_head = compile_context_pack(root, "C001/P01/T01")
             self.assertFalse(after_head["cache_hit"])
 
+    def test_verify_recompiles_context_and_rejects_canonical_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = self.make_repo(Path(temp))
+            result = compile_context_pack(root, "C001/P01/T01")
+            pack = root / str(result["path"])
+            payload = json.loads(pack.read_text(encoding="utf-8"))
+            payload["context"]["task"]["result"] = "resultado adulterado"
+            pack.write_text(
+                json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ContextPackError, "STALE_EVIDENCE"):
+                verify_context_pack(root, pack)
+
     def test_only_relevant_approved_lesson_enters_pack_and_conflict_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = self.make_repo(Path(temp))
+            results = root / ".bianchini/changes/C001-context/results/learning"
+            results.mkdir()
+            candidates = (
+                ("relevant", "Usar escrita durável.", ["session-state"], []),
+                ("irrelevant", "Não deve entrar.", ["src/other.py"], []),
+            )
+            for name, statement, tags, conflicts in candidates:
+                (results / f"{name}.md").write_text(
+                    frontmatter(
+                        {
+                            "status": "completed",
+                            "green": True,
+                            "evidence": ["teste determinístico passou"],
+                            "learning_candidate": {
+                                "classification": "repeatable_procedure",
+                                "statement": statement,
+                                "tags": tags,
+                                "validity": "Enquanto o contrato session-state existir.",
+                                "conflicts": conflicts,
+                            },
+                        },
+                        name,
+                    ),
+                    encoding="utf-8",
+                )
+            proposed = propose_learning(root)
+            approved_ids: dict[str, str] = {}
+            for item in proposed["candidates"]:
+                pending = json.loads((root / str(item["path"])).read_text(encoding="utf-8"))
+                approved_ids[pending["statement"]] = str(item["id"])
+                approve_learning(root, str(item["id"]), str(item["digest"]), "human:test")
+            relevant_id = approved_ids["Usar escrita durável."]
             lessons = root / ".bianchini/current/lessons"
-            lessons.mkdir()
-            relevant = {
-                "id": "L001",
-                "status": "approved",
-                "active": True,
-                "tags": {"seams": ["session-state"]},
-                "lesson": "Usar escrita durável.",
-                "conflicts": [],
-            }
-            irrelevant = {
-                "id": "L002",
-                "status": "approved",
-                "tags": {"paths": ["src/other.py"]},
-                "lesson": "Não deve entrar.",
-                "conflicts": [],
-            }
             pending = {
-                "id": "L003",
+                "id": "L000000000000",
                 "status": "pending",
                 "tags": ["session-state"],
                 "lesson": "Não aprovado.",
                 "conflicts": [],
             }
-            for value in (relevant, irrelevant, pending):
-                (lessons / f"{value['id']}.json").write_text(
-                    json.dumps(value, sort_keys=True) + "\n", encoding="utf-8"
-                )
+            (lessons / f"{pending['id']}.json").write_text(
+                json.dumps(pending, sort_keys=True) + "\n", encoding="utf-8"
+            )
             result = compile_context_pack(root, "C001/P01/T01")
             payload = json.loads((root / str(result["path"])).read_text(encoding="utf-8"))
             self.assertEqual(
                 [item["id"] for item in payload["context"]["approved_lessons"]],
-                ["L001"],
+                [relevant_id],
             )
 
-            conflicting = {
-                "id": "L004",
+            (results / "irrelevant.md").unlink()
+            archived_source = (
+                root
+                / ".bianchini/archive/C001-context/results/learning/relevant.md"
+            )
+            archived_source.parent.mkdir(parents=True)
+            (results / "relevant.md").replace(archived_source)
+            moved = compile_context_pack(root, "C001/P01/T01")
+            moved_payload = json.loads(
+                (root / str(moved["path"])).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                [item["id"] for item in moved_payload["context"]["approved_lessons"]],
+                [relevant_id],
+            )
+
+            conflict_source = results / "conflict.md"
+            conflict_source.write_text(
+                frontmatter(
+                    {
+                        "status": "completed",
+                        "green": True,
+                        "evidence": ["conflito demonstrado"],
+                        "learning_candidate": {
+                            "classification": "deterministic_invariant",
+                            "statement": "Conflito explícito.",
+                            "tags": ["session-state"],
+                            "validity": "Enquanto a regra anterior existir.",
+                            "conflicts": [relevant_id],
+                        },
+                    },
+                    "Conflito",
+                ),
+                encoding="utf-8",
+            )
+            conflict = next(
+                item
+                for item in propose_learning(root)["candidates"]
+                if json.loads((root / str(item["path"])).read_text(encoding="utf-8"))["statement"]
+                == "Conflito explícito."
+            )
+            approve_learning(
+                root,
+                str(conflict["id"]),
+                str(conflict["digest"]),
+                "human:test",
+            )
+            with self.assertRaisesRegex(ContextPackError, "PACK_INCOMPLETE"):
+                compile_context_pack(root, "C001/P01/T01")
+
+    def test_forged_approved_lesson_is_never_injected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = self.make_repo(Path(temp))
+            lessons = root / ".bianchini/current/lessons"
+            lessons.mkdir()
+            forged = {
+                "id": "LAAAAAAAAAAAA",
+                "schema_version": 1,
                 "status": "approved",
+                "active": True,
+                "classification": "repeatable_procedure",
+                "statement": "Não confiar nesta lição.",
                 "tags": ["session-state"],
-                "lesson": "Conflito explícito.",
-                "conflicts": ["L001"],
+                "validity": "Sempre.",
+                "conflicts": [],
+                "evidence": ["nenhuma"],
+                "source": ".bianchini/changes/C001-context/results/P00.md",
+                "source_digest": "0" * 64,
+                "approved_by": "human:forged",
+                "approved_digest": "0" * 64,
+                "approved_at": "2026-09-01T00:00:00Z",
             }
-            (lessons / "L004.json").write_text(
-                json.dumps(conflicting, sort_keys=True) + "\n", encoding="utf-8"
+            (lessons / "LAAAAAAAAAAAA.json").write_text(
+                json.dumps(forged, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ContextPackError, "PACK_INCOMPLETE"):
+                compile_context_pack(root, "C001/P01/T01")
+
+            source = root / ".bianchini/changes/C001-context/results/P00.md"
+            base = {
+                "schema_version": 1,
+                "status": "pending",
+                "classification": "repeatable_procedure",
+                "statement": "FORGED_ARBITRARY_LESSON",
+                "tags": ["session-state"],
+                "validity": "Sempre.",
+                "conflicts": [],
+                "evidence": ["forjada"],
+                "source": ".bianchini/changes/C001-context/results/P00.md",
+                "source_digest": hashlib.sha256(source.read_bytes()).hexdigest(),
+            }
+            canonical_base = (
+                json.dumps(base, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                + "\n"
+            ).encode()
+            identifier = "L" + hashlib.sha256(canonical_base).hexdigest()[:12].upper()
+            candidate = {"id": identifier, **base}
+            candidate_digest = hashlib.sha256(
+                (
+                    json.dumps(
+                        candidate,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                ).encode()
+            ).hexdigest()
+            approved = {
+                **{key: item for key, item in candidate.items() if key != "status"},
+                "status": "approved",
+                "active": True,
+                "approved_by": "human:forged",
+                "approved_digest": candidate_digest,
+                "approved_at": "2026-09-01T00:00:00Z",
+            }
+            (lessons / "LAAAAAAAAAAAA.json").unlink()
+            (lessons / f"{identifier}.json").write_text(
+                json.dumps(
+                    approved,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
             )
             with self.assertRaisesRegex(ContextPackError, "PACK_INCOMPLETE"):
                 compile_context_pack(root, "C001/P01/T01")
@@ -503,6 +669,21 @@ class ContextPackScenarios(unittest.TestCase):
             root = self.make_repo(base)
             with self.assertRaisesRegex(ContextPackError, "PATH_UNSAFE"):
                 compile_context_pack(root, "C001/P01", output=base / "escape.json")
+
+            protected = root / "README.md"
+            protected.write_text("conteúdo protegido\n", encoding="utf-8")
+            before = protected.read_bytes()
+            with self.assertRaisesRegex(ContextPackError, "PATH_UNSAFE"):
+                compile_context_pack(root, "C001/P01", output=protected)
+            self.assertEqual(protected.read_bytes(), before)
+            self.assertFalse((root / ".bianchini/.runtime/context").exists())
+
+            with self.assertRaisesRegex(ContextPackError, "PATH_UNSAFE"):
+                compile_context_pack(
+                    root,
+                    "C001/P01",
+                    output=root / ".bianchini/current/STATE.md",
+                )
 
             internal = root / ".bianchini/context-real"
             internal.mkdir()

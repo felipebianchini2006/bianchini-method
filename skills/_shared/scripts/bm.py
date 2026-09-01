@@ -40,6 +40,7 @@ from bm_host_adapters import HostAdapterError, install_adapter, render_adapter
 from bm_learning import (
     LearningError,
     approve_learning,
+    deactivate_learning,
     list_learning,
     propose_learning,
     reject_learning,
@@ -4027,7 +4028,9 @@ def parser() -> argparse.ArgumentParser:
     adapter.add_argument("--overwrite", action="store_true")
 
     learn = commands.add_parser("learn")
-    learn.add_argument("action", choices=["propose", "list", "approve", "reject"])
+    learn.add_argument(
+        "action", choices=["propose", "list", "approve", "reject", "deactivate"]
+    )
     learn.add_argument("--repo", type=Path, default=Path.cwd())
     learn.add_argument("--since")
     learn.add_argument("--candidate")
@@ -4435,10 +4438,20 @@ def main() -> int:
                         args.repo, args.candidate, args.digest, args.approved_by
                     )
                 )
-            else:
+            elif args.action == "reject":
                 if not args.candidate or not args.reason:
                     raise BMError("learn reject exige --candidate e --reason")
                 emit(reject_learning(args.repo, args.candidate, args.reason))
+            else:
+                if not all((args.candidate, args.reason, args.approved_by)):
+                    raise BMError(
+                        "learn deactivate exige --candidate, --reason e --approved-by"
+                    )
+                emit(
+                    deactivate_learning(
+                        args.repo, args.candidate, args.reason, args.approved_by
+                    )
+                )
         elif args.command == "migrate":
             if args.action == "check":
                 emit(v04.migration_check(args.repo))

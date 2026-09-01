@@ -33,7 +33,7 @@ class CliContractScenarios(unittest.TestCase):
         self.assertTrue(result["valid"])
         self.assertEqual(result["unregistered_skill_surfaces"], [])
         self.assertEqual(result["command_count"], 31)
-        self.assertEqual(result["surface_count"], 57)
+        self.assertEqual(result["surface_count"], 58)
         self.assertEqual(result["negative_surface_count"], 4)
 
     def test_generated_document_is_reproducible_byte_for_byte(self) -> None:

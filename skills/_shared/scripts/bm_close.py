@@ -29,6 +29,7 @@ CLOSE_PHASES = (
     "STATE_COMMITTED",
     "DONE",
 )
+_PREPARING_PHASE = "PREPARING"
 _CHANGE_ID = re.compile(r"C[0-9]{3}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?")
 _JOURNAL_NAME = "cycle-close.json"
 _LOCK_NAME = "cycle-close.lock"
@@ -154,6 +155,24 @@ def _journal_path(root: Path) -> Path:
     return runtime / _JOURNAL_NAME
 
 
+def _reject_symlink_chain(repository: Path, relative: Path, label: str) -> None:
+    current = repository
+    for part in relative.parts:
+        current = current / part
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            break
+        except OSError as error:
+            raise CloseRecoveryError(
+                "PATH_UNSAFE", f"não foi possível inspecionar {label}: {current}"
+            ) from error
+        if stat.S_ISLNK(metadata.st_mode):
+            raise CloseRecoveryError(
+                "PATH_UNSAFE", f"{label} atravessa symlink: {current}"
+            )
+
+
 def _write_journal(path: Path, journal: dict[str, Any]) -> None:
     _atomic_write(
         path,
@@ -177,7 +196,7 @@ def _read_journal(root: Path) -> dict[str, Any] | None:
         raise CloseRecoveryError("JOURNAL_CORRUPT", "journal exige objeto JSON")
     if value.get("schema_version") != 1 or value.get("spec_contract") != 1:
         raise CloseRecoveryError("JOURNAL_CORRUPT", "versão do journal inválida")
-    if value.get("phase") not in CLOSE_PHASES:
+    if value.get("phase") not in {_PREPARING_PHASE, *CLOSE_PHASES}:
         raise CloseRecoveryError("JOURNAL_CORRUPT", "fase do journal inválida")
     change = value.get("change")
     if not isinstance(change, str) or _CHANGE_ID.fullmatch(change) is None:
@@ -202,6 +221,7 @@ def _read_journal(root: Path) -> dict[str, Any] | None:
         relative = Path(item)
         if relative.is_absolute() or ".." in relative.parts or ".planning" in relative.parts:
             raise CloseRecoveryError("JOURNAL_CORRUPT", "path inseguro no journal")
+        _reject_symlink_chain(repository, relative, "path do journal")
         resolved = (repository / relative).resolve()
         try:
             resolved.relative_to(repository)
@@ -213,7 +233,11 @@ def _read_journal(root: Path) -> dict[str, Any] | None:
     for moment in ("before", "after"):
         item = digests[moment]
         expected_keys = {"current", "change", "state"}
-        if moment == "after" and value["phase"] == "PREPARED" and item == {}:
+        if (
+            moment == "after"
+            and value["phase"] in {_PREPARING_PHASE, "PREPARED"}
+            and item == {}
+        ):
             continue
         if not isinstance(item, dict) or set(item) != expected_keys:
             raise CloseRecoveryError("JOURNAL_CORRUPT", f"digests {moment} inválidos")
@@ -224,6 +248,12 @@ def _read_journal(root: Path) -> dict[str, Any] | None:
             raise CloseRecoveryError("JOURNAL_CORRUPT", f"digest {moment} malformado")
     inputs = value.get("inputs")
     expected_inputs = {"architecture", "system_model", "specs", "summary", "state"}
+    if value["phase"] == _PREPARING_PHASE:
+        if inputs != {} or digests["after"] != {}:
+            raise CloseRecoveryError(
+                "JOURNAL_CORRUPT", "journal PREPARING contém digests prematuros"
+            )
+        return value
     if not isinstance(inputs, dict) or set(inputs) != expected_inputs:
         raise CloseRecoveryError("JOURNAL_CORRUPT", "digests de input inválidos")
     if not all(
@@ -270,7 +300,12 @@ def _exclusive_lock(root: Path) -> Iterator[None]:
 
 def _paths(root: Path, journal: dict[str, Any]) -> dict[str, Path]:
     repository = root.resolve()
-    return {key: repository / value for key, value in journal["paths"].items()}
+    result: dict[str, Path] = {}
+    for key, value in journal["paths"].items():
+        relative = Path(value)
+        _reject_symlink_chain(repository, relative, key)
+        result[key] = repository / relative
+    return result
 
 
 def _remove_known(path: Path, *, expected_digest: str | None = None) -> None:
@@ -547,6 +582,21 @@ def _prepare(
         )
         if ".." in raw_manifest.parts or ".planning" in raw_manifest.parts:
             raise CloseRecoveryError("PATH_UNSAFE", "specs manifest inseguro")
+        try:
+            manifest_relative = raw_manifest.absolute().relative_to(
+                change_dir.absolute()
+            )
+        except ValueError as error:
+            raise CloseRecoveryError(
+                "PATH_UNSAFE", "specs manifest fora do change"
+            ) from error
+        inspected = change_dir
+        for part in manifest_relative.parts:
+            inspected = inspected / part
+            if inspected.is_symlink():
+                raise CloseRecoveryError(
+                    "PATH_UNSAFE", f"symlink proibido: {inspected}"
+                )
         manifest_source = raw_manifest.resolve()
         try:
             manifest_source.relative_to(change_dir.resolve())
@@ -561,21 +611,11 @@ def _prepare(
     if transaction.exists() or transaction.is_symlink():
         raise CloseRecoveryError("RECOVERY_AMBIGUOUS", "staging órfão sem journal")
     runtime.mkdir(parents=True, exist_ok=True)
-    inputs = transaction / "inputs"
-    inputs.mkdir(parents=True)
-    _atomic_write(inputs / "ARCHITECTURE.md", architecture.read_bytes())
-    _atomic_write(inputs / "SYSTEM_MODEL.md", system_model.read_bytes())
-    _atomic_write(inputs / "SUMMARY.md", summary)
-    _atomic_write(inputs / "STATE.md", next_state)
-    _atomic_write(inputs / "STATE.before.md", state.read_bytes())
-    shutil.copytree(source, inputs / "specs")
-    if manifest_source is not None:
-        _atomic_write(inputs / "specs" / "MANIFEST.json", manifest_source.read_bytes())
     journal = {
         "schema_version": 1,
         "spec_contract": 1,
         "change": change,
-        "phase": "PREPARED",
+        "phase": _PREPARING_PHASE,
         "paths": {
             "current": _relative(repository, current),
             "change": _relative(repository, change_dir),
@@ -591,16 +631,65 @@ def _prepare(
             },
             "after": {},
         },
-        "inputs": {
-            "architecture": _file_digest(inputs / "ARCHITECTURE.md"),
-            "system_model": _file_digest(inputs / "SYSTEM_MODEL.md"),
-            "specs": _tree_digest(inputs / "specs"),
-            "summary": _file_digest(inputs / "SUMMARY.md"),
-            "state": _file_digest(inputs / "STATE.md"),
-        },
+        "inputs": {},
     }
     _write_journal(_journal_path(root), journal)
+    inputs = transaction / "inputs"
+    inputs.mkdir(parents=True)
+    _atomic_write(inputs / "ARCHITECTURE.md", architecture.read_bytes())
+    _atomic_write(inputs / "SYSTEM_MODEL.md", system_model.read_bytes())
+    _atomic_write(inputs / "SUMMARY.md", summary)
+    _atomic_write(inputs / "STATE.md", next_state)
+    _atomic_write(inputs / "STATE.before.md", state.read_bytes())
+    shutil.copytree(source, inputs / "specs")
+    if manifest_source is not None:
+        _atomic_write(inputs / "specs" / "MANIFEST.json", manifest_source.read_bytes())
+    journal["inputs"] = {
+        "architecture": _file_digest(inputs / "ARCHITECTURE.md"),
+        "system_model": _file_digest(inputs / "SYSTEM_MODEL.md"),
+        "specs": _tree_digest(inputs / "specs"),
+        "summary": _file_digest(inputs / "SUMMARY.md"),
+        "state": _file_digest(inputs / "STATE.md"),
+    }
+    journal["phase"] = "PREPARED"
+    _write_journal(_journal_path(root), journal)
     return journal
+
+
+def _discard_preparing(root: Path, journal: dict[str, Any]) -> dict[str, Any]:
+    """Volta um intent incompleto ao estado anterior sem tocar dados visíveis."""
+
+    if journal["phase"] != _PREPARING_PHASE:
+        raise CloseRecoveryError("RECOVERY_AMBIGUOUS", "journal não está preparando")
+    paths = _paths(root, journal)
+    before = journal["digests"]["before"]
+    _assert_digest(
+        _digest_if_present(paths["current"], directory=True),
+        before["current"],
+        "current durante preparação",
+    )
+    _assert_digest(
+        _digest_if_present(paths["change"], directory=True),
+        before["change"],
+        "change durante preparação",
+    )
+    _assert_digest(
+        _digest_if_present(paths["state"], directory=False),
+        before["state"],
+        "STATE.md durante preparação",
+    )
+    if paths["archive"].exists() or paths["archive"].is_symlink():
+        raise CloseRecoveryError(
+            "RECOVERY_AMBIGUOUS", "archive apareceu durante preparação"
+        )
+    transaction = paths["transaction"]
+    if transaction.exists() or transaction.is_symlink():
+        transaction_digest = _tree_digest(transaction)
+        _remove_known(transaction, expected_digest=transaction_digest)
+    journal_path = _journal_path(root)
+    journal_path.unlink()
+    _sync_directory(journal_path.parent)
+    return {"change": journal["change"], "status": "restored"}
 
 
 def _restore_tree(current: Path, backup: Path, before: str, after: str) -> None:
@@ -678,6 +767,8 @@ def recover_pending_close(
         journal = _read_journal(root)
         if journal is None:
             return None
+        if journal["phase"] == _PREPARING_PHASE:
+            return _discard_preparing(root, journal)
         if strategy == "restore":
             return _restore(root, journal)
         result = _advance(root, journal, failpoint)
@@ -711,7 +802,10 @@ def crash_recoverable_close(
                     "CLOSE_CONFLICT",
                     f"journal pendente pertence a {journal['change']}",
                 )
-        else:
+            if journal["phase"] == _PREPARING_PHASE:
+                _discard_preparing(root, journal)
+                journal = None
+        if journal is None:
             journal = _prepare(
                 root,
                 change,

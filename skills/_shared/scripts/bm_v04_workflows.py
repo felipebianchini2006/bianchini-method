@@ -323,6 +323,14 @@ def quick_start(
     state = read_state(root)
     if state.get("active_work"):
         raise WorkflowError("COHERENCE_ERROR", "já existe trabalho ativo")
+    head = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    base_head = head.stdout.strip() if head.returncode == 0 else "UNBORN"
     quick_id = MethodWorkspace(root).allocate_id("quick")
     slug = _slug(objective)
     work_id = f"{quick_id}-{slug}"
@@ -369,6 +377,7 @@ def quick_start(
         "docviva_contract": 1,
         "docviva_before": bm_docviva.snapshot_docviva(root),
         "id": work_id,
+        "base_head": base_head,
         "status": "active",
         "objective": objective,
         "scope": scope_text,
@@ -501,7 +510,7 @@ def quick_checkpoint(
     }
 
 
-def _quick_diff_paths(root: Path) -> list[str]:
+def _quick_diff_paths(root: Path, base_head: str | None = None) -> list[str]:
     head = subprocess.run(
         ["git", "rev-parse", "--verify", "HEAD"],
         cwd=root,
@@ -510,12 +519,43 @@ def _quick_diff_paths(root: Path) -> list[str]:
         check=False,
     )
     tracked_args = ["diff", "--name-only"]
-    if head.returncode == 0:
+    if base_head and base_head != "UNBORN":
+        base = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{base_head}^{{commit}}"],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", base_head, "HEAD"],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if base.returncode != 0 or ancestor.returncode != 0:
+            raise WorkflowError(
+                "STALE_EVIDENCE", "base Git do quick não pertence ao HEAD atual"
+            )
+        tracked_args.append(base_head)
+    elif head.returncode == 0 and base_head != "UNBORN":
         tracked_args.append("HEAD")
     tracked_args.extend(
         ["--", ".", ":(exclude).bianchini", ":(exclude).planning"]
     )
     tracked = set(_git(root, *tracked_args).splitlines())
+    if base_head == "UNBORN" and head.returncode == 0:
+        tracked.update(
+            _git(
+                root,
+                "ls-files",
+                "--",
+                ".",
+                ":(exclude).bianchini",
+                ":(exclude).planning",
+            ).splitlines()
+        )
     untracked = set(
         _git(
             root,
@@ -550,7 +590,7 @@ def _quick_final_risk(
             int(initial.get("declared_score", initial.get("score", 0))),
             flags=inputs.get("flags", {}),
             declared_paths=declared_paths,
-            diff_paths=_quick_diff_paths(root),
+            diff_paths=_quick_diff_paths(root, brief.get("base_head")),
             phase="finish",
         )
     except bm_risk.RiskInputError as error:

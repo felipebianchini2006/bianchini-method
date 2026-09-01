@@ -131,6 +131,75 @@ class Phase3CliScenarios(unittest.TestCase):
             self.assertTrue(finished["risk"]["reclassified"])
             self.assertEqual(finished["risk"]["effective_score"], 3)
 
+    def test_finish_reclassifies_changes_committed_after_quick_start(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            self.init_repo(repo)
+            self.json_bm("model", "init", "--repo", str(repo))
+            subprocess.run(
+                ["git", "add", "."], cwd=repo, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "baseline"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+            )
+            started = self.json_bm(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Criar migração pequena",
+                "--scope",
+                "Mudança localizada",
+                "--acceptance",
+                "Migração verificada",
+                "--verification",
+                "python3 -m unittest",
+            )
+            quick = str(started["id"])
+            migration = repo / "db/migrations/0002_committed.sql"
+            migration.parent.mkdir(parents=True)
+            migration.write_text("ALTER TABLE fixture ADD COLUMN name TEXT;\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "db/migrations/0002_committed.sql"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "add migration"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+            )
+            checkpoint = self.json_bm(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                quick,
+                "--checkpoint",
+                "Migração commitada verificada",
+                "--next-action",
+                "Finalizar",
+                "--evidence",
+                "teste local passou",
+                "--guard",
+                "rollback",
+                "--guard",
+                "backup_restore",
+                "--guard",
+                "migration_verify",
+            )
+            self.assertEqual(checkpoint["risk"]["route"], "protected")
+            self.assertIn(
+                "diff_path:migration:db/migrations/0002_committed.sql",
+                checkpoint["risk"]["reasons"],
+            )
+
     def test_next_wave_is_public_read_only_projection(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo, _change = NextWaveScenarios().make_repo(Path(temp))

@@ -13,6 +13,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+import bm_learning
 from bm_feature_support import (
     FIX_ROUNDS_BY_PROFILE,
     confined_path,
@@ -446,6 +447,16 @@ def _safe_existing_file(root: Path, path: Path, label: str) -> Path:
 
 def _safe_output(root: Path, output: str | Path) -> Path:
     candidate = _relative_candidate(root, output, "output")
+    runtime_context = root / ".bianchini/.runtime/context"
+    try:
+        relative = candidate.relative_to(runtime_context)
+    except ValueError:
+        _context_fail(
+            "PATH_UNSAFE",
+            "output deve ficar em .bianchini/.runtime/context",
+        )
+    if not relative.parts:
+        _context_fail("PATH_UNSAFE", "output exige nome de arquivo")
     if candidate.exists() and not candidate.is_file():
         _context_fail("PATH_UNSAFE", "output existente não é arquivo regular")
     return candidate
@@ -1037,22 +1048,27 @@ def _rc_context(
     fingerprint: str,
     required_refs: set[str],
 ) -> dict[str, Any]:
-    changes = root / ".bianchini/changes"
     matches: list[tuple[Path, dict[str, Any]]] = []
-    for change in _children(changes, "mudanças"):
-        if not change.is_dir():
+    for cycle_root, label in (
+        (root / ".bianchini/changes", "mudanças"),
+        (root / ".bianchini/archive", "archive"),
+    ):
+        if not cycle_root.exists():
             continue
-        candidate = change / "results/HOMOLOGATION.md"
-        if candidate.is_symlink():
-            _context_fail("PATH_UNSAFE", "HOMOLOGATION.md não pode ser symlink")
-        if candidate.is_file():
-            value = sources.frontmatter(candidate, "HOMOLOGATION.md")
-            if value.get("fingerprint") == fingerprint:
-                matches.append((candidate, value))
+        for change in _children(cycle_root, label):
+            if not change.is_dir():
+                continue
+            candidate = change / "results/HOMOLOGATION.md"
+            if candidate.is_symlink():
+                _context_fail("PATH_UNSAFE", "HOMOLOGATION.md não pode ser symlink")
+            if candidate.is_file():
+                value = sources.frontmatter(candidate, "HOMOLOGATION.md")
+                if value.get("fingerprint") == fingerprint:
+                    matches.append((candidate, value))
     if len(matches) != 1:
         _context_fail(
             "PACK_INCOMPLETE",
-            "RC exige fonte explícita HOMOLOGATION.md com fingerprint exato",
+            "RC exige uma fonte explícita HOMOLOGATION.md com fingerprint exato em changes ou archive",
         )
     path, candidate = matches[0]
     required_refs.add(f"release-candidate:{fingerprint}")
@@ -1063,25 +1079,45 @@ def _rc_context(
         _context_fail("PACK_INCOMPLETE", "RC.required_refs exige lista de paths")
     referenced: list[dict[str, Any]] = []
     for value in declared_refs:
-        ref_path = _relative_candidate(root, value, "RC.required_refs")
-        text = sources.text(ref_path, f"referência do RC {value}")
+        ref_candidates = [_relative_candidate(root, value, "RC.required_refs")]
+        value_parts = Path(value).parts
+        if (
+            ".bianchini/archive" in path.relative_to(root).as_posix()
+            and len(value_parts) >= 4
+            and value_parts[:2] == (".bianchini", "changes")
+        ):
+            ref_candidates.append(
+                _relative_candidate(
+                    root,
+                    Path(".bianchini/archive") / Path(*value_parts[2:]),
+                    "RC.required_refs archive",
+                )
+            )
+        existing_refs = [candidate for candidate in ref_candidates if candidate.is_file()]
+        if len(existing_refs) != 1:
+            _context_fail(
+                "PACK_INCOMPLETE", f"referência do RC exige uma fonte íntegra: {value}"
+            )
+        ref_path = existing_refs[0]
+        actual_value = ref_path.relative_to(root).as_posix()
+        text = sources.text(ref_path, f"referência do RC {actual_value}")
         if ref_path.suffix == ".json":
             try:
                 parsed: Any = json.loads(text)
             except json.JSONDecodeError:
-                _context_fail("PACK_INCOMPLETE", f"referência JSON inválida do RC: {value}")
+                _context_fail("PACK_INCOMPLETE", f"referência JSON inválida do RC: {actual_value}")
         else:
             match = re.match(
                 r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", text, re.DOTALL
             )
             if match is None:
-                _context_fail("PACK_INCOMPLETE", f"referência do RC sem frontmatter: {value}")
+                _context_fail("PACK_INCOMPLETE", f"referência do RC sem frontmatter: {actual_value}")
             try:
                 parsed = json.loads(match.group(1))
             except json.JSONDecodeError:
-                _context_fail("PACK_INCOMPLETE", f"referência do RC inválida: {value}")
-        referenced.append({"path": value, "value": parsed})
-        required_refs.add(f"evidence:{value}")
+                _context_fail("PACK_INCOMPLETE", f"referência do RC inválida: {actual_value}")
+        referenced.append({"path": actual_value, "value": parsed})
+        required_refs.add(f"evidence:{actual_value}")
     return {
         "kind": "release_candidate",
         "state": _state_slice(state),
@@ -1164,10 +1200,88 @@ def _approved_lessons(
         if value.get("status") != "approved" or value.get("active", True) is False:
             continue
         identifier = value.get("id")
-        if not isinstance(identifier, str) or not identifier.strip():
-            _context_fail("PACK_INCOMPLETE", f"lição aprovada sem id: {path.name}")
+        if not isinstance(identifier, str) or not re.fullmatch(r"L[0-9A-F]{12}", identifier):
+            _context_fail("PACK_INCOMPLETE", f"lição aprovada possui id inválido: {path.name}")
+        approved_by = value.get("approved_by")
+        approved_digest = value.get("approved_digest")
+        if not isinstance(approved_by, str) or not re.fullmatch(
+            r"human:[^\s:][^\s]*", approved_by
+        ):
+            _context_fail(
+                "PACK_INCOMPLETE", f"lesson:{identifier} não possui aprovação humana"
+            )
+        if not isinstance(approved_digest, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", approved_digest
+        ):
+            _context_fail(
+                "PACK_INCOMPLETE", f"lesson:{identifier} possui digest de aprovação inválido"
+            )
+        candidate = {
+            key: item
+            for key, item in value.items()
+            if key not in {"active", "approved_by", "approved_digest", "approved_at"}
+        }
+        candidate["status"] = "pending"
+        candidate_digest = hashlib.sha256(_canonical_pack(candidate)).hexdigest()
+        base = {key: item for key, item in candidate.items() if key != "id"}
+        expected_id = "L" + hashlib.sha256(_canonical_pack(base)).hexdigest()[:12].upper()
+        if candidate_digest != approved_digest or expected_id != identifier:
+            _context_fail(
+                "PACK_INCOMPLETE", f"lesson:{identifier} não deriva de candidato aprovado"
+            )
+        source_value = value.get("source")
+        source_digest = value.get("source_digest")
+        if (
+            not isinstance(source_value, str)
+            or not isinstance(source_digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", source_digest)
+        ):
+            _context_fail("PACK_INCOMPLETE", f"lesson:{identifier} não possui fonte")
         if not (_lesson_tags(value) & selectors):
             continue
+        source_candidates = [
+            _relative_candidate(root, source_value, f"lesson:{identifier}.source")
+        ]
+        source_parts = Path(source_value).parts
+        if len(source_parts) >= 4 and source_parts[:2] == (".bianchini", "changes"):
+            source_candidates.append(
+                _relative_candidate(
+                    root,
+                    Path(".bianchini/archive") / Path(*source_parts[2:]),
+                    f"lesson:{identifier}.archive_source",
+                )
+            )
+        existing_sources = [candidate for candidate in source_candidates if candidate.is_file()]
+        if len(existing_sources) != 1:
+            _context_fail(
+                "PACK_INCOMPLETE",
+                f"lesson:{identifier} exige uma fonte histórica íntegra",
+            )
+        source = _safe_existing_file(
+            root, existing_sources[0], f"lesson:{identifier}.source"
+        )
+        source_bytes = source.read_bytes()
+        source_relative = source.relative_to(root).as_posix()
+        sources.digests[source_relative] = hashlib.sha256(source_bytes).hexdigest()
+        if sources.digests[source_relative] != source_digest:
+            _context_fail("PACK_INCOMPLETE", f"lesson:{identifier} possui fonte alterada")
+        try:
+            expected_candidate = bm_learning.candidate_from_source(
+                root, source, source_identity=source_value
+            )
+        except bm_learning.LearningError as error:
+            _context_fail(
+                "PACK_INCOMPLETE",
+                f"lesson:{identifier} não deriva de fonte governada ({error.code})",
+            )
+        actual_candidate = {**candidate, "digest": approved_digest}
+        if (
+            expected_candidate is None
+            or _canonical_pack(expected_candidate) != _canonical_pack(actual_candidate)
+        ):
+            _context_fail(
+                "PACK_INCOMPLETE", f"lesson:{identifier} diverge da proposta da fonte"
+            )
         selected.append(value)
         selected_ids.add(identifier)
         required_refs.add(f"lesson:{identifier}")
@@ -1232,25 +1346,7 @@ def _result_for_pack(
     }
 
 
-def compile_context_pack(
-    repo: str | Path,
-    unit: str,
-    output: str | Path | None = None,
-    max_bytes: int = DEFAULT_MAX_BYTES,
-) -> dict[str, Any]:
-    """Compila um pack mínimo, determinístico e vinculado às fontes atuais.
-
-    O limite default de 16 KiB é inferior à menor baseline prescrita da Fase 0
-    (22.686 bytes). Isso torna a redução verificável em bytes e arquivos; a API
-    não estima nem declara redução de tokens.
-    """
-
-    root = _repo_root(repo)
-    if not isinstance(unit, str):
-        _context_fail("PACK_INCOMPLETE", "identidade da unidade exige string")
-    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes <= 0:
-        _context_fail("PACK_INCOMPLETE", "max_bytes exige inteiro positivo")
-
+def _assemble_context_payload(root: Path, unit: str) -> dict[str, Any]:
     change_match = UNIT_CHANGE.fullmatch(unit)
     rc_match = UNIT_RC.fullmatch(unit)
     if not (
@@ -1285,7 +1381,6 @@ def compile_context_pack(
     context["approved_lessons"] = _approved_lessons(
         root, sources, unit, context, required_refs
     )
-
     head = _git_head(root)
     source_digests = {key: sources.digests[key] for key in sorted(sources.digests)}
     cache_material = {
@@ -1293,18 +1388,40 @@ def compile_context_pack(
         "head": head,
         "source_digests": source_digests,
     }
-    cache_key = hashlib.sha256(_canonical_pack(cache_material)).hexdigest()
-    payload = {
+    return {
         "schema_version": CONTEXT_PACK_SCHEMA_VERSION,
         "contract": CONTEXT_PACK_CONTRACT,
         "unit": unit,
         "head": head,
-        "cache_key": cache_key,
+        "cache_key": hashlib.sha256(_canonical_pack(cache_material)).hexdigest(),
         "source_digests": source_digests,
         "sources": sorted(source_digests),
         "required_refs": sorted(required_refs),
         "context": context,
     }
+
+
+def compile_context_pack(
+    repo: str | Path,
+    unit: str,
+    output: str | Path | None = None,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+) -> dict[str, Any]:
+    """Compila um pack mínimo, determinístico e vinculado às fontes atuais.
+
+    O limite default de 16 KiB é inferior à menor baseline prescrita da Fase 0
+    (22.686 bytes). Isso torna a redução verificável em bytes e arquivos; a API
+    não estima nem declara redução de tokens.
+    """
+
+    root = _repo_root(repo)
+    if not isinstance(unit, str):
+        _context_fail("PACK_INCOMPLETE", "identidade da unidade exige string")
+    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes <= 0:
+        _context_fail("PACK_INCOMPLETE", "max_bytes exige inteiro positivo")
+
+    payload = _assemble_context_payload(root, unit)
+    context = payload["context"]
     content = _canonical_pack(payload)
     if len(content) > max_bytes:
         largest = sorted(
@@ -1388,6 +1505,14 @@ def verify_context_pack(repo: str | Path, path: str | Path) -> dict[str, Any]:
     expected_cache_key = hashlib.sha256(_canonical_pack(cache_material)).hexdigest()
     if payload.get("cache_key") != expected_cache_key:
         _context_fail("STALE_EVIDENCE", "cache key do pack diverge")
+    try:
+        expected_payload = _assemble_context_payload(root, unit)
+    except ContextPackError as error:
+        _context_fail(
+            "STALE_EVIDENCE", f"pack não pode ser recompilado: {error.code}"
+        )
+    if _canonical_pack(expected_payload) != content:
+        _context_fail("STALE_EVIDENCE", "conteúdo derivado do pack diverge das fontes")
     return _result_for_pack(root, target, content, payload, cache_hit=True)
 
 
