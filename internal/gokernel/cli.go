@@ -40,6 +40,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runCoherence(args[1:])
 	case "impact":
 		result, err = runImpact(args[1:])
+	case "plan":
+		result, err = runPlan(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
 	case "policy":
@@ -81,7 +83,11 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	case "status":
 		result, err = runStatus(args[1:])
 	case "workspace":
-		result, err = runWorkspace(args[1:])
+		result, err = runExecutionWorkspace(args[1:])
+	case "context":
+		result, err = runContext(args[1:])
+	case "update-bm":
+		result, err = runUpdate(args[1:])
 	default:
 		return writeArgparseError(stderr, fmt.Sprintf("argument command: invalid choice: '%s'", args[0]))
 	}

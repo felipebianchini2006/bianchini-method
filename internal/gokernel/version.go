@@ -20,6 +20,7 @@ var ImplementedSurfaces = []string{
 	"coherence:check",
 	"coherence:approve",
 	"impact:analyze",
+	"plan:complete",
 	"change-policy",
 	"policy",
 	"adapter:render",
@@ -59,7 +60,13 @@ var ImplementedSurfaces = []string{
 	"telemetry:summary",
 	"spec-diff:file",
 	"status:legacy",
-	"workspace:create-parser",
+	"workspace:create",
+	"workspace:locate",
+	"workspace:resume",
+	"workspace:check",
+	"context:pack",
+	"context:verify",
+	"update-bm",
 }
 
 type VersionMetadata struct {
