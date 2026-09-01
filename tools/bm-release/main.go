@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,37 +44,60 @@ type releaseManifest struct {
 	Artifacts     []releaseArtifact `json:"artifacts"`
 }
 
+type releaseOptions struct {
+	repository string
+	output     string
+	version    string
+	commit     string
+	targets    string
+}
+
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 }
 
-func run() error {
-	repository := flag.String("repo", ".", "repository root")
-	output := flag.String("output", "dist", "output directory")
-	version := flag.String("version", "", "release version; defaults to skills/_shared/VERSION")
-	commit := flag.String("commit", "", "build commit; defaults to HEAD")
-	entrypoint := flag.String("entrypoint", "./cmd/bm", "Go CLI package")
-	targets := flag.String("targets", strings.Join(releaseTargets, ","), "comma-separated target matrix")
-	flag.Parse()
+func parseReleaseOptions(arguments []string) (releaseOptions, error) {
+	options := releaseOptions{}
+	flags := flag.NewFlagSet("bm-release", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	flags.StringVar(&options.repository, "repo", ".", "repository root")
+	flags.StringVar(&options.output, "output", "dist", "output directory")
+	flags.StringVar(&options.version, "version", "", "release version; defaults to skills/_shared/VERSION")
+	flags.StringVar(&options.commit, "commit", "", "build commit; defaults to HEAD")
+	flags.StringVar(&options.targets, "targets", strings.Join(releaseTargets, ","), "comma-separated target matrix")
+	if err := flags.Parse(arguments); err != nil {
+		return releaseOptions{}, err
+	}
+	if flags.NArg() != 0 {
+		return releaseOptions{}, fmt.Errorf("unexpected release arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	return options, nil
+}
 
-	root, err := filepath.Abs(*repository)
+func run(arguments []string) error {
+	options, err := parseReleaseOptions(arguments)
+	if err != nil {
+		return err
+	}
+
+	root, err := filepath.Abs(options.repository)
 	if err != nil {
 		return err
 	}
 	if info, err := os.Lstat(root); err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return fmt.Errorf("release root must be a real directory: %s", root)
 	}
-	resolvedCommit, err := resolveReleaseCommit(root, *commit)
+	resolvedCommit, err := resolveReleaseCommit(root, options.commit)
 	if err != nil {
 		return err
 	}
 	if err := requireCleanReleaseInputs(root); err != nil {
 		return err
 	}
-	resolvedVersion := strings.TrimSpace(*version)
+	resolvedVersion := strings.TrimSpace(options.version)
 	versionBytes, err := os.ReadFile(filepath.Join(root, "skills", "_shared", "VERSION"))
 	if err != nil {
 		return fmt.Errorf("read packaged version: %w", err)
@@ -92,11 +116,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	selected, err := parseReleaseTargets(*targets)
+	selected, err := parseReleaseTargets(options.targets)
 	if err != nil {
 		return err
 	}
-	destination, err := filepath.Abs(*output)
+	destination, err := filepath.Abs(options.output)
 	if err != nil {
 		return err
 	}
@@ -122,11 +146,14 @@ func run() error {
 			return err
 		}
 		ldflags := "-s -w -buildid= -X github.com/felipebianchini2006/bianchini-method/internal/gokernel.BuildCommit=" + resolvedCommit
-		command := exec.Command("go", "build", "-mod=readonly", "-trimpath", "-ldflags", ldflags, "-o", binary, *entrypoint)
+		command := exec.Command("go", "build", "-mod=readonly", "-trimpath", "-ldflags", ldflags, "-o", binary, "./cmd/bm")
 		command.Dir = root
 		command.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS="+goos, "GOARCH="+goarch)
 		if output, err := command.CombinedOutput(); err != nil {
 			return fmt.Errorf("build %s: %w\n%s", target, err, output)
+		}
+		if err := validateBuiltReleaseBinary(binary, target, resolvedVersion, resolvedCommit); err != nil {
+			return err
 		}
 		archiveName := fmt.Sprintf("bianchini-method_%s_%s.tar.gz", resolvedVersion, target)
 		archive := filepath.Join(destination, archiveName)
@@ -158,6 +185,28 @@ func run() error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(manifest)
+}
+
+func validateBuiltReleaseBinary(binary, target, version, commit string) error {
+	if target != runtime.GOOS+"-"+runtime.GOARCH {
+		return nil
+	}
+	command := exec.Command(binary, "version", "--json")
+	command.Env = []string{"PATH="}
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("identidade do binário %s inválida: %w\n%s", target, err, output)
+	}
+	var metadata gokernel.VersionMetadata
+	if err := json.Unmarshal(output, &metadata); err != nil {
+		return fmt.Errorf("identidade do binário %s não é JSON válido: %w", target, err)
+	}
+	if metadata.Engine != "go" || !metadata.Official || metadata.Preview ||
+		metadata.Version != version || metadata.BuildCommit != commit ||
+		metadata.ContractVersion != gokernel.ContractVersion || len(metadata.ImplementedSurfaces) == 0 {
+		return fmt.Errorf("identidade do binário %s diverge do release: %+v", target, metadata)
+	}
+	return nil
 }
 
 func validateReleaseVersionContract(packagedVersion, releaseVersion, kernelVersion string) error {

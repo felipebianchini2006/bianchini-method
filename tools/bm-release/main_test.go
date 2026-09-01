@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -162,6 +163,34 @@ func TestReleaseBuilderMustBeClean(t *testing.T) {
 	err := requireCleanReleaseInputs(root)
 	if err == nil || !strings.Contains(err.Error(), "tools/bm-release/main.go") {
 		t.Fatalf("builder alterado não foi rejeitado: %v", err)
+	}
+}
+
+func TestReleaseEntrypointCannotBeOverridden(t *testing.T) {
+	if _, err := parseReleaseOptions([]string{"--entrypoint", "./tools/bm-release"}); err == nil {
+		t.Fatal("entrypoint arbitrário foi aceito")
+	}
+}
+
+func TestBuiltReleaseBinaryIdentityIsChecked(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(t.TempDir(), "bm")
+	commit := strings.Repeat("a", 40)
+	ldflags := "-s -w -buildid= -X github.com/felipebianchini2006/bianchini-method/internal/gokernel.BuildCommit=" + commit
+	command := exec.Command("go", "build", "-trimpath", "-ldflags", ldflags, "-o", binary, "./cmd/bm")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("build do CLI: %v\n%s", err, output)
+	}
+	target := runtime.GOOS + "-" + runtime.GOARCH
+	if err := validateBuiltReleaseBinary(binary, target, "0.5.0", commit); err != nil {
+		t.Fatalf("CLI oficial foi rejeitado: %v", err)
+	}
+	if err := validateBuiltReleaseBinary(binary, target, "0.5.0", strings.Repeat("b", 40)); err == nil {
+		t.Fatal("build_commit divergente foi aceito")
 	}
 }
 
