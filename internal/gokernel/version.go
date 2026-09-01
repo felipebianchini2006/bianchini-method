@@ -10,6 +10,7 @@ const (
 )
 
 var ImplementedSurfaces = []string{
+	"validate-state",
 	"change-policy",
 	"policy",
 	"adapter:render",

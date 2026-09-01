@@ -28,6 +28,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "version":
 		result, err = runVersion(args[1:])
+	case "validate-state":
+		result, err = runValidateState(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
 	case "policy":

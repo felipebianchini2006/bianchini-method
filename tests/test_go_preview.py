@@ -194,6 +194,28 @@ class GoPreviewScenarios(unittest.TestCase):
                 (python_repo / "AGENTS.md").stat().st_mode & 0o777,
             )
 
+    def test_go_validate_state_matches_python_oracle(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="bm-go-state-parity-") as temp:
+            base = Path(temp)
+            binary = base / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            cases = (
+                (str(ROOT / "tests" / "fixtures" / "project-state-v2.json"),),
+                (str(base / "missing-state.json"),),
+            )
+            for arguments in cases:
+                with self.subTest(arguments=arguments):
+                    argv = ("validate-state", *arguments)
+                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    go = run(str(binary), *argv)
+                    self.assertEqual(go.returncode, python.returncode)
+                    self.assertEqual(go.stderr, python.stderr)
+                    if python.stdout:
+                        self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
+                    else:
+                        self.assertEqual(go.stdout, python.stdout)
+
     def test_preview_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),
