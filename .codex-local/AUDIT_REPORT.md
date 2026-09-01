@@ -192,13 +192,14 @@ As correções da auditoria final incluem:
 - verificação do target já instalado na recuperação committed do updater;
 - binding entre versão pedida, versão das skills e versão compilada.
 
+O ambiente de uso e validação nativa desta entrega é macOS. As correções e o cross-build Windows acima são compatibilidade adicional; não constituem gate, risco ou bloqueio para o uso no Mac.
+
 ## 10. Riscos e limitações restantes
 
 1. **Bloqueador de aceitação:** o plano normativo não pôde ser relido pela auditoria independente. O contrato congelado e as evidências versionadas sustentam os testes executados, mas não substituem a prova de completude das seções 14 e 17.
-2. O Windows teve cross-build de `gokernel.test.exe` e `bm.exe`, além de testes build-tag compilados. Não houve runner Windows real nem ensaio de power-loss; portanto o comportamento Win32 em runtime não é declarado como observado neste host.
-3. As métricas são bytes, não tokens.
-4. As jornadas automatizadas provam os fluxos estruturais e públicos. Homologação humana de um produto real continua sendo responsabilidade do projeto consumidor.
-5. Os artifacts foram produzidos somente em diretórios temporários e não foram publicados.
+2. As métricas são bytes, não tokens.
+3. As jornadas automatizadas provam os fluxos estruturais e públicos. Homologação humana de um produto real continua sendo responsabilidade do projeto consumidor.
+4. Os artifacts foram produzidos somente em diretórios temporários e não foram publicados.
 
 Nenhuma dessas limitações autoriza enfraquecer schema, digest, path safety, evidência ou gates.
 
@@ -250,7 +251,7 @@ unlink "$audit_tmp_dir/bm"
 rmdir "$audit_tmp_dir"
 ```
 
-Cross-build Windows, sem alegar execução Windows:
+Compatibilidade adicional opcional — cross-build Windows, fora dos gates do ambiente macOS:
 
 ```bash
 audit_windows_dir=$(mktemp -d)
@@ -289,6 +290,7 @@ rmdir "$audit_release_root"
 
 - Main intacta.
 - Branch dedicada publicada para continuação da auditoria, mas ainda não apta para merge.
+- Ambiente macOS validado nativamente.
 - Cutover Go explícito e observável.
 - Release não publicada.
 - Deploy continua exigindo ação explícita no projeto consumidor.
