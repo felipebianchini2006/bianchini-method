@@ -83,6 +83,27 @@ func TestReleaseTargetsAreClosedAndDeduplicated(t *testing.T) {
 	}
 }
 
+func TestReleaseCommitMustResolveToCurrentHead(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveReleaseCommit(root, "deadbeef"); err == nil || !strings.Contains(err.Error(), "commit de release inválido") {
+		t.Fatalf("SHA inexistente foi aceito: %v", err)
+	}
+	head, err := gitOutput(root, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolveReleaseCommit(root, head[:12])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved != head {
+		t.Fatalf("resolved=%s, esperado %s", resolved, head)
+	}
+}
+
 type archivedReleaseEntry struct {
 	content []byte
 	mode    int64

@@ -156,12 +156,32 @@ func updateBianchiniMethod(request updateRequest) (map[string]any, error) {
 	if gitRoot != "" {
 		return updateGitCheckout(gitRoot, root, installed, latest, lineageManifest)
 	}
-	archiveURL, err := updateArchiveURL(latest, runtime.GOOS, runtime.GOARCH)
+	archiveURL, archiveName, binaryPath, err := updateArchiveIdentity(latest, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
+		return nil, err
+	}
+	manifestURL, _ := updateReleaseAssetURL(latest, "release-manifest.json")
+	releaseManifest, err := fetchUpdateLimited(request.fetch, manifestURL, request.timeout, maxUpdateReleaseMetadataBytes, "manifesto da release")
+	if err != nil {
+		return nil, err
+	}
+	artifact, err := validateUpdateReleaseManifest(releaseManifest, latest, runtime.GOOS+"-"+runtime.GOARCH, archiveName, binaryPath)
+	if err != nil {
+		return nil, err
+	}
+	checksumsURL, _ := updateReleaseAssetURL(latest, "SHA256SUMS")
+	checksums, err := fetchUpdateLimited(request.fetch, checksumsURL, request.timeout, maxUpdateReleaseMetadataBytes, "checksums da release")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateUpdateChecksums(checksums, artifact); err != nil {
 		return nil, err
 	}
 	archiveBytes, err := fetchUpdateLimited(request.fetch, archiveURL, request.timeout, maxUpdateArchiveBytes, "archive oficial")
 	if err != nil {
+		return nil, err
+	}
+	if err := verifyUpdateArchive(archiveBytes, artifact); err != nil {
 		return nil, err
 	}
 	extraction, err := os.MkdirTemp("", "bianchini-method-download.*")

@@ -4,11 +4,15 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -36,6 +40,7 @@ type updateArchiveEntry struct {
 	typeflag byte
 	linkname string
 	size     int64
+	mode     int64
 }
 
 func updateArchive(t *testing.T, version, marker string, extra ...updateArchiveEntry) []byte {
@@ -44,6 +49,15 @@ func updateArchive(t *testing.T, version, marker string, extra ...updateArchiveE
 	for _, name := range managedSkillDirectories {
 		entries = append(entries, updateArchiveEntry{name: "bianchini-method-main/skills/" + name + "/PACKAGE.txt", content: []byte(marker + "\n")})
 	}
+	binary := "bm"
+	if runtime.GOOS == "windows" {
+		binary = "bm.exe"
+	}
+	entries = append(entries,
+		updateArchiveEntry{name: "bianchini-method-main/skills/_shared/bin/" + binary, content: []byte("native\n"), mode: 0o755},
+		updateArchiveEntry{name: "bianchini-method-main/skills/_shared/LICENSE", content: []byte("license\n")},
+		updateArchiveEntry{name: "bianchini-method-main/skills/_shared/THIRD_PARTY_NOTICES.md", content: []byte("notices\n")},
+	)
 	entries = append(entries, extra...)
 	return rawUpdateArchive(t, entries)
 }
@@ -62,7 +76,11 @@ func rawUpdateArchive(t *testing.T, entries []updateArchiveEntry) []byte {
 		if entry.size != 0 {
 			size = entry.size
 		}
-		header := &tar.Header{Name: entry.name, Mode: 0o644, Size: size, Typeflag: typeflag, Linkname: entry.linkname}
+		mode := entry.mode
+		if mode == 0 {
+			mode = 0o644
+		}
+		header := &tar.Header{Name: entry.name, Mode: mode, Size: size, Typeflag: typeflag, Linkname: entry.linkname}
 		if err := archive.WriteHeader(header); err != nil {
 			t.Fatal(err)
 		}
@@ -83,6 +101,7 @@ func rawUpdateArchive(t *testing.T, entries []updateArchiveEntry) []byte {
 
 func updateFetcher(version string, archive, manifest []byte) (updateFetch, *[]string) {
 	calls := []string{}
+	releaseManifest, checksums := updateReleaseMetadata(version, archive)
 	fetch := func(url string, _ time.Duration) ([]byte, error) {
 		calls = append(calls, url)
 		switch {
@@ -90,6 +109,10 @@ func updateFetcher(version string, archive, manifest []byte) (updateFetch, *[]st
 			return []byte(version + "\n"), nil
 		case strings.HasSuffix(url, "/skills/_shared/releases/0.4.0.json"):
 			return manifest, nil
+		case strings.HasSuffix(url, "/release-manifest.json"):
+			return releaseManifest, nil
+		case strings.HasSuffix(url, "/SHA256SUMS"):
+			return checksums, nil
 		case strings.Contains(url, "/releases/download/"):
 			return archive, nil
 		default:
@@ -97,6 +120,27 @@ func updateFetcher(version string, archive, manifest []byte) (updateFetch, *[]st
 		}
 	}
 	return fetch, &calls
+}
+
+func updateReleaseMetadata(version string, archive []byte) ([]byte, []byte) {
+	target := runtime.GOOS + "-" + runtime.GOARCH
+	name := "bianchini-method_" + version + "_" + target + ".tar.gz"
+	digestBytes := sha256.Sum256(archive)
+	digest := hex.EncodeToString(digestBytes[:])
+	binary := "skills/_shared/bin/bm"
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
+	payload := map[string]any{
+		"schema_version": 1, "version": version,
+		"build_commit": "0123456789abcdef", "source_date_epoch": 1,
+		"artifacts": []any{map[string]any{
+			"target": target, "archive": name, "sha256": digest,
+			"size": len(archive), "binary": binary,
+		}},
+	}
+	encoded, _ := json.Marshal(payload)
+	return append(encoded, '\n'), []byte(digest + "  " + name + "\n")
 }
 
 func TestUpdateUsesVersionedNativeReleaseArchive(t *testing.T) {
@@ -165,7 +209,7 @@ func TestInstalledPackageUpdatesAtomicallyAndPreservesForeignSkills(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stateString(result["status"]) != "updated" || stateString(result["mode"]) != "installed_package" || len(*calls) != 2 {
+	if stateString(result["status"]) != "updated" || stateString(result["mode"]) != "installed_package" || len(*calls) != 4 {
 		t.Fatalf("result=%#v calls=%v", result, *calls)
 	}
 	assertUpdateMarker(t, skills, "3.2.0", "remote")
@@ -186,7 +230,7 @@ func TestUpdateInstallsCleanSkillsRootFromZeroVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stateString(result["installed_version"]) != "0.0.0" || stateString(result["status"]) != "updated" || len(*calls) != 2 {
+	if stateString(result["installed_version"]) != "0.0.0" || stateString(result["status"]) != "updated" || len(*calls) != 4 {
 		t.Fatalf("result=%#v calls=%v", result, *calls)
 	}
 	assertUpdateMarker(t, skills, "3.2.0", "clean")
@@ -277,7 +321,7 @@ func TestUpdateLineageResetTo040RequiresAndValidatesManifest(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if stateString(result["status"]) != "updated" || len(*calls) != 3 {
+		if stateString(result["status"]) != "updated" || len(*calls) != 5 {
 			t.Fatalf("result=%#v calls=%v", result, *calls)
 		}
 		assertUpdateMarker(t, skills, "0.4.0", "reset")
@@ -294,6 +338,33 @@ func TestUpdateLineageResetTo040RequiresAndValidatesManifest(t *testing.T) {
 		}
 		assertUpdateMarker(t, skills, "3.2.0", "local")
 	})
+}
+
+func TestUpdateRejectsArchiveThatDoesNotMatchSignedReleaseMetadata(t *testing.T) {
+	skills := filepath.Join(t.TempDir(), "skills")
+	writeUpdateInstallation(t, skills, "3.1.0", "local")
+	officialArchive := updateArchive(t, "3.2.0", "official")
+	tamperedArchive := append(append([]byte(nil), officialArchive...), byte(0))
+	releaseManifest, checksums := updateReleaseMetadata("3.2.0", officialArchive)
+	fetch := func(url string, _ time.Duration) ([]byte, error) {
+		switch {
+		case strings.HasSuffix(url, "/skills/_shared/VERSION"):
+			return []byte("3.2.0\n"), nil
+		case strings.HasSuffix(url, "/release-manifest.json"):
+			return releaseManifest, nil
+		case strings.HasSuffix(url, "/SHA256SUMS"):
+			return checksums, nil
+		case strings.Contains(url, "/releases/download/"):
+			return tamperedArchive, nil
+		default:
+			return nil, errors.New("URL inesperada")
+		}
+	}
+	_, err := updateBianchiniMethod(updateRequest{skillsRoot: skills, fetch: fetch, fs: defaultUpdateFS(), timeout: 15 * time.Second})
+	if err == nil || !strings.Contains(err.Error(), "diverge do manifesto") {
+		t.Fatalf("archive adulterado foi aceito: %v", err)
+	}
+	assertUpdateMarker(t, skills, "3.1.0", "local")
 }
 
 func TestUpdateGitCheckoutFastForwardsOfficialMainWithoutArchive(t *testing.T) {

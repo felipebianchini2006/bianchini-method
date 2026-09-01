@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -63,6 +64,13 @@ func run() error {
 	if info, err := os.Lstat(root); err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return fmt.Errorf("release root must be a real directory: %s", root)
 	}
+	resolvedCommit, err := resolveReleaseCommit(root, *commit)
+	if err != nil {
+		return err
+	}
+	if err := requireCleanReleaseInputs(root); err != nil {
+		return err
+	}
 	resolvedVersion := strings.TrimSpace(*version)
 	versionBytes, err := os.ReadFile(filepath.Join(root, "skills", "_shared", "VERSION"))
 	if err != nil {
@@ -77,16 +85,6 @@ func run() error {
 	}
 	if packagedVersion != resolvedVersion {
 		return fmt.Errorf("skills version %s differs from release %s", packagedVersion, resolvedVersion)
-	}
-	resolvedCommit := strings.TrimSpace(*commit)
-	if resolvedCommit == "" {
-		resolvedCommit, err = gitOutput(root, "rev-parse", "HEAD")
-		if err != nil {
-			return err
-		}
-	}
-	if len(resolvedCommit) < 7 || strings.ContainsAny(resolvedCommit, " \t\r\n") {
-		return fmt.Errorf("invalid build commit: %q", resolvedCommit)
 	}
 	epoch, err := releaseEpoch(root, resolvedCommit)
 	if err != nil {
@@ -228,6 +226,40 @@ func gitOutput(root string, args ...string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+func resolveReleaseCommit(root, requested string) (string, error) {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		requested = "HEAD"
+	}
+	if strings.ContainsAny(requested, " \t\r\n") {
+		return "", fmt.Errorf("commit de release inválido: %q", requested)
+	}
+	resolved, err := gitOutput(root, "rev-parse", "--verify", requested+"^{commit}")
+	if err != nil || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(resolved) {
+		return "", fmt.Errorf("commit de release inválido: %q", requested)
+	}
+	head, err := gitOutput(root, "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	if resolved != head {
+		return "", fmt.Errorf("commit de release %s não corresponde ao HEAD %s", resolved, head)
+	}
+	return resolved, nil
+}
+
+func requireCleanReleaseInputs(root string) error {
+	status, err := gitOutput(root, "status", "--porcelain=v1", "--untracked-files=all", "--",
+		"cmd", "internal", "go.mod", "go.sum", "skills", "LICENSE", "THIRD_PARTY_NOTICES.md")
+	if err != nil {
+		return err
+	}
+	if status != "" {
+		return fmt.Errorf("inputs de release possuem alterações locais:\n%s", status)
+	}
+	return nil
+}
+
 func createReleaseArchive(root, output, packageRoot, binary, binaryName string, epoch time.Time) error {
 	temporary := output + ".part"
 	if _, err := os.Lstat(temporary); err == nil {
@@ -275,8 +307,14 @@ func createReleaseArchive(root, output, packageRoot, binary, binaryName string, 
 	if err := writeTarFileFromPath(tarWriter, binary, packageRoot+"/skills/_shared/bin/"+binaryName, 0o755, epoch); err != nil {
 		return err
 	}
-	if err := writeTarFileFromPath(tarWriter, filepath.Join(root, "THIRD_PARTY_NOTICES.md"), packageRoot+"/THIRD_PARTY_NOTICES.md", 0o644, epoch); err != nil {
-		return err
+	for _, legal := range []string{"LICENSE", "THIRD_PARTY_NOTICES.md"} {
+		source := filepath.Join(root, legal)
+		if err := writeTarFileFromPath(tarWriter, source, packageRoot+"/"+legal, 0o644, epoch); err != nil {
+			return err
+		}
+		if err := writeTarFileFromPath(tarWriter, source, packageRoot+"/skills/_shared/"+legal, 0o644, epoch); err != nil {
+			return err
+		}
 	}
 	if err := closeWithError(); err != nil {
 		return err

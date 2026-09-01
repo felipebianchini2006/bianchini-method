@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -139,6 +140,24 @@ func validateRemoteSkills(remoteSkills, latest, installed string, lineageManifes
 	for _, name := range managedSkillDirectories {
 		if err := rejectUpdateTreeLinks(filepath.Join(remoteSkills, name), "pacote "+name); err != nil {
 			return err
+		}
+	}
+	binaryName := "bm"
+	if runtime.GOOS == "windows" {
+		binaryName = "bm.exe"
+	}
+	for _, relative := range []string{
+		filepath.Join("_shared", "bin", binaryName),
+		filepath.Join("_shared", "LICENSE"),
+		filepath.Join("_shared", "THIRD_PARTY_NOTICES.md"),
+	} {
+		path := filepath.Join(remoteSkills, relative)
+		info, statErr := os.Lstat(path)
+		if statErr != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || info.Size() == 0 {
+			return userError("archive não contém artefato obrigatório regular: " + filepath.ToSlash(relative))
+		}
+		if relative == filepath.Join("_shared", "bin", binaryName) && runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
+			return userError("binário nativo do archive não é executável")
 		}
 	}
 	return nil
