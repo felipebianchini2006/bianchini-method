@@ -58,7 +58,7 @@ jobs:
 
       - name: Validate CLI entrypoints
         run: |
-          /tmp/bm version --json | grep -q '"official":true'
+          /tmp/bm version --json | python3 -c 'import json, sys; assert json.load(sys.stdin)["official"] is True'
           python3 scripts/run_cli_contract_fixtures.py --engine go --binary /tmp/bm
           test "$(cat skills/_shared/VERSION)" = "0.5.0"
 
@@ -88,4 +88,4 @@ jobs:
         shell: pwsh
         run: |
           go build -trimpath -o bm.exe ./cmd/bm
-          .\bm.exe version --json | Select-String '"official":true'
+          .\bm.exe version --json | python -c "import json, sys; assert json.load(sys.stdin)['official'] is True"
