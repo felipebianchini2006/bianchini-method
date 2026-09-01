@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -110,8 +111,7 @@ func updateBianchiniMethod(request updateRequest) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	versionURL, archiveURL := updateURLs()
-	latestBytes, err := fetchUpdateLimited(request.fetch, versionURL, request.timeout, maxUpdateVersionBytes, "versão remota")
+	latestBytes, err := fetchUpdateLimited(request.fetch, updateVersionURL(), request.timeout, maxUpdateVersionBytes, "versão remota")
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +155,10 @@ func updateBianchiniMethod(request updateRequest) (map[string]any, error) {
 	}
 	if gitRoot != "" {
 		return updateGitCheckout(gitRoot, root, installed, latest, lineageManifest)
+	}
+	archiveURL, err := updateArchiveURL(latest, runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return nil, err
 	}
 	archiveBytes, err := fetchUpdateLimited(request.fetch, archiveURL, request.timeout, maxUpdateArchiveBytes, "archive oficial")
 	if err != nil {
@@ -224,9 +228,25 @@ func isLineageReset(installed, latest semanticVersion) bool {
 	return compareUpdateVersion(latest, reset) == 0 && compareUpdateVersion(installed, latest) > 0 && installed.major > 0
 }
 
-func updateURLs() (string, string) {
+func updateVersionURL() string {
 	base := "https://raw.githubusercontent.com/" + officialUpdateRepository + "/" + officialUpdateBranch
-	return base + "/skills/_shared/VERSION", "https://codeload.github.com/" + officialUpdateRepository + "/tar.gz/refs/heads/" + officialUpdateBranch
+	return base + "/skills/_shared/VERSION"
+}
+
+func updateArchiveURL(version, goos, goarch string) (string, error) {
+	if _, err := parseUpdateVersion(version); err != nil {
+		return "", err
+	}
+	target := goos + "-" + goarch
+	allowed := map[string]bool{
+		"linux-amd64": true, "linux-arm64": true, "darwin-amd64": true,
+		"darwin-arm64": true, "windows-amd64": true,
+	}
+	if !allowed[target] {
+		return "", userError("plataforma sem pacote oficial: " + target)
+	}
+	name := "bianchini-method_" + version + "_" + target + ".tar.gz"
+	return "https://github.com/" + officialUpdateRepository + "/releases/download/v" + version + "/" + name, nil
 }
 
 func lineageManifestURL() string {

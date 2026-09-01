@@ -90,13 +90,27 @@ func updateFetcher(version string, archive, manifest []byte) (updateFetch, *[]st
 			return []byte(version + "\n"), nil
 		case strings.HasSuffix(url, "/skills/_shared/releases/0.4.0.json"):
 			return manifest, nil
-		case strings.Contains(url, "codeload.github.com"):
+		case strings.Contains(url, "/releases/download/"):
 			return archive, nil
 		default:
 			return nil, fmt.Errorf("URL inesperada: %s", url)
 		}
 	}
 	return fetch, &calls
+}
+
+func TestUpdateUsesVersionedNativeReleaseArchive(t *testing.T) {
+	url, err := updateArchiveURL("0.5.0", "darwin", "arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "https://github.com/felipebianchini2006/bianchini-method/releases/download/v0.5.0/bianchini-method_0.5.0_darwin-arm64.tar.gz"
+	if url != want {
+		t.Fatalf("url=%q, esperado %q", url, want)
+	}
+	if _, err := updateArchiveURL("0.5.0", "plan9", "amd64"); err == nil || !strings.Contains(err.Error(), "plataforma sem pacote oficial") {
+		t.Fatalf("plataforma sem distribuição aceita: %v", err)
+	}
 }
 
 func TestUpdateParserFreezesPublicFlagsWithoutTestSource(t *testing.T) {
