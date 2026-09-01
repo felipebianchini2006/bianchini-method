@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -454,7 +455,7 @@ func readActualDelta(path string) (map[string]any, error) {
 		return nil, workflowError("MODEL_MISMATCH", "actual_delta inválido: "+err.Error())
 	}
 	var trailing any
-	if err := decoder.Decode(&trailing); err == nil {
+	if err := decoder.Decode(&trailing); err != io.EOF {
 		return nil, workflowError("MODEL_MISMATCH", "actual_delta inválido: valores adicionais")
 	}
 	delta, ok := raw.(map[string]any)

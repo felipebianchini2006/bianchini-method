@@ -49,6 +49,20 @@ func TestCrashRecoverableCloseContinuesFromPromotedCurrent(t *testing.T) {
 	if _, statErr := os.Stat(filepath.Join(root, ".bianchini", ".runtime", "cycle-close.json")); statErr != nil {
 		t.Fatalf("journal ausente: %v", statErr)
 	}
+	journalPath := filepath.Join(root, ".bianchini", ".runtime", "cycle-close.json")
+	journalBytes, readErr := os.ReadFile(journalPath)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if err := os.WriteFile(journalPath, append(append([]byte(nil), journalBytes...), []byte("trailing-garbage")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recoverPendingClose(root); err == nil {
+		t.Fatal("recovery aceitou journal JSON seguido de lixo")
+	}
+	if err := os.WriteFile(journalPath, journalBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	result, err := recoverPendingClose(root)
 	if err != nil {
 		t.Fatal(err)

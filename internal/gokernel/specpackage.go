@@ -297,7 +297,7 @@ func loadManagedManifest(root, path string) (managedManifest, error) {
 	if err != nil || !validUTF8Text(content) {
 		return managedManifest{}, specError("SPEC_MANIFEST_INVALID", "MANIFEST.json inválido")
 	}
-	value, err := decodeJSONObject(content)
+	value, err := decodeStrictJSONObject(content)
 	if err != nil {
 		return managedManifest{}, specError("SPEC_MANIFEST_INVALID", "MANIFEST.json inválido: "+err.Error())
 	}

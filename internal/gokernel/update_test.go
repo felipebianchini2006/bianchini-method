@@ -257,6 +257,36 @@ func TestUpdateFailureRollsBackCompleteInstallation(t *testing.T) {
 	assertUpdateMarker(t, skills, "3.1.0", "local")
 }
 
+func TestCommittedJournalSyncFailureReportsInstalledOutcome(t *testing.T) {
+	parent := t.TempDir()
+	skills := filepath.Join(parent, "skills")
+	remote := filepath.Join(parent, "remote")
+	writeUpdateInstallation(t, skills, "3.1.0", "local")
+	writeUpdateInstallation(t, remote, "3.2.0", "remote")
+	fsops := defaultUpdateFS()
+	writes := 0
+	fsops.writeJournal = func(transaction updateTransaction) error {
+		writes++
+		if writes == 2 {
+			return writeUpdateJournalWithSync(transaction, func(string) error {
+				return errors.New("fsync committed journal failed")
+			})
+		}
+		return writeUpdateJournal(transaction)
+	}
+	backup, err := installSkillsAtomically(skills, remote, "3.1.0", fsops)
+	if err != nil {
+		t.Fatalf("commit confirmado foi rotulado como rollback: %v", err)
+	}
+	if backup == "" {
+		t.Fatal("backup confirmado ausente")
+	}
+	assertUpdateMarker(t, skills, "3.2.0", "remote")
+	if _, statErr := os.Lstat(updateJournalPath(skills)); !os.IsNotExist(statErr) {
+		t.Fatalf("journal residual após commit confirmado: %v", statErr)
+	}
+}
+
 func TestUpdateRecoversInterruptedDirectorySwap(t *testing.T) {
 	parent := t.TempDir()
 	skills := filepath.Join(parent, "skills")
@@ -293,6 +323,49 @@ func TestUpdateRecoversInterruptedDirectorySwap(t *testing.T) {
 	}
 	if _, statErr := os.Lstat(stage); !os.IsNotExist(statErr) {
 		t.Fatalf("stage residual: %v", statErr)
+	}
+}
+
+func TestCommittedUpdateRecoveryVerifiesEveryTarget(t *testing.T) {
+	parent := t.TempDir()
+	skills := filepath.Join(parent, "skills")
+	writeUpdateInstallation(t, skills, "3.1.0", "local")
+	stage, err := os.MkdirTemp(parent, ".bianchini-method-stage.*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeUpdateInstallation(t, stage, "3.2.0", "remote")
+	backup := filepath.Join(parent, ".bianchini-method-backups", "committed-v3.1.0")
+	if err := os.MkdirAll(backup, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	journal, err := newUpdateTransaction(skills, stage, backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, move := range journal.Moves {
+		if err := os.Rename(filepath.Join(skills, move.Name), filepath.Join(backup, move.Name)); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(filepath.Join(stage, move.Name), filepath.Join(skills, move.Name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	journal.Committed = true
+	if err := writeUpdateJournal(journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skills, "_shared", "PACKAGE.txt"), []byte("tampered\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverUpdateTransaction(skills, defaultUpdateFS()); err == nil {
+		t.Fatal("recovery committed ocultou target adulterado")
+	}
+	if _, err := os.Lstat(updateJournalPath(skills)); err != nil {
+		t.Fatalf("journal de recuperação não foi preservado: %v", err)
+	}
+	if _, err := os.Lstat(stage); err != nil {
+		t.Fatalf("stage de recuperação não foi preservado: %v", err)
 	}
 }
 

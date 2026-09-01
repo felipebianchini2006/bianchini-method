@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -525,6 +526,9 @@ func coherenceSemanticReport(path, expectedInput string) (map[string]any, error)
 	value := map[string]any{}
 	if err := decoder.Decode(&value); err != nil {
 		return nil, workflowError("COHERENCE_ERROR", "relatório semântico inválido na linha 1")
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return nil, workflowError("COHERENCE_ERROR", "relatório semântico possui dados extras")
 	}
 	findings, ok := value["findings"].([]any)
 	if value["findings"] == nil {

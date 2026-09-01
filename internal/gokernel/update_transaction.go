@@ -80,6 +80,10 @@ func newUpdateTransaction(skillsRoot, stage, backup string) (updateTransaction, 
 }
 
 func writeUpdateJournal(transaction updateTransaction) error {
+	return writeUpdateJournalWithSync(transaction, syncDirectory)
+}
+
+func writeUpdateJournalWithSync(transaction updateTransaction, syncDir directorySync) error {
 	content, err := json.MarshalIndent(transaction, "", "  ")
 	if err != nil {
 		return err
@@ -88,11 +92,31 @@ func writeUpdateJournal(transaction updateTransaction) error {
 	if info, statErr := os.Lstat(path); statErr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return userError("journal de atualização não pode ser symlink")
 	}
-	temporary := path + ".part"
-	if err := os.WriteFile(temporary, append(content, '\n'), 0o600); err != nil {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".bianchini-method-update.*.part")
+	if err != nil {
 		return err
 	}
-	return os.Rename(temporary, path)
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(append(content, '\n')); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	return syncDir(filepath.Dir(path))
 }
 
 func readUpdateJournal(skillsRoot string) (*updateTransaction, error) {
@@ -152,17 +176,41 @@ func validateUpdateTransaction(skillsRoot string, transaction updateTransaction)
 	return nil
 }
 
+const (
+	updateRecoveryNone       = "none"
+	updateRecoveryCommitted  = "committed"
+	updateRecoveryRolledBack = "rolled_back"
+)
+
 func recoverUpdateTransaction(skillsRoot string, fsops updateFS) error {
+	_, err := recoverUpdateTransactionOutcome(skillsRoot, fsops)
+	return err
+}
+
+func recoverUpdateTransactionOutcome(skillsRoot string, fsops updateFS) (string, error) {
 	transaction, err := readUpdateJournal(skillsRoot)
 	if err != nil || transaction == nil {
-		return err
+		return updateRecoveryNone, err
 	}
 	if transaction.Committed {
-		_ = fsops.removeAll(transaction.Stage)
-		if err := os.Remove(updateJournalPath(skillsRoot)); err != nil && !os.IsNotExist(err) {
-			return updateError("atualização concluída, mas journal não pôde ser removido", 3)
+		problems := []string{}
+		for _, move := range transaction.Moves {
+			target := filepath.Join(skillsRoot, move.Name)
+			digest, present, digestErr := updateTreeDigestIfPresent(target)
+			if digestErr != nil || !present || digest != move.StagedDigest {
+				problems = append(problems, move.Name+": target committed divergiu")
+			}
 		}
-		return nil
+		if len(problems) > 0 {
+			return updateRecoveryCommitted, updateError("commit de atualização não pôde ser confirmado; cópias preservadas: "+strings.Join(problems, "; "), 3)
+		}
+		if err := fsops.removeAll(transaction.Stage); err != nil {
+			return updateRecoveryCommitted, updateError("commit confirmado, mas stage foi preservado: "+err.Error(), 3)
+		}
+		if err := durableRemoveFile(updateJournalPath(skillsRoot)); err != nil {
+			return updateRecoveryCommitted, updateError("atualização concluída, mas journal não pôde ser removido", 3)
+		}
+		return updateRecoveryCommitted, nil
 	}
 	problems := []string{}
 	for index := len(transaction.Moves) - 1; index >= 0; index-- {
@@ -215,15 +263,15 @@ func recoverUpdateTransaction(skillsRoot string, fsops updateFS) error {
 		}
 	}
 	if len(problems) > 0 {
-		return updateError("rollback incompleto; cópias preservadas: "+strings.Join(problems, "; "), 3)
+		return updateRecoveryRolledBack, updateError("rollback incompleto; cópias preservadas: "+strings.Join(problems, "; "), 3)
 	}
 	if err := fsops.removeAll(transaction.Stage); err != nil {
-		return updateError("rollback restaurou a instalação, mas stage foi preservado: "+err.Error(), 3)
+		return updateRecoveryRolledBack, updateError("rollback restaurou a instalação, mas stage foi preservado: "+err.Error(), 3)
 	}
-	if err := os.Remove(updateJournalPath(skillsRoot)); err != nil && !os.IsNotExist(err) {
-		return updateError("rollback restaurou a instalação, mas journal foi preservado", 3)
+	if err := durableRemoveFile(updateJournalPath(skillsRoot)); err != nil {
+		return updateRecoveryRolledBack, updateError("rollback restaurou a instalação, mas journal foi preservado", 3)
 	}
-	return nil
+	return updateRecoveryRolledBack, nil
 }
 
 func updateTreeDigestIfPresent(path string) (string, bool, error) {

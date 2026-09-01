@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -169,6 +170,9 @@ func waveFrontmatter(root, path, label string) (map[string]any, error) {
 	err = decoder.Decode(&raw)
 	if err != nil {
 		return nil, waveError("WAVE_INCOMPLETE", fmt.Sprintf("%s possui JSON inválido na linha %d", label, jsonErrorLine(match[1], err)))
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return nil, waveError("WAVE_INCOMPLETE", label+" possui dados extras no frontmatter JSON")
 	}
 	value, ok := raw.(map[string]any)
 	if !ok {

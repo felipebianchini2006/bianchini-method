@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -152,13 +153,17 @@ func closeDigestIfPresent(path string, directory bool) (string, error) {
 }
 
 func closeAtomicWrite(path string, content []byte) error {
+	return closeAtomicWriteWithSync(path, content, syncDirectory)
+}
+
+func closeAtomicWriteWithSync(path string, content []byte, syncDir directorySync) error {
 	if info, err := os.Lstat(path); err == nil {
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 			return closeError("PATH_UNSAFE", "escrita recusada para symlink: "+path)
 		}
 		current, readErr := os.ReadFile(path)
 		if readErr == nil && bytes.Equal(current, content) {
-			return nil
+			return syncDir(filepath.Dir(path))
 		}
 	}
 	repository, err := closeRepositoryPath(path)
@@ -191,7 +196,10 @@ func closeAtomicWrite(path string, content []byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, path)
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	return syncDir(filepath.Dir(path))
 }
 
 func closeRejectSymlinkChain(root, path string) error {
@@ -268,7 +276,7 @@ func closeCopyTree(source, target string) error {
 func closeRemoveKnown(path string, expected string) error {
 	info, err := os.Lstat(path)
 	if os.IsNotExist(err) {
-		return nil
+		return syncDirectory(filepath.Dir(path))
 	}
 	if err != nil || info.Mode()&os.ModeSymlink != 0 {
 		return closeError("PATH_UNSAFE", "remoção recusada para symlink: "+path)
@@ -283,14 +291,21 @@ func closeRemoveKnown(path string, expected string) error {
 			return digestErr
 		}
 	}
-	return os.RemoveAll(path)
+	return durableRemoveAll(path)
 }
 
 func closeRename(source, target string) error {
+	return closeRenameWithSync(source, target, syncDirectory)
+}
+
+func closeRenameWithSync(source, target string, syncDir directorySync) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
-	return os.Rename(source, target)
+	if err := os.Rename(source, target); err != nil {
+		return err
+	}
+	return syncRenameDirectories(source, target, syncDir)
 }
 
 func writeCloseJournal(root string, journal closeJournal) error {
@@ -324,7 +339,7 @@ func readCloseJournal(root string) (*closeJournal, error) {
 		return nil, closeError("JOURNAL_CORRUPT", "journal truncado ou inválido")
 	}
 	var trailing any
-	if err := decoder.Decode(&trailing); err == nil {
+	if err := decoder.Decode(&trailing); err != io.EOF {
 		return nil, closeError("JOURNAL_CORRUPT", "journal truncado ou inválido")
 	}
 	if err := validateCloseJournal(root, journal); err != nil {
@@ -489,6 +504,9 @@ func prepareClose(root, change, specsSource, specsManifest string, summary, next
 	if err := closeAtomicWrite(filepath.Join(inputs, "specs", "MANIFEST.json"), manifestContent); err != nil {
 		return closeJournal{}, err
 	}
+	if err := syncTreeDurably(inputs); err != nil {
+		return closeJournal{}, err
+	}
 	journal.Inputs = map[string]string{}
 	for key, path := range map[string]string{
 		"architecture": filepath.Join(inputs, "ARCHITECTURE.md"), "system_model": filepath.Join(inputs, "SYSTEM_MODEL.md"),
@@ -599,7 +617,7 @@ func discardPreparingClose(root string, journal closeJournal) (map[string]any, e
 	if err := closeRemoveKnown(paths["transaction"], ""); err != nil {
 		return nil, err
 	}
-	if err := os.Remove(closeJournalPath(root)); err != nil && !os.IsNotExist(err) {
+	if err := durableRemoveFile(closeJournalPath(root)); err != nil {
 		return nil, err
 	}
 	return map[string]any{"change": journal.Change, "status": "restored"}, nil
@@ -703,6 +721,12 @@ func stageClose(root string, journal *closeJournal) error {
 	if err := closeAtomicWrite(filepath.Join(stagedArchive, "SUMMARY.md"), mustReadClose(filepath.Join(inputs, "SUMMARY.md"))); err != nil {
 		return err
 	}
+	if err := syncTreeDurably(stagedCurrent); err != nil {
+		return err
+	}
+	if err := syncTreeDurably(stagedArchive); err != nil {
+		return err
+	}
 	currentAfter, err := closeTreeDigest(stagedCurrent)
 	if err != nil {
 		return err
@@ -743,6 +767,9 @@ func promoteCloseCurrent(root string, journal *closeJournal) error {
 	if currentDigest != after || stageDigest != "" || backupDigest != before {
 		return closeError("RECOVERY_AMBIGUOUS", "promoção de current está em estado desconhecido")
 	}
+	if err := syncRenameDirectories(stage, paths["current"], syncDirectory); err != nil {
+		return err
+	}
 	journal.Phase = "CURRENT_PROMOTED"
 	return writeCloseJournal(root, *journal)
 }
@@ -770,6 +797,9 @@ func archiveCloseChange(root string, journal *closeJournal) error {
 	}
 	if changeDigest != "" || archiveDigest != after || stageDigest != "" || backupDigest != before {
 		return closeError("RECOVERY_AMBIGUOUS", "arquivamento da mudança está em estado desconhecido")
+	}
+	if err := syncRenameDirectories(stage, paths["archive"], syncDirectory); err != nil {
+		return err
 	}
 	journal.Phase = "CHANGE_ARCHIVED"
 	return writeCloseJournal(root, *journal)
@@ -819,7 +849,7 @@ func cleanupCloseDone(root string, journal closeJournal) error {
 	if err := closeRemoveKnown(paths["transaction"], ""); err != nil {
 		return err
 	}
-	if err := os.Remove(closeJournalPath(root)); err != nil && !os.IsNotExist(err) {
+	if err := durableRemoveFile(closeJournalPath(root)); err != nil {
 		return err
 	}
 	return nil

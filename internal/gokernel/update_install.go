@@ -11,8 +11,9 @@ import (
 )
 
 type updateFS struct {
-	rename    func(string, string) error
-	removeAll func(string) error
+	rename       func(string, string) error
+	removeAll    func(string) error
+	writeJournal func(updateTransaction) error
 }
 
 type updateCompletedMove struct {
@@ -21,7 +22,7 @@ type updateCompletedMove struct {
 }
 
 func defaultUpdateFS() updateFS {
-	return updateFS{rename: os.Rename, removeAll: os.RemoveAll}
+	return updateFS{rename: durableRename, removeAll: durableRemoveAll, writeJournal: writeUpdateJournal}
 }
 
 func installSkillsAtomically(skillsRoot, remoteSkills, installed string, fsops updateFS) (string, error) {
@@ -48,19 +49,27 @@ func installSkillsAtomically(skillsRoot, remoteSkills, installed string, fsops u
 			return "", err
 		}
 	}
+	if err := syncTreeDurably(stage); err != nil {
+		return "", updateError("stage não pôde ser sincronizado antes do journal: "+err.Error(), 3)
+	}
 	transaction, err := newUpdateTransaction(skillsRoot, stage, backup)
 	if err != nil {
 		return "", err
 	}
-	if err := writeUpdateJournal(transaction); err != nil {
+	if err := fsops.writeJournal(transaction); err != nil {
 		return "", err
 	}
 	journalCreated = true
 	fail := func(cause error) (string, error) {
-		if recoveryErr := recoverUpdateTransaction(skillsRoot, fsops); recoveryErr != nil {
+		outcome, recoveryErr := recoverUpdateTransactionOutcome(skillsRoot, fsops)
+		if recoveryErr != nil {
 			return "", updateError("falha na atualização; "+recoveryErr.Error()+"; causa: "+cause.Error(), 3)
 		}
 		journalCreated = false
+		if outcome == updateRecoveryCommitted {
+			pruneUpdateBackups(backup, fsops, 3)
+			return backup, nil
+		}
 		return "", updateError("falha na atualização; rollback concluído; causa: "+cause.Error(), 3)
 	}
 	for _, move := range transaction.Moves {
@@ -76,13 +85,13 @@ func installSkillsAtomically(skillsRoot, remoteSkills, installed string, fsops u
 		}
 	}
 	transaction.Committed = true
-	if err := writeUpdateJournal(transaction); err != nil {
+	if err := fsops.writeJournal(transaction); err != nil {
 		return fail(err)
 	}
 	if err := fsops.removeAll(stage); err != nil {
 		return "", updateError("atualização concluída, mas stage não pôde ser removido: "+err.Error(), 3)
 	}
-	if err := os.Remove(updateJournalPath(skillsRoot)); err != nil && !os.IsNotExist(err) {
+	if err := durableRemoveFile(updateJournalPath(skillsRoot)); err != nil {
 		return "", updateError("atualização concluída, mas journal foi preservado", 3)
 	}
 	journalCreated = false
