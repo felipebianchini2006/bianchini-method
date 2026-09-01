@@ -7,6 +7,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GO_ENTRYPOINT = ROOT / "cmd" / "bm"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def run(*argv: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
