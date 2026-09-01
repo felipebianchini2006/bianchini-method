@@ -134,6 +134,20 @@ func TestGovernedLearningTransitionRequiresExclusiveLock(t *testing.T) {
 	}
 }
 
+func TestGovernedLearningRejectsCandidatePathBeforeFilesystemAccess(t *testing.T) {
+	repo := learningTestRepo(t)
+	for _, id := range []string{"../../outside", "/absolute", `L123\\outside`, "l813bc8bd6bab"} {
+		for _, args := range [][]string{
+			{"approve", "--repo", repo, "--candidate", id, "--digest", strings.Repeat("0", 64), "--approved-by", "human:fixture"},
+			{"reject", "--repo", repo, "--candidate", id, "--reason", "inválido"},
+		} {
+			if _, err := runLearning(args); err == nil || !strings.Contains(err.Error(), "LEARNING_CANDIDATE_INVALID") {
+				t.Fatalf("id=%q args=%v err=%v", id, args, err)
+			}
+		}
+	}
+}
+
 func TestGovernedLearningAcceptsTruthfulBooleanGreenOnly(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -279,6 +279,9 @@ func learningApprove(repo, id, digest, approvedBy string) (map[string]any, error
 	if !humanIDPattern.MatchString(approvedBy) {
 		return nil, learningError("HUMAN_APPROVAL_REQUIRED", "approved_by exige identidade human:<id>")
 	}
+	if !learningIDPattern.MatchString(id) {
+		return nil, learningError("LEARNING_CANDIDATE_INVALID", "ID de candidato inválido")
+	}
 	source, candidate, err := loadLearningCandidate(repo, id)
 	if err != nil {
 		pending, pendingErr := learningFixedDir(repo, ".bianchini/.runtime/learning/pending", false)
@@ -409,6 +412,9 @@ func learningDeactivate(repo, id, reason, actor string) (map[string]any, error) 
 }
 
 func learningReject(repo, id, reason string) (map[string]any, error) {
+	if !learningIDPattern.MatchString(id) {
+		return nil, learningError("LEARNING_CANDIDATE_INVALID", "ID de candidato inválido")
+	}
 	if strings.TrimSpace(reason) == "" {
 		return nil, learningError("LEARNING_REJECTION_INVALID", "rejeição exige motivo")
 	}

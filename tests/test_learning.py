@@ -112,6 +112,21 @@ class GovernedLearningScenarios(unittest.TestCase):
                     propose_learning(repo)
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
+    def test_candidate_path_is_rejected_before_transition_target_lookup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            for candidate in ("../../outside", "/absolute", r"L123\outside", "l813bc8bd6bab"):
+                for transition in (
+                    lambda value=candidate: approve_learning(
+                        repo, value, "0" * 64, "human:felipe"
+                    ),
+                    lambda value=candidate: reject_learning(repo, value, "inválido"),
+                ):
+                    with self.assertRaisesRegex(
+                        LearningError, "LEARNING_CANDIDATE_INVALID"
+                    ):
+                        transition()
+
     def test_partial_approve_and_reject_transitions_resume_idempotently(self) -> None:
         for action in ("approve", "reject"):
             with self.subTest(action=action), tempfile.TemporaryDirectory() as temp:

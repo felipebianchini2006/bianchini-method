@@ -582,6 +582,8 @@ def approve_learning(
     root = _repo_root(repo)
     if not isinstance(approved_by, str) or not re.fullmatch(r"human:[^\s:][^\s]*", approved_by):
         _fail("HUMAN_APPROVAL_REQUIRED", "approved_by exige identidade human:<id>")
+    if not CANDIDATE_ID.fullmatch(candidate):
+        _fail("LEARNING_CANDIDATE_INVALID", "ID de candidato inválido")
     pending = _fixed_dir(root, ".bianchini/.runtime/learning/pending", create=False)
     source_path = pending / f"{candidate}.json"
     if source_path.is_symlink() or source_path.exists():
@@ -707,6 +709,8 @@ def deactivate_learning(
 @_transition_locked
 def reject_learning(repo: str | Path, candidate: str, reason: str) -> dict[str, Any]:
     root = _repo_root(repo)
+    if not CANDIDATE_ID.fullmatch(candidate):
+        _fail("LEARNING_CANDIDATE_INVALID", "ID de candidato inválido")
     if not isinstance(reason, str) or not reason.strip():
         _fail("LEARNING_REJECTION_INVALID", "rejeição exige motivo")
     clean_reason = reason.strip()
