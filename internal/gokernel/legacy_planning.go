@@ -247,7 +247,7 @@ func runPlanningAudit(args []string) (any, error) {
 	return legacyPlanningAudit(statePath, root, strict, true)
 }
 
-func legacyPlanningAudit(statePath, root string, strict, requireChecker bool) (map[string]any, error) {
+func legacyPlanningAuditBaseline(statePath, root string, strict, requireChecker bool) (map[string]any, error) {
 	state, err := validateStateFile(statePath, "")
 	if err != nil {
 		return nil, err
@@ -531,13 +531,13 @@ func legacyDesignAudit(rootValue, scopeValue, manifestValue string, seal bool) (
 			return nil, fmt.Errorf("manifesto de design: arquivo vazio ou ausente: %s", relative)
 		}
 	}
-	if filepath.Ext(stateString(manifest["contract"])) != ".md" {
+	if strings.ToLower(filepath.Ext(stateString(manifest["contract"]))) != ".md" {
 		return nil, fmt.Errorf("manifesto de design: contract deve ser Markdown")
 	}
-	if filepath.Ext(stateString(manifest["prototype"])) != ".html" {
+	if strings.ToLower(filepath.Ext(stateString(manifest["prototype"]))) != ".html" {
 		return nil, fmt.Errorf("manifesto de design: prototype deve ser HTML estático")
 	}
-	if filepath.Ext(stateString(manifest["tokens"])) != ".css" {
+	if strings.ToLower(filepath.Ext(stateString(manifest["tokens"]))) != ".css" {
 		return nil, fmt.Errorf("manifesto de design: tokens deve ser CSS")
 	}
 	scopeRelative, _ := legacyRelative(root, scope)
@@ -666,6 +666,9 @@ func legacyPlanningCheck(stateValue, rootValue, reportValue string) (map[string]
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
 			return nil, fmt.Errorf("checker: histórico inválido na linha %d", lineNumber+1)
 		}
+		if record == nil {
+			return nil, fmt.Errorf("checker: histórico inválido na linha %d", lineNumber+1)
+		}
 		history = append(history, record)
 	}
 	if len(history) >= 2 || (len(history) > 0 && stateString(history[len(history)-1]["verdict"]) == "blocked") {
@@ -692,6 +695,9 @@ func legacyPlanningCheck(stateValue, rootValue, reportValue string) (map[string]
 	round := len(history) + 1
 	if round == 2 {
 		previous := history[len(history)-1]
+		if !oneOf(stateString(previous["verdict"]), "changes_requested", "passed") {
+			return nil, &commandError{message: "BLOQUEADO: segunda revisão não foi autorizada", exitCode: 3}
+		}
 		if stateString(previous["package_digest"]) == packageDigest {
 			return nil, &commandError{message: "BLOQUEADO: segunda revisão exige correção factual no pacote", exitCode: 3}
 		}
@@ -703,7 +709,7 @@ func legacyPlanningCheck(stateValue, rootValue, reportValue string) (map[string]
 		}
 	}
 	record := map[string]any{
-		"schema_version": 1, "round": round, "recorded_at": time.Now().UTC().Format(time.RFC3339Nano),
+		"schema_version": 1, "round": round, "recorded_at": time.Now().UTC().Format("2006-01-02T15:04:05.999999999+00:00"),
 		"package_digest": packageDigest, "report_digest": reportDigest,
 		"verdict": report["verdict"], "findings": report["findings"],
 	}
@@ -766,10 +772,11 @@ func legacyCheckerReport(path string) (map[string]any, error) {
 				return nil, fmt.Errorf("checker: finding %d sem %s", index, field)
 			}
 		}
-		if identifiers[stateString(finding["id"])] {
+		identifier := strings.TrimSpace(stateString(finding["id"]))
+		if identifiers[identifier] {
 			return nil, fmt.Errorf("checker: IDs de findings duplicados")
 		}
-		identifiers[stateString(finding["id"])] = true
+		identifiers[identifier] = true
 		if severity == "critical" || severity == "important" {
 			material++
 		}

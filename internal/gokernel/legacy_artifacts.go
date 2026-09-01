@@ -262,7 +262,7 @@ func legacyExtractGroup(content, heading string) (string, error) {
 	return strings.TrimRight(content[match[0]:end], "\r\n") + "\n", nil
 }
 
-func legacyHydrateTaskContext(rootValue, stateValue, planPath string, labels, sections []string, ledgerTail int) (string, string, error) {
+func legacyHydrateTaskContextBaseline(rootValue, stateValue, planPath string, labels, sections []string, ledgerTail int) (string, string, error) {
 	root, err := safeRoot(rootValue)
 	if err != nil {
 		return "", "", err

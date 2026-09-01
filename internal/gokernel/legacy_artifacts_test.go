@@ -51,6 +51,36 @@ func TestRunTaskBriefRejectsUngroupedMultiSelection(t *testing.T) {
 	}
 }
 
+func TestRunTaskBriefHydratesSelectedReadinessSpecsAndLedger(t *testing.T) {
+	root, state, planRelative := legacyQualityV2Fixture(t)
+	plan := filepath.Join(root, filepath.FromSlash(planRelative))
+	output := filepath.Join(root, "brief-hydrated.md")
+	result, err := runTaskBrief([]string{
+		"--plan", plan, "--task", "T01", "--state", state, "--root", root,
+		"--hydrate-context", "--ledger-tail-lines", "1", "--output", output,
+	})
+	if err != nil {
+		t.Fatalf("hydrate task brief: %v", err)
+	}
+	value := result.(map[string]any)
+	if value["hydrated"] != true || stateString(value["context_digest"]) == "" {
+		t.Fatalf("missing hydrated metadata: %#v", value)
+	}
+	data, _ := os.ReadFile(output)
+	content := string(data)
+	for _, expected := range []string{
+		`"id": "D-001"`, `"id": "SD-001"`, "#### `docs/bianchini/changes/v1/specs/system-change.md#contracts`",
+		"## Contracts", "latest", `"readiness_refs"`, `"spec_refs"`,
+	} {
+		if !strings.Contains(content, expected) {
+			t.Fatalf("hydrated brief missing %q:\n%s", expected, content)
+		}
+	}
+	if strings.Contains(content, "Do not hydrate this section") || strings.Contains(content, "old\nlatest") {
+		t.Fatalf("hydration was not selective:\n%s", content)
+	}
+}
+
 func TestRunReviewPackageRedactsSecrets(t *testing.T) {
 	repo := t.TempDir()
 	legacyGit(t, repo, "init", "-q")
