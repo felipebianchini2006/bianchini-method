@@ -142,6 +142,8 @@ class MethodWorkspace:
         target = self.resolve(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         data = content.encode("utf-8") if isinstance(content, str) else bytes(content)
+        if target.is_file() and target.read_bytes() == data:
+            return target
         descriptor, temporary_name = tempfile.mkstemp(
             dir=target.parent,
             prefix=f".{target.name}.",

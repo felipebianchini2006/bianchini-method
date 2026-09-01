@@ -68,6 +68,10 @@ def _sync_directory(path: Path) -> None:
 
 def _atomic_write(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise CloseRecoveryError("PATH_UNSAFE", f"escrita recusada para symlink: {path}")
+    if path.is_file() and path.read_bytes() == content:
+        return
     descriptor, temporary_name = tempfile.mkstemp(
         dir=path.parent,
         prefix=f".{path.name}.",
@@ -107,7 +111,7 @@ def _tree_digest(path: Path) -> str:
         files.sort()
         for name in names:
             candidate = Path(directory) / name
-            if name == ".planning":
+            if name.casefold() == ".planning":
                 raise CloseRecoveryError("PATH_UNSAFE", "namespace .planning é proibido")
             metadata = candidate.lstat()
             if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
@@ -119,7 +123,7 @@ def _tree_digest(path: Path) -> str:
             entries.append(f"D\0{relative}\0{mode:o}\n".encode("utf-8"))
         for name in files:
             candidate = Path(directory) / name
-            if name == ".planning":
+            if name.casefold() == ".planning":
                 raise CloseRecoveryError("PATH_UNSAFE", "namespace .planning é proibido")
             metadata = candidate.lstat()
             if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
@@ -145,7 +149,7 @@ def _relative(root: Path, path: Path) -> str:
         relative = path.resolve().relative_to(root.resolve())
     except ValueError as error:
         raise CloseRecoveryError("PATH_UNSAFE", f"caminho fora do repositório: {path}") from error
-    if ".planning" in relative.parts:
+    if any(part.casefold() == ".planning" for part in relative.parts):
         raise CloseRecoveryError("PATH_UNSAFE", "namespace .planning é proibido")
     return relative.as_posix()
 
@@ -219,7 +223,11 @@ def _read_journal(root: Path) -> dict[str, Any] | None:
         raise CloseRecoveryError("JOURNAL_CORRUPT", "paths não correspondem ao change")
     for item in paths.values():
         relative = Path(item)
-        if relative.is_absolute() or ".." in relative.parts or ".planning" in relative.parts:
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or any(part.casefold() == ".planning" for part in relative.parts)
+        ):
             raise CloseRecoveryError("JOURNAL_CORRUPT", "path inseguro no journal")
         _reject_symlink_chain(repository, relative, "path do journal")
         resolved = (repository / relative).resolve()
@@ -315,7 +323,9 @@ def _remove_known(path: Path, *, expected_digest: str | None = None) -> None:
         raise CloseRecoveryError("PATH_UNSAFE", f"remoção recusada para symlink: {path}")
     if path.is_dir():
         for _, names, files in os.walk(path, topdown=True, followlinks=False):
-            if ".planning" in names or ".planning" in files:
+            if any(
+                name.casefold() == ".planning" for name in (*names, *files)
+            ):
                 raise CloseRecoveryError("PATH_UNSAFE", "namespace .planning é proibido")
     if expected_digest is not None:
         actual = _tree_digest(path) if path.is_dir() else _file_digest(path)
@@ -348,6 +358,57 @@ def _assert_digest(actual: str | None, expected: str, label: str) -> None:
         )
 
 
+def _tree_entries(path: Path) -> dict[Path, tuple[str, Path, int]]:
+    """Indexa árvore regular sem seguir symlinks ou namespace estrangeiro."""
+
+    _tree_digest(path)
+    entries: dict[Path, tuple[str, Path, int]] = {}
+    for directory, names, files in os.walk(path, topdown=True, followlinks=False):
+        names.sort()
+        files.sort()
+        parent = Path(directory)
+        for name in names:
+            candidate = parent / name
+            metadata = candidate.lstat()
+            relative = candidate.relative_to(path)
+            entries[relative] = ("directory", candidate, stat.S_IMODE(metadata.st_mode))
+        for name in files:
+            candidate = parent / name
+            metadata = candidate.lstat()
+            relative = candidate.relative_to(path)
+            entries[relative] = ("file", candidate, stat.S_IMODE(metadata.st_mode))
+    return entries
+
+
+def _sync_tree(source: Path, target: Path) -> None:
+    """Sincroniza a árvore staged preservando arquivos de conteúdo igual."""
+
+    source_entries = _tree_entries(source)
+    target_entries = _tree_entries(target)
+    for relative in sorted(
+        target_entries,
+        key=lambda value: (len(value.parts), value.as_posix()),
+        reverse=True,
+    ):
+        target_kind, target_path, _target_mode = target_entries[relative]
+        source_entry = source_entries.get(relative)
+        if source_entry is not None and source_entry[0] == target_kind:
+            continue
+        _remove_known(target_path)
+    for relative in sorted(
+        source_entries, key=lambda value: (len(value.parts), value.as_posix())
+    ):
+        source_kind, source_path, source_mode = source_entries[relative]
+        target_path = target / relative
+        if source_kind == "directory":
+            target_path.mkdir(exist_ok=True)
+            os.chmod(target_path, source_mode)
+            continue
+        content = source_path.read_bytes()
+        _atomic_write(target_path, content)
+        os.chmod(target_path, source_mode)
+
+
 def _stage(root: Path, journal: dict[str, Any]) -> None:
     paths = _paths(root, journal)
     transaction = paths["transaction"]
@@ -375,8 +436,7 @@ def _stage(root: Path, journal: dict[str, Any]) -> None:
     _atomic_write(staged_current / "ARCHITECTURE.md", (inputs / "ARCHITECTURE.md").read_bytes())
     _atomic_write(staged_current / "SYSTEM_MODEL.md", (inputs / "SYSTEM_MODEL.md").read_bytes())
     staged_specs = staged_current / "specs"
-    _remove_known(staged_specs)
-    shutil.copytree(inputs / "specs", staged_specs)
+    _sync_tree(inputs / "specs", staged_specs)
     shutil.copytree(paths["change"], staged_archive)
     _atomic_write(staged_archive / "SUMMARY.md", (inputs / "SUMMARY.md").read_bytes())
     journal["digests"]["after"] = {
@@ -558,7 +618,9 @@ def _prepare(
         if not source.is_file() or source.is_symlink():
             raise CloseRecoveryError("CLOSE_INCOMPLETE", f"{label} final ausente")
     raw_source = specs_source if specs_source.is_absolute() else repository / specs_source
-    if ".." in raw_source.parts or ".planning" in raw_source.parts:
+    if ".." in raw_source.parts or any(
+        part.casefold() == ".planning" for part in raw_source.parts
+    ):
         raise CloseRecoveryError("PATH_UNSAFE", "specs source inseguro")
     try:
         lexical_relative = raw_source.absolute().relative_to(change_dir.absolute())
@@ -580,7 +642,9 @@ def _prepare(
         raw_manifest = (
             specs_manifest if specs_manifest.is_absolute() else repository / specs_manifest
         )
-        if ".." in raw_manifest.parts or ".planning" in raw_manifest.parts:
+        if ".." in raw_manifest.parts or any(
+            part.casefold() == ".planning" for part in raw_manifest.parts
+        ):
             raise CloseRecoveryError("PATH_UNSAFE", "specs manifest inseguro")
         try:
             manifest_relative = raw_manifest.absolute().relative_to(

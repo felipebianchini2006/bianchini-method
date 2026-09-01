@@ -390,6 +390,98 @@ class CloseRecoveryScenarios(unittest.TestCase):
             self.assertEqual(workspace.current_architecture.read_bytes(), b"# Architecture before\n")
             self.assertTrue(Path(fixture["change_dir"]).is_dir())
 
+    def test_unchanged_current_documents_preserve_bytes_and_mtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self._workspace(root)
+            workspace = fixture["workspace"]
+            assert isinstance(workspace, MethodWorkspace)
+            change_dir = Path(fixture["change_dir"])
+            specs = Path(fixture["specs"])
+            (change_dir / "ARCHITECTURE.md").write_bytes(
+                workspace.current_architecture.read_bytes()
+            )
+            (specs / "billing.md").write_bytes(
+                (workspace.current_specs / "billing.md").read_bytes()
+            )
+            architecture_before = workspace.current_architecture.read_bytes()
+            architecture_mtime = workspace.current_architecture.stat().st_mtime_ns
+            spec_before = (workspace.current_specs / "billing.md").read_bytes()
+            spec_mtime = (workspace.current_specs / "billing.md").stat().st_mtime_ns
+
+            self._close(root, fixture)
+
+            self.assertEqual(workspace.current_architecture.read_bytes(), architecture_before)
+            self.assertEqual(workspace.current_architecture.stat().st_mtime_ns, architecture_mtime)
+            self.assertEqual((workspace.current_specs / "billing.md").read_bytes(), spec_before)
+            self.assertEqual(
+                (workspace.current_specs / "billing.md").stat().st_mtime_ns,
+                spec_mtime,
+            )
+
+    def test_casefold_planning_is_rejected_before_visible_mutation(self) -> None:
+        for location in ("current", "change"):
+            with self.subTest(location=location), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                fixture = self._workspace(root)
+                workspace = fixture["workspace"]
+                assert isinstance(workspace, MethodWorkspace)
+                base = (
+                    workspace.current_dir
+                    if location == "current"
+                    else Path(fixture["change_dir"])
+                )
+                foreign = base / ".PLANNING"
+                foreign.mkdir()
+                (foreign / "keep.md").write_text("foreign\n", encoding="utf-8")
+                architecture_before = workspace.current_architecture.read_bytes()
+                coherence_before = (
+                    Path(fixture["change_dir"]) / "COHERENCE.md"
+                ).read_bytes()
+                state_before = workspace.state_file.read_bytes()
+
+                with self.assertRaisesRegex(CloseRecoveryError, "PATH_UNSAFE"):
+                    self._close(root, fixture)
+
+                self.assertEqual(
+                    workspace.current_architecture.read_bytes(), architecture_before
+                )
+                self.assertEqual(
+                    (Path(fixture["change_dir"]) / "COHERENCE.md").read_bytes(),
+                    coherence_before,
+                )
+                self.assertEqual(workspace.state_file.read_bytes(), state_before)
+                self.assertEqual((foreign / "keep.md").read_text(encoding="utf-8"), "foreign\n")
+                self.assertFalse(
+                    (workspace.runtime_dir / f"cycle-close-{fixture['change']}").exists()
+                )
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self._workspace(root)
+            workspace = fixture["workspace"]
+            assert isinstance(workspace, MethodWorkspace)
+            with self.assertRaises(SimulatedCloseCrash):
+                self._close(root, fixture, failpoint="PREPARED")
+            journal = pending_close(root)
+            assert journal is not None
+            transaction = root / journal["paths"]["transaction"]
+            foreign = transaction / "inputs/specs/.PLANNING"
+            foreign.mkdir()
+            (foreign / "keep.md").write_text("foreign\n", encoding="utf-8")
+            current_before = bm_close._tree_digest(workspace.current_dir)
+            change_before = bm_close._tree_digest(Path(fixture["change_dir"]))
+            state_before = workspace.state_file.read_bytes()
+
+            with self.assertRaisesRegex(CloseRecoveryError, "PATH_UNSAFE"):
+                recover_pending_close(root)
+
+            self.assertEqual(bm_close._tree_digest(workspace.current_dir), current_before)
+            self.assertEqual(
+                bm_close._tree_digest(Path(fixture["change_dir"])), change_before
+            )
+            self.assertEqual(workspace.state_file.read_bytes(), state_before)
+
     def test_journal_cannot_redirect_cleanup_outside_transaction(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

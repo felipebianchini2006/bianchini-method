@@ -1701,6 +1701,10 @@ class MethodV04Scenarios(unittest.TestCase):
                 ]
             )
             change_root = repo / ".bianchini/changes" / change_id
+            current_architecture = repo / ".bianchini/current/ARCHITECTURE.md"
+            (change_root / "ARCHITECTURE.md").write_bytes(
+                current_architecture.read_bytes()
+            )
             delta = {"contracts": {"add": [{"id": "invoice_created"}]}}
             (change_root / "SYSTEM_MODEL.md").write_text(
                 markdown_document(
@@ -1827,6 +1831,8 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertEqual(task_payload["verification"], ["test_invoice passou"])
             git(repo, "add", ".")
             git(repo, "commit", "-m", "complete billing plan")
+            architecture_before = current_architecture.read_bytes()
+            architecture_mtime = current_architecture.stat().st_mtime_ns
 
             original_atomic_write = bm_close._atomic_write
             crashed = False
@@ -1867,6 +1873,8 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertTrue(closed["recovered"])
             self.assertTrue(closed["specs_promoted"])
             self.assertEqual(closed["specs_status"], "managed")
+            self.assertEqual(current_architecture.read_bytes(), architecture_before)
+            self.assertEqual(current_architecture.stat().st_mtime_ns, architecture_mtime)
             self.assertIn("model_digest", closed)
             self.assertFalse(change_root.exists())
             archive = repo / ".bianchini/archive" / change_id
