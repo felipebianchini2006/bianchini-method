@@ -377,7 +377,7 @@ model_delta:
             )
 
     def test_go_scope_seal_and_verify_match_python_oracle(self) -> None:
-        from tests.test_method_v04_cli import detailed_scope_body, write_text_pdf
+        from test_method_v04_cli import detailed_scope_body, write_text_pdf
 
         with tempfile.TemporaryDirectory(prefix="bm-go-scope-parity-") as temp:
             base = Path(temp)
@@ -438,7 +438,7 @@ model_delta:
                 self.assertTrue(json.loads(verified.stdout)["verified"])
 
     def test_go_next_wave_matches_python_oracle_without_mutation(self) -> None:
-        from tests.test_next_wave import NextWaveScenarios, tree_digest
+        from test_next_wave import NextWaveScenarios, tree_digest
 
         with tempfile.TemporaryDirectory(prefix="bm-go-wave-parity-") as temp:
             base = Path(temp)
