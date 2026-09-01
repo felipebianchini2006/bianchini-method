@@ -13,6 +13,7 @@ const usageLine = "usage: bm <command> [options]\n"
 type commandError struct {
 	message  string
 	argparse bool
+	exitCode int
 }
 
 func (e *commandError) Error() string { return e.message }
@@ -41,8 +42,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return writeArgparseError(stderr, fmt.Sprintf("argument command: invalid choice: '%s'", args[0]))
 	}
 	if err != nil {
-		if cliErr, ok := err.(*commandError); ok && cliErr.argparse {
-			return writeArgparseError(stderr, cliErr.message)
+		if cliErr, ok := err.(*commandError); ok {
+			if cliErr.argparse {
+				return writeArgparseError(stderr, cliErr.message)
+			}
+			fmt.Fprintln(stderr, cliErr.message)
+			if cliErr.exitCode > 0 {
+				return cliErr.exitCode
+			}
+			return 2
 		}
 		fmt.Fprintln(stderr, err)
 		return 2
@@ -75,6 +83,10 @@ func argparseError(message string) error {
 
 func domainError(code, message string) error {
 	return &commandError{message: code + ": " + message}
+}
+
+func riskInputError(message string) error {
+	return &commandError{message: "RISK_PATH_INVALID: " + message, exitCode: 3}
 }
 
 func runVersion(args []string) (any, error) {

@@ -213,6 +213,17 @@ func sha256Bytes(data []byte) string {
 }
 
 func atomicWrite(path string, data []byte) error {
+	mode := os.FileMode(0o644)
+	existing := false
+	if info, err := os.Lstat(path); err == nil {
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("output inseguro")
+		}
+		mode = info.Mode().Perm()
+		existing = true
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -222,9 +233,24 @@ func atomicWrite(path string, data []byte) error {
 	}
 	temporaryPath := temporary.Name()
 	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o644); err != nil {
-		temporary.Close()
-		return err
+	if existing {
+		if err := temporary.Chmod(mode); err != nil {
+			temporary.Close()
+			return err
+		}
+	} else {
+		if err := temporary.Close(); err != nil {
+			return err
+		}
+		if err := os.Remove(temporaryPath); err != nil {
+			return err
+		}
+		temporary, err = os.OpenFile(
+			temporaryPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666,
+		)
+		if err != nil {
+			return err
+		}
 	}
 	if _, err := temporary.Write(data); err != nil {
 		temporary.Close()

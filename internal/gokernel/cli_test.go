@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -118,6 +119,38 @@ func TestDirectReopenTerminalIsImmutable(t *testing.T) {
 	}
 }
 
+func TestDirectReopenValidatesArgumentsBeforeTerminalError(t *testing.T) {
+	code, stdout, stderr := runCLI(t, "direct", "reopen", "--bogus")
+	if code != 2 || stdout != "" || !strings.Contains(stderr, "unrecognized arguments: --bogus") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestDirectClassifyRejectsUnsafeRiskPathsLikePython(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"non NFC", "src/cafe\u0301.go", "RISK_PATH_INVALID: declared_paths não está em NFC"},
+		{"foreign namespace", "src/.planning/x", "RISK_PATH_INVALID: declared_paths usa namespace estrangeiro"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			code, stdout, stderr := runCLI(
+				t,
+				"direct",
+				"classify",
+				"--changed-file",
+				test.path,
+			)
+			if code != 3 || stdout != "" || !strings.Contains(stderr, test.want) {
+				t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+		})
+	}
+}
+
 func TestRetiredCommandsRemainInvalid(t *testing.T) {
 	for _, command := range []string{"legacy-transition", "repo-hygiene", "route"} {
 		t.Run(command, func(t *testing.T) {
@@ -155,6 +188,12 @@ func TestStatusLegacyFixtures(t *testing.T) {
 	}
 	assertJSONEqual(t, stdout, `{"implicit_legacy":false,"method_mode":"legacy-superpowers","method_version":1,"mode":"legacy-superpowers","status":"legacy"}`)
 
+	code, stdout, stderr = runCLI(t, "status", state, "--root", repo)
+	if code != 0 || stderr != "" {
+		t.Fatalf("default json with root: code=%d stderr=%q", code, stderr)
+	}
+	assertJSONEqual(t, stdout, `{"implicit_legacy":false,"method_mode":"legacy-superpowers","method_version":1,"mode":"legacy-superpowers","status":"legacy"}`)
+
 	code, stdout, stderr = runCLI(t, "status", state, "--format", "text")
 	want := "# Status do projeto\n\n- Método: v1 legado (Superpowers)\n- Marcador implícito: não\n"
 	if code != 0 || stderr != "" || stdout != want {
@@ -187,6 +226,34 @@ func TestSpecDiffFixtureAndPathSafety(t *testing.T) {
 	wantOutput := "# Spec Diff\n\nEsta é uma projeção derivada. A spec target completa permanece a fonte de verdade.\n\n```json\n{\n  \"added\": [\n    \"REQ-002\"\n  ],\n  \"base\": \"base.md\",\n  \"base_digest\": \"5976dc433f17bf6128fcc0474a1ae15fccac2573db3756c62dc39f77c0a88994\",\n  \"modified\": [\n    \"REQ-001\"\n  ],\n  \"removed\": [],\n  \"schema_version\": 1,\n  \"target\": \"target.md\",\n  \"target_digest\": \"5db96862e6f1a7ac687de5e76de77c155506554bd53e0aed815466343f6bbe33\"\n}\n```\n\n## ADDED\n\n### REQ-002\n\n## REQ-002 Novo\n\nNovo.\n\n\n## MODIFIED\n\n### REQ-001\n\n## REQ-001 Depois\n\nDepois.\n\n\n## REMOVED\n\nNenhum.\n"
 	if string(data) != wantOutput {
 		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s", data, wantOutput)
+	}
+	if err := os.Chmod(output, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", base, "--target", target, "--output", output)
+	if code != 0 || stderr != "" {
+		t.Fatalf("rewrite code=%d stderr=%q", code, stderr)
+	}
+	info, err := os.Stat(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Fatalf("output mode=%o want=755", info.Mode().Perm())
+	}
+	restrictedOutput := filepath.Join(repo, "restricted.md")
+	oldUmask := syscall.Umask(0o077)
+	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", base, "--target", target, "--output", restrictedOutput)
+	syscall.Umask(oldUmask)
+	if code != 0 || stderr != "" {
+		t.Fatalf("restricted umask code=%d stderr=%q", code, stderr)
+	}
+	restrictedInfo, err := os.Stat(restrictedOutput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restrictedInfo.Mode().Perm() != 0o600 {
+		t.Fatalf("restricted output mode=%o want=600", restrictedInfo.Mode().Perm())
 	}
 
 	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", filepath.Join(repo, ".planning", "base.md"), "--target", target, "--output", filepath.Join(repo, "unsafe.md"))

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 var directValueFlags = map[string]bool{
@@ -33,6 +35,9 @@ func runDirect(args []string) (any, error) {
 	}
 	action := args[0]
 	if action == "reopen" {
+		if _, err := parseFlags(args[1:], directValueFlags, directBooleanFlags); err != nil {
+			return nil, err
+		}
 		return nil, domainError("ORDER_VIOLATION", "quick 0.4 terminal é imutável")
 	}
 	if action != "classify" {
@@ -213,27 +218,69 @@ func classifyDirect(flags parsedFlags) (map[string]any, error) {
 }
 
 func riskPathSignals(path string) (string, []riskSignal, error) {
-	if err := validateRelativePath(path, "declared path"); err != nil {
+	if err := validateRiskPath(path); err != nil {
 		return "", nil, err
 	}
 	clean := filepath.ToSlash(filepath.Clean(path))
 	parts := strings.Split(strings.ToLower(clean), "/")
 	directories := parts[:len(parts)-1]
 	basename := parts[len(parts)-1]
+	ignoredDomain := len(parts) > 0 && containsAny(
+		[]string{parts[0]}, "doc", "docs", "note", "notes", "test", "tests",
+		"example", "examples", "fixtures",
+	)
 	signals := make([]riskSignal, 0)
 	if containsAny(directories, "migration", "migrations", "migrate") {
 		signals = append(signals, riskSignal{3, "declared_path:migration:" + clean, "migration"})
 	}
-	if containsAny(directories, "payment", "payments", "billing", "ledger", "money", "financial") {
+	if !ignoredDomain && containsAny(directories, "payment", "payments", "billing", "ledger", "money", "financial") {
 		signals = append(signals, riskSignal{3, "declared_path:payment:" + clean, "payment"})
 	}
-	if containsAny(directories, "webhook", "webhooks") {
+	if !ignoredDomain && containsAny(directories, "webhook", "webhooks") {
 		signals = append(signals, riskSignal{3, "declared_path:webhook:" + clean, "webhook"})
 	}
-	if basename == "go.mod" || basename == "go.sum" || basename == "package.json" || strings.HasSuffix(basename, ".lock") {
+	if containsAny(
+		[]string{basename},
+		"package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
+		"pyproject.toml", "poetry.lock", "requirements.txt", "pom.xml",
+		"build.gradle", "build.gradle.kts", "go.mod", "go.sum", "cargo.toml",
+		"cargo.lock", "gemfile", "gemfile.lock", "composer.json", "composer.lock",
+	) {
 		signals = append(signals, riskSignal{3, "declared_path:dependency_manifest:" + clean, "dependency_manifest"})
 	}
+	if containsAny(directories, "contract", "contracts", "schema", "schemas") ||
+		containsAny([]string{filepath.Ext(basename)}, ".proto", ".graphql", ".gql", ".avsc") ||
+		containsAny(
+			[]string{basename}, "openapi.json", "openapi.yaml", "openapi.yml",
+			"swagger.json", "swagger.yaml", "swagger.yml",
+		) {
+		signals = append(signals, riskSignal{3, "declared_path:contract:" + clean, "contract"})
+	}
 	return clean, signals, nil
+}
+
+func validateRiskPath(path string) error {
+	if path == "" {
+		return riskInputError("declared_paths vazio")
+	}
+	if strings.Contains(path, "\\") {
+		return riskInputError("declared_paths contém barra invertida: " + path)
+	}
+	if filepath.IsAbs(path) || filepath.ToSlash(filepath.Clean(path)) != path {
+		return riskInputError("declared_paths deve ser POSIX relativo: " + path)
+	}
+	for _, part := range strings.Split(path, "/") {
+		if part == "" || part == "." || part == ".." {
+			return riskInputError("declared_paths contém traversal: " + path)
+		}
+		if strings.EqualFold(part, ".planning") {
+			return riskInputError("declared_paths usa namespace estrangeiro")
+		}
+	}
+	if !norm.NFC.IsNormalString(path) {
+		return riskInputError("declared_paths não está em NFC: " + path)
+	}
+	return nil
 }
 
 func guardsFor(kind string) []string {
@@ -248,6 +295,7 @@ func guardsFor(kind string) []string {
 		"ownership":           {"local_contract", "owner_approval"},
 		"architecture":        {"architecture_review", "local_contract"},
 		"dependency_manifest": {"dependency_audit", "lockfile_consistency"},
+		"contract":            {"contract_tests", "local_contract"},
 	}[kind]
 }
 

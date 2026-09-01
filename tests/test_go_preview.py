@@ -70,6 +70,43 @@ class GoPreviewScenarios(unittest.TestCase):
             self.assertEqual(payload["passed"], 12)
             self.assertEqual(payload["failed"], 0)
 
+    def test_go_risk_path_policy_matches_python_oracle(self) -> None:
+        cases = (
+            "pyproject.toml",
+            "src/contracts/payments.proto",
+            "src/webhooks/delivery.py",
+            "db/migrations/0001.sql",
+            "docs/payments/example.md",
+            "api/openapi.yaml",
+        )
+        with tempfile.TemporaryDirectory(prefix="bm-go-risk-parity-") as temp:
+            binary = Path(temp) / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            for changed_file in cases:
+                with self.subTest(changed_file=changed_file):
+                    argv = ("direct", "classify", "--changed-file", changed_file)
+                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    go = run(str(binary), *argv)
+                    self.assertEqual(python.returncode, 0, python.stderr)
+                    self.assertEqual(go.returncode, 0, go.stderr)
+                    self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
+
+    def test_go_and_python_reject_unsafe_risk_paths_identically(self) -> None:
+        changed_files = ("src/cafe\u0301.py", "src/.planning/x")
+        with tempfile.TemporaryDirectory(prefix="bm-go-risk-unicode-") as temp:
+            binary = Path(temp) / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            for changed_file in changed_files:
+                with self.subTest(changed_file=changed_file):
+                    argv = ("direct", "classify", "--changed-file", changed_file)
+                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    go = run(str(binary), *argv)
+                    self.assertEqual(go.returncode, python.returncode)
+                    self.assertEqual(go.stdout, python.stdout)
+                    self.assertEqual(go.stderr, python.stderr)
+
     def test_preview_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),

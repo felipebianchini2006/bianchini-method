@@ -14,7 +14,7 @@ func runStatus(args []string) (any, error) {
 		return nil, argparseError("the following arguments are required: state")
 	}
 	state := args[0]
-	format := "text"
+	format := "json"
 	for index := 1; index < len(args); index++ {
 		switch args[index] {
 		case "--format":
@@ -23,6 +23,11 @@ func runStatus(args []string) (any, error) {
 			}
 			index++
 			format = args[index]
+		case "--root":
+			if index+1 >= len(args) {
+				return nil, argparseError("argument --root: expected one argument")
+			}
+			index++
 		default:
 			return nil, argparseError("unrecognized arguments: " + args[index])
 		}

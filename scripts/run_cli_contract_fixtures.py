@@ -191,6 +191,12 @@ def run_fixture(path: Path, engine: str, binary: Path | None) -> list[str]:
                 errors.append(f"arquivo esperado ausente: {relative}")
             elif checked.read_bytes() != _bytes(specification):
                 errors.append(f"bytes divergentes: {relative} ({_digest(checked.read_bytes())})")
+            elif "mode" in specification:
+                actual_mode = f"{checked.stat().st_mode & 0o777:04o}"
+                if actual_mode != specification["mode"]:
+                    errors.append(
+                        f"modo divergente: {relative} ({actual_mode} != {specification['mode']})"
+                    )
     return errors
 
 
