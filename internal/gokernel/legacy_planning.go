@@ -128,23 +128,11 @@ func runSnapshot(args []string) (any, error) {
 	if !oneOf(action, "create", "verify") {
 		return nil, argparseError(fmt.Sprintf("argument action: invalid choice: '%s'", action))
 	}
-	positionals := make([]string, 0, 1)
-	rootValue := ""
-	for index := 1; index < len(args); index++ {
-		switch args[index] {
-		case "--root":
-			if index+1 >= len(args) {
-				return nil, argparseError("argument --root: expected one argument")
-			}
-			index++
-			rootValue = args[index]
-		default:
-			if strings.HasPrefix(args[index], "--") {
-				return nil, argparseError("unrecognized arguments: " + args[index])
-			}
-			positionals = append(positionals, args[index])
-		}
+	flags, positionals, err := parseArguments(args[1:], flagSet("--root"), flagSet())
+	if err != nil {
+		return nil, err
 	}
+	rootValue := lastValue(flags, "--root")
 	if len(positionals) == 0 || rootValue == "" {
 		missing := "state"
 		if len(positionals) > 0 {
@@ -153,7 +141,7 @@ func runSnapshot(args []string) (any, error) {
 		return nil, argparseError("the following arguments are required: " + missing)
 	}
 	if len(positionals) > 1 {
-		return nil, argparseError("unrecognized arguments: " + strings.Join(positionals[1:], " "))
+		return nil, unrecognizedArgumentsError(positionals[1:])
 	}
 	return legacySnapshot(positionals[0], rootValue, action == "verify")
 }
@@ -206,32 +194,21 @@ func legacySnapshot(stateValue, rootValue string, verify bool) (map[string]any, 
 }
 
 func runPlanningAudit(args []string) (any, error) {
-	positionals := make([]string, 0, 1)
-	rootValue := ""
-	strict := false
-	for index := 0; index < len(args); index++ {
-		switch args[index] {
-		case "--root":
-			if index+1 >= len(args) {
-				return nil, argparseError("argument --root: expected one argument")
-			}
-			index++
-			rootValue = args[index]
-		case "--strict":
-			strict = true
-		default:
-			if strings.HasPrefix(args[index], "--") {
-				return nil, argparseError("unrecognized arguments: " + args[index])
-			}
-			positionals = append(positionals, args[index])
-		}
+	flags, positionals, err := parseArguments(args, flagSet("--root"), flagSet("--strict"))
+	if err != nil {
+		return nil, err
 	}
+	rootValue := lastValue(flags, "--root")
+	strict := flags.booleans["--strict"]
 	if len(positionals) == 0 || rootValue == "" {
 		missing := "state"
 		if len(positionals) > 0 {
 			missing = "--root"
 		}
 		return nil, argparseError("the following arguments are required: " + missing)
+	}
+	if len(positionals) > 1 {
+		return nil, unrecognizedArgumentsError(positionals[1:])
 	}
 	root, err := safeRoot(rootValue)
 	if err != nil {

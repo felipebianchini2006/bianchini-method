@@ -26,7 +26,7 @@ func runRoadmap(args []string) (any, error) {
 	}
 	format := lastValue(flags, "--format")
 	if format != "" && format != "json" {
-		return nil, argparseError("argument --format: invalid choice: '" + format + "'")
+		return nil, argparseError(argparseInvalidChoice("--format", format, []string{"json"}))
 	}
 	repo := lastValue(flags, "--repo")
 	if repo == "" {

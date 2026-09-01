@@ -97,7 +97,7 @@ func runScope(args []string) (any, error) {
 		return nil, argparseError("argument --pages: invalid int value: '" + pagesRaw + "'")
 	}
 	if !oneOf(extraction, "native", "ocr", "mixed") {
-		return nil, argparseError("argument --extraction: invalid choice: '" + extraction + "'")
+		return nil, argparseError(argparseInvalidChoice("--extraction", extraction, []string{"native", "ocr", "mixed"}))
 	}
 	return sealScope(repo, change, source, draft, pages, extraction)
 }

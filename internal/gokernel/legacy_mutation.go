@@ -43,7 +43,7 @@ func runMutationEvidence(args []string) (any, error) {
 	}
 	tool := lastValue(flags, "--tool")
 	if !oneOf(tool, "normalized", "stryker") {
-		return nil, argparseError("argument --tool: invalid choice: '" + tool + "'")
+		return nil, argparseError(argparseInvalidChoice("--tool", tool, []string{"normalized", "stryker"}))
 	}
 	result, err := legacyMutationEvidenceVerify(
 		lastValue(flags, "--root"), lastValue(flags, "--state"), lastValue(flags, "--plan"),

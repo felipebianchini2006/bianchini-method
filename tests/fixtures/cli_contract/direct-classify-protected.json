@@ -2,7 +2,7 @@
   "schema_version": 2,
   "evolution_note": "Fase 3 adiciona piso derivado observável; campos legados permanecem presentes.",
   "surface": "direct.classify",
-  "argv": ["direct", "classify", "--repo", "{repo}", "--scope-score", "2", "--payment-flow", "--production-authorized"],
+  "argv": ["direct", "classify", "--repo", "{repo}", "--scope-sc=2", "--payment-flow", "--production-authorized"],
   "initial_tree": {"keep.txt": {"text": "preservar\n"}},
   "expected": {
     "exit_code": 0,

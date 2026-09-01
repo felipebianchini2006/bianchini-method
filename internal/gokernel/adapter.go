@@ -70,7 +70,7 @@ func runAdapter(args []string) (any, error) {
 		return nil, argparseError("the following arguments are required: --host")
 	}
 	if _, ok := adapterDefinitions[host]; !ok {
-		return nil, argparseError("argument --host: invalid choice: '" + host + "'")
+		return nil, argparseError(argparseInvalidChoice("--host", host, []string{"generic", "codex", "claude-compatible"}))
 	}
 	content := renderAdapter(host)
 	if action == "render" {

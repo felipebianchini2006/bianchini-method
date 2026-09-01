@@ -48,7 +48,7 @@ func runTelemetry(args []string) (any, error) {
 		phase = "execution"
 	}
 	if !legacyTelemetryPhases[phase] {
-		return nil, argparseError("argument --phase: invalid choice: '" + phase + "'")
+		return nil, argparseError(argparseInvalidChoice("--phase", phase, []string{"planning", "execution", "gate", "homologation", "final_review"}))
 	}
 	metrics := make(map[string]int, len(legacyTelemetryMetrics))
 	for _, metric := range legacyTelemetryMetrics {

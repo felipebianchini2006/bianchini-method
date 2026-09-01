@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Primitivas determinísticas do Bianchini Method 0.4. Somente stdlib."""
+"""Primitivas determinísticas do Bianchini Method 0.4."""
 
 from __future__ import annotations
 

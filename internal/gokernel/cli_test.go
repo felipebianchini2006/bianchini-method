@@ -160,7 +160,7 @@ func TestRetiredCommandsRemainInvalid(t *testing.T) {
 			if code != 2 || stdout != "" {
 				t.Fatalf("code=%d stdout=%q", code, stdout)
 			}
-			want := "bm: error: argument command: invalid choice: '" + command + "'\n"
+			want := "bm: error: " + argparseInvalidChoice("command", command, staticCLICommandChoices) + "\n"
 			if !strings.Contains(stderr, "usage: bm") || !strings.HasSuffix(stderr, want) {
 				t.Fatalf("unexpected stderr: %q", stderr)
 			}

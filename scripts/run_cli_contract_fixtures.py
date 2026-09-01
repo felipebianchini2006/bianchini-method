@@ -106,14 +106,7 @@ def _json_matches(actual: Any, expected: Any) -> bool:
 
 def _normalize_stderr(stderr: str, repo: Path, temp: Path) -> str:
     normalized = _normalize_text(stderr, repo, temp)
-    if "usage: bm" not in normalized:
-        return normalized
-    last = normalized.rstrip().splitlines()[-1]
-    if last.startswith("bm: error: argument command: invalid choice:"):
-        marker = " (choose from "
-        if marker in last:
-            last = last.split(marker, 1)[0]
-    return f"ARGPARSE: {last}\n"
+    return normalized
 
 
 def _mutation(before: dict[str, bytes], after: dict[str, bytes]) -> dict[str, Any]:
@@ -277,7 +270,19 @@ def _check_expected(
     stdout_contract = expected["stdout"]
     if stdout_contract["kind"] == "json":
         try:
-            actual_stdout = _normalize_json(json.loads(completed.stdout), repo, temp)
+            decoded_stdout = json.loads(completed.stdout)
+            canonical_stdout = (
+                json.dumps(
+                    decoded_stdout,
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+            if completed.stdout != canonical_stdout:
+                errors.append("stdout JSON não está na forma canônica byte a byte")
+            actual_stdout = _normalize_json(decoded_stdout, repo, temp)
         except json.JSONDecodeError as error:
             errors.append(f"stdout não é JSON: {error}")
         else:

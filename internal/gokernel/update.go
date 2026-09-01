@@ -70,7 +70,7 @@ func runUpdateWithFetcher(args []string, fetch updateFetch, fsops updateFS) (any
 		format = "text"
 	}
 	if format != "text" && format != "json" {
-		return nil, argparseError("argument --format: invalid choice: '" + format + "'")
+		return nil, argparseError(argparseInvalidChoice("--format", format, []string{"text", "json"}))
 	}
 	skillsRoot := lastValue(flags, "--skills-root")
 	if skillsRoot == "" {

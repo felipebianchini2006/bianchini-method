@@ -40,21 +40,21 @@ func runPolicy(args []string) (map[string]any, error) {
 		return nil, argparseError("the following arguments are required: --profile")
 	}
 	if !oneOf(profile, "lean", "standard", "full") {
-		return nil, argparseError("argument --profile: invalid choice: '" + profile + "'")
+		return nil, argparseError(argparseInvalidChoice("--profile", profile, []string{"lean", "standard", "full"}))
 	}
 	risk := lastValue(flags, "--risk")
 	if risk == "" {
 		return nil, argparseError("the following arguments are required: --risk")
 	}
 	if !oneOf(risk, "low", "medium", "high", "critical") {
-		return nil, argparseError("argument --risk: invalid choice: '" + risk + "'")
+		return nil, argparseError(argparseInvalidChoice("--risk", risk, []string{"low", "medium", "high", "critical"}))
 	}
 	manualPDF := lastValue(flags, "--manual-pdf")
 	if manualPDF == "" {
 		manualPDF = "scope"
 	}
 	if !oneOf(manualPDF, "none", "quick_start", "full", "scope") {
-		return nil, argparseError("argument --manual-pdf: invalid choice: '" + manualPDF + "'")
+		return nil, argparseError(argparseInvalidChoice("--manual-pdf", manualPDF, []string{"none", "quick_start", "full", "scope"}))
 	}
 	round, err := intFlag(flags, "--round", 0)
 	if err != nil {
@@ -75,7 +75,7 @@ func runPolicy(args []string) (map[string]any, error) {
 	findings := append([]string{}, flags.values["--structural-finding"]...)
 	for _, finding := range findings {
 		if !structuralFindingClasses[finding] {
-			return nil, argparseError("argument --structural-finding: invalid choice: '" + finding + "'")
+			return nil, argparseError(argparseInvalidChoice("--structural-finding", finding, []string{"crash_window", "partial_commit", "toctou", "external_effect_before_persistence", "retry_after_timeout", "concurrent_idempotency", "recovery_after_restart"}))
 		}
 	}
 	change := lastValue(flags, "--change")

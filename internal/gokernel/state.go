@@ -23,27 +23,15 @@ var (
 )
 
 func runValidateState(args []string) (any, error) {
-	flags := parsedFlags{values: map[string][]string{}, booleans: map[string]bool{}}
-	positionals := make([]string, 0, 1)
-	for index := 0; index < len(args); index++ {
-		if args[index] == "--schema" {
-			if index+1 >= len(args) {
-				return nil, argparseError("argument --schema: expected one argument")
-			}
-			index++
-			flags.values["--schema"] = append(flags.values["--schema"], args[index])
-			continue
-		}
-		if strings.HasPrefix(args[index], "--") {
-			return nil, argparseError("unrecognized arguments: " + args[index])
-		}
-		positionals = append(positionals, args[index])
+	flags, positionals, err := parseArguments(args, map[string]bool{"--schema": true}, map[string]bool{})
+	if err != nil {
+		return nil, err
 	}
 	if len(positionals) == 0 {
 		return nil, argparseError("the following arguments are required: state")
 	}
 	if len(positionals) > 1 {
-		return nil, argparseError("unrecognized arguments: " + strings.Join(positionals[1:], " "))
+		return nil, unrecognizedArgumentsError(positionals[1:])
 	}
 	state, err := validateStateFile(positionals[0], lastValue(flags, "--schema"))
 	if err != nil {
@@ -648,10 +636,25 @@ func stateInt(value any) int {
 	case int64:
 		return int(number)
 	case float64:
-		return int(number)
+		if math.IsNaN(number) || math.IsInf(number, 0) || math.Trunc(number) != number || number < math.MinInt64 || number > math.MaxInt64 {
+			return 0
+		}
+		parsed := int64(number)
+		converted := int(parsed)
+		if int64(converted) != parsed {
+			return 0
+		}
+		return converted
 	case json.Number:
-		parsed, _ := number.Int64()
-		return int(parsed)
+		parsed, err := number.Int64()
+		if err != nil {
+			return 0
+		}
+		converted := int(parsed)
+		if int64(converted) != parsed {
+			return 0
+		}
+		return converted
 	default:
 		return 0
 	}

@@ -6,34 +6,26 @@ import (
 )
 
 func runStatus(args []string) (any, error) {
-	if len(args) == 0 {
+	flags, positionals, err := parseArguments(args, map[string]bool{"--format": true, "--root": true}, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	if len(positionals) == 0 {
 		return nil, argparseError("the following arguments are required: state")
 	}
-	state := args[0]
-	format := "json"
-	root := ""
-	for index := 1; index < len(args); index++ {
-		switch args[index] {
-		case "--format":
-			if index+1 >= len(args) {
-				return nil, argparseError("argument --format: expected one argument")
-			}
-			index++
-			format = args[index]
-		case "--root":
-			if index+1 >= len(args) {
-				return nil, argparseError("argument --root: expected one argument")
-			}
-			index++
-			root = args[index]
-		default:
-			return nil, argparseError("unrecognized arguments: " + args[index])
-		}
+	if len(positionals) > 1 {
+		return nil, unrecognizedArgumentsError(positionals[1:])
 	}
+	state := positionals[0]
+	format := lastValue(flags, "--format")
+	if format == "" {
+		format = "json"
+	}
+	root := lastValue(flags, "--root")
 	if format != "json" && format != "text" {
-		return nil, argparseError("argument --format: invalid choice: '" + format + "'")
+		return nil, argparseError(argparseInvalidChoice("--format", format, []string{"json", "text"}))
 	}
-	path, err := safeStandaloneFile(state, "status")
+	path, err := safeStandaloneFile(state, "state")
 	if err != nil {
 		return nil, err
 	}
