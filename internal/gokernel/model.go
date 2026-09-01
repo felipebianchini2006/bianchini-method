@@ -247,12 +247,19 @@ func validateModelChange(repo, change string) (map[string]any, error) {
 		return nil, err
 	}
 	workspace := newMethodWorkspace(root)
-	if _, err := workspace.readState(); err != nil {
+	state, err := workspace.readState()
+	if err != nil {
 		return nil, err
 	}
 	directory, err := locateChangeDirectory(workspace, change)
 	if err != nil {
 		return nil, err
+	}
+	active, activeOK := state["active_work"].(map[string]any)
+	if activeOK && stateString(active["id"]) == filepath.Base(directory) && (stateString(state["status"]) == "scope_ready" || stateString(active["status"]) == "scope_ready") {
+		if _, verifyErr := verifyScope(root, filepath.Base(directory), ""); verifyErr != nil {
+			return nil, workflowError("STALE_EVIDENCE", verifyErr.Error())
+		}
 	}
 	current, err := loadProjectModel(workspace.currentMod)
 	if err != nil {

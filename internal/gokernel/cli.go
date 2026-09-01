@@ -32,6 +32,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runValidateState(args[1:])
 	case "model":
 		result, err = runModel(args[1:])
+	case "scope":
+		result, err = runScope(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
 	case "policy":

@@ -13,6 +13,8 @@ var ImplementedSurfaces = []string{
 	"validate-state",
 	"model:init",
 	"model:validate",
+	"scope:seal",
+	"scope:verify",
 	"change-policy",
 	"policy",
 	"adapter:render",

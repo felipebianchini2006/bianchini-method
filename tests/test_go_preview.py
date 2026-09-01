@@ -368,6 +368,67 @@ model_delta:
                 json.loads(python_change_validate.stdout),
             )
 
+    def test_go_scope_seal_and_verify_match_python_oracle(self) -> None:
+        from tests.test_method_v04_cli import detailed_scope_body, write_text_pdf
+
+        with tempfile.TemporaryDirectory(prefix="bm-go-scope-parity-") as temp:
+            base = Path(temp)
+            binary = base / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            source = base / "scope.pdf"
+            draft = base / "draft.md"
+            write_text_pdf(source, ["Portal", "Aceite"])
+            draft.write_text(detailed_scope_body(), encoding="utf-8")
+            repositories = {"python": base / "python-repo", "go": base / "go-repo"}
+            commands = {
+                "python": ("python3", str(ROOT / "scripts" / "bm.py")),
+                "go": (str(binary),),
+            }
+            changes: dict[str, str] = {}
+            for engine, repo in repositories.items():
+                initialized = run("git", "init", str(repo))
+                self.assertEqual(initialized.returncode, 0, initialized.stderr)
+                init = run(*commands[engine], "model", "init", "--repo", str(repo))
+                self.assertEqual(init.returncode, 0, init.stderr)
+                change = run(
+                    *commands[engine], "model", "init", "--repo", str(repo),
+                    "--change", "Portal suporte",
+                )
+                self.assertEqual(change.returncode, 0, change.stderr)
+                changes[engine] = str(json.loads(change.stdout)["change"])
+            self.assertEqual(changes["go"], changes["python"])
+            sealed: dict[str, dict[str, object]] = {}
+            for engine, repo in repositories.items():
+                result = run(
+                    *commands[engine], "scope", "seal", "--repo", str(repo),
+                    "--change", changes[engine], "--source", str(source),
+                    "--draft", str(draft), "--pages", "2", "--extraction", "mixed",
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                sealed[engine] = json.loads(result.stdout)
+            for payload in sealed.values():
+                payload.pop("scope")
+                payload.pop("scope_digest")
+            self.assertEqual(sealed["go"], sealed["python"])
+            change = changes["go"]
+            scope_documents = {}
+            for engine, repo in repositories.items():
+                path = repo / ".bianchini" / "changes" / change / "SCOPE.md"
+                text_value = path.read_text(encoding="utf-8")
+                metadata = json.loads(text_value.split("---", 2)[1])
+                metadata.pop("sealed_at")
+                metadata.pop("scope_digest")
+                scope_documents[engine] = (metadata, text_value.split("---", 2)[2])
+            self.assertEqual(scope_documents["go"], scope_documents["python"])
+            for engine, repo in repositories.items():
+                verified = run(
+                    *commands[engine], "scope", "verify", "--repo", str(repo),
+                    "--change", change, "--source", str(source),
+                )
+                self.assertEqual(verified.returncode, 0, verified.stderr)
+                self.assertTrue(json.loads(verified.stdout)["verified"])
+
     def test_preview_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),
