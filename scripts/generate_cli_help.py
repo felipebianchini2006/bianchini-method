@@ -14,7 +14,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "contracts" / "cli-surfaces.json"
-ORACLE = ROOT / "scripts" / "bm.py"
+ORACLE = ROOT / "scripts" / "bm_python_oracle.py"
 OUTPUT = ROOT / "internal" / "gokernel" / "assets" / "cli-help.json"
 
 
@@ -82,7 +82,7 @@ def generated_bytes() -> bytes:
         "source": {
             "contract": "contracts/cli-surfaces.json",
             "contract_sha256": digest(CONTRACT),
-            "oracle": "scripts/bm.py",
+            "oracle": "scripts/bm_python_oracle.py",
             "oracle_sha256": digest(ORACLE),
         },
         "help": help_by_path,

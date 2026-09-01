@@ -15,7 +15,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CLI = ROOT / "scripts" / "bm.py"
+CLI = ROOT / "scripts" / "bm_python_oracle.py"
 SCRIPTS = ROOT / "skills/_shared/scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))

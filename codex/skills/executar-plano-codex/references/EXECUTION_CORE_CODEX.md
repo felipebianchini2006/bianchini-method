@@ -4,28 +4,27 @@ Este arquivo contém somente preflight, rota, aprovação, worktree, implementa�
 
 ## Preflight, rota e aprovação
 
-1. Resolver `bm.py` da instalação ativa e executar `bm.py route`.
-2. Na rota v1, exigir Superpowers e executar integralmente o fluxo legado. Não misturar etapas v2 durante a fase. Após encerramento completo, executar a transição legada descrita abaixo.
-3. Na rota v2, executar `bm.py validate-state` e `bm.py snapshot verify`. Em `planning.quality_version: 2`, exigir readiness válido e checker `passed` no digest aprovado.
-4. Executar `bm.py repo-hygiene check --repo <repo>`. Exigir ignore versionado e rejeitar `.superpowers/` rastreado.
-5. Aprovação `pending` só muda por aprovação explícita inequívoca do digest atual. O comando de execução não vale como aprovação.
-6. Na aprovação, verificar snapshot, commitar localmente somente pacote, estado e manifesto, então exigir árvore limpa.
-7. Confirmar planos em `approved_plans` e dependências concluídas.
-8. Exigir `git status --porcelain` vazio antes de criar worktree. Nunca omitir, copiar ou incluir mudança preexistente em commit do planejamento.
+1. Resolver o `bm` nativo indicado pela skill. Ausência bloqueia; nunca chamar implementação Python.
+2. Ler `.bianchini/STATE.md`. Sem estado, bloquear e orientar `/migrar-bianchini` ou `/sdd-planning`; a rota humana continua `/executar-plano` e não depende de comando auxiliar.
+3. Exigir `status: approved|executing`, mudança ativa, `COHERENCE.md` aprovado e digest vigente. Executar `bm model validate --repo <repo> --change <change_id>` e `bm roadmap next-wave --repo <repo> --change <change_id> --format json`.
+4. Confirmar planos aprovados, dependências concluídas e unidade presente em `parallel_units`. Rejeitar `ERROR`, `WARNING` aberto, pacote stale ou artefato divergente.
+5. Aprovação pendente só muda por aprovação humana explícita e inequívoca do digest atual. O comando de execução não vale como aprovação.
+6. Exigir ignore versionado para `.bianchini/.runtime/`, rejeitar metadata temporária rastreada e executar `git status --porcelain` antes de criar ou retomar worktree.
+7. Nunca omitir, copiar ou incluir mudança preexistente em commit do planejamento.
 
-Snapshot divergente invalida aprovação. Não classificar divergência como mudança editorial.
+Digest divergente invalida aprovação. Não classificar divergência como mudança editorial.
 
 ## Worktree isolada
 
 Criar um workspace por plano:
 
 ```bash
-<bm.py> workspace create --repo <repo> --planning-version <planning_version> --plan <plan_id> --state <PROJECT_STATE.md>
-<bm.py> workspace resume --repo <repo> --planning-version <planning_version> --plan <plan_id>
-<bm.py> workspace check --repo <workspace>
+bm workspace create --repo <repo> --change <change_id> --plan <plan_id>
+bm workspace resume --repo <repo> --change <change_id> --plan <plan_id>
+bm workspace check --repo <workspace>
 ```
 
-Usar `planning_version` do estado. Branch: `bm/<planning_version>-<plan_id>`. Entrar no caminho retornado antes de editar. Executar `workspace check` no início e antes de cada commit. Main, master, detached HEAD e worktree primária são proibidos. Não usar branch atual como fallback.
+Usar a identidade `change_id/plan_id` do estado. Branch: `bm/<change_id>-<plan_id>` normalizada pelo CLI. Entrar no caminho retornado antes de editar. Executar `workspace check` no início e antes de cada commit. Main, master, detached HEAD e worktree primária são proibidos. Não usar branch atual como fallback.
 
 Aquecer dependências uma vez no workspace com gerenciador e comandos do projeto. Antes de runtime, respeitar `.mise.toml`, `mise.toml` ou configuração equivalente.
 
@@ -45,13 +44,13 @@ Retomada começa com `workspace resume`. Ler checkpoint, estado, unidade atual e
 
 ## Implementação
 
-Antes da unidade, executar `bm.py policy` com perfil, risco e `Change` declarado no brief; planos antigos sem `Change` usam `behavioral` somente por compatibilidade. Confirmar coincidência com `execution` aprovado. Divergência pode aumentar garantia automaticamente; redução exige novo pacote aprovado.
+Antes da unidade, executar `bm policy` com perfil, risco e `Change` declarado no brief; planos antigos sem `Change` usam `behavioral` somente por compatibilidade. Confirmar coincidência com `execution` aprovado. Divergência pode aumentar garantia automaticamente; redução exige novo pacote aprovado.
 
 Quando o host suportar subagentes e seu uso for apropriado, passar ao implementador somente brief, relatório, ownership e contexto estritamente necessário. Não fixar nome, modelo, reasoning effort, hierarquia ou quantidade de subagentes: usar os padrões atuais do host. Sem subagentes, cumprir a mesma responsabilidade inline.
 
 ## Autonomia e plano congelado
 
-O plano aprovado permanece congelado. Antes de alterar decomposição, comandos, contratos ou design, executar `bm.py change-policy` e seguir uma destas classes:
+O plano aprovado permanece congelado. Antes de alterar decomposição, comandos, contratos ou design, executar `bm change-policy` e seguir uma destas classes:
 
 - `implementation_detail`: decisão técnica interna e reversível. Escolher a opção reversível de menor risco, registrar no relatório e continuar;
 - `bounded_amendment`: ajuste limitado de arquivo, comando ou ordem interna sem mudar entrega. Registrar no ledger/checkpoint e continuar, sem nova unidade, revisor ou aprovação;
@@ -65,7 +64,7 @@ Na implementação de cada unidade, executar somente `verification.fast`: unitá
 
 Uma família de teste não cria unidade, dispatch, revisor ou subagente. Não dividir uma tarefa aprovada em “unitários”, “integração”, “E2E” e “mutação”, não criar campanha de cobertura e não despachar agente para gate mecânico. O mesmo implementador executa os comandos aplicáveis e registra proofs.
 
-No `verification.plan`, executar suítes afetadas, regressão do plano e E2E das jornadas críticas entregues. Quando `bm.py policy` exigir mutation testing, fazer uma execução seletiva por seam de risco no `HEAD` final do gate, usando somente ferramenta e comando aprovados. Não instalar ferramenta, não perseguir score global e não repetir mutação após cada fix. Mutante sem prova de que altera comportamento aprovado de risco alto/crítico vira hardening adiado; mutante equivalente ou inalcançável recebe justificativa curta.
+No `verification.plan`, executar suítes afetadas, regressão do plano e E2E das jornadas críticas entregues. Quando `bm policy` exigir mutation testing, fazer uma execução seletiva por seam de risco no `HEAD` final do gate, usando somente ferramenta e comando aprovados. Não instalar ferramenta, não perseguir score global e não repetir mutação após cada fix. Mutante sem prova de que altera comportamento aprovado de risco alto/crítico vira hardening adiado; mutante equivalente ou inalcançável recebe justificativa curta.
 
 No `verification.release`, usar os comandos aprovados para suíte unitária completa configurada, integração/contratos aplicáveis, regressão completa, E2E de todas as jornadas críticas, build e evidência de mutação vigente quando obrigatória. Homologação apenas confirma essa baseline e opera o RC real; não abre outra campanha automatizada.
 
@@ -126,24 +125,12 @@ Quando último plano aprovado concluir:
 4. exigir `homologation: accepted` e status `homologated`;
 5. criar `artifacts/delivery/DELIVERY.md`;
 6. definir `release.status: ready`;
-7. em `planning.quality_version: 2`, executar `bm.py cycle-close` para sincronizar deltas nas specs atuais, arquivar o ciclo e preparar o próximo estado `idle`.
+7. executar `bm cycle-close --repo <repo> --change <change_id>` para sincronizar deltas nas specs atuais, arquivar a mudança e preparar o próximo estado `idle`.
 
 Manual ou PDF entra na entrega somente quando `manual_pdf` e escopo exigirem.
 
-## Transição após encerramento legado
+## Compatibilidade de mudanças antigas
 
-Após fase v1 concluir gates, verificação final e entrega do fluxo legado:
+Mudança schema 1 fecha pelo mesmo `bm cycle-close --repo <repo> --change <change_id>`. Não migrar, converter ou reescrever pacote antigo. Confirmar que specs atuais permanecem inalteradas quando a mudança não declara atualização DocViva, que o histórico foi preservado em `.bianchini/archive/` e que o estado voltou a `idle`.
 
-1. commitar integralmente fase e exigir árvore limpa;
-2. executar:
-
-```bash
-<bm.py> legacy-transition --repo <repo> --state <PROJECT_STATE.md> --completed
-```
-
-3. confirmar preservação do estado legado em `docs/bianchini/legacy/transitions/`, estado ativo v2 `idle` e `repo-hygiene check` aprovado;
-4. não editar conteúdo livre de `AGENTS.md` ou `CLAUDE.md`; limitar atualização a bloco Bianchini Method existente, senão somente relatar sugestão;
-5. validar e criar commit local atômico `chore: transition completed legacy project to Bianchini Method v2`;
-6. confirmar árvore limpa.
-
-`--completed` exige marcador objetivo no estado ou `--completion-proof` rastreado e commitado. Transição não reexecuta nem converte plano concluído.
+Não editar conteúdo livre de `AGENTS.md` ou `CLAUDE.md`; limitar atualização ao bloco gerenciado existente. Validar, criar commit local atômico de fechamento e confirmar árvore limpa.

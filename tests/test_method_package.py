@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CLI = ROOT / "scripts" / "bm.py"
+CLI = ROOT / "scripts" / "bm_python_oracle.py"
 FIXTURES = ROOT / "tests" / "fixtures"
 PROJECT_FIXTURES = FIXTURES / "projects"
 SKILL_NAMES = (

@@ -15,6 +15,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GO_ENTRYPOINT = ROOT / "cmd" / "bm"
+PUBLIC_LAUNCHER = ROOT / "scripts" / "bm.py"
+PYTHON_ORACLE = ROOT / "scripts" / "bm_python_oracle.py"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -31,9 +33,60 @@ def run(*argv: str, env: dict[str, str] | None = None) -> subprocess.CompletedPr
 
 
 class GoBackendScenarios(unittest.TestCase):
+    def test_repository_launcher_is_go_only_and_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="bm-go-launcher-") as temp:
+            base = Path(temp)
+            missing = base / "missing-bm"
+            absent = run(
+                sys.executable,
+                str(PUBLIC_LAUNCHER),
+                "version",
+                "--json",
+                env={**os.environ, "BM_GO_BINARY": str(missing)},
+            )
+            self.assertEqual(absent.returncode, 4)
+            self.assertEqual(absent.stdout, "")
+            self.assertIn("BM_INSTALLATION_INVALID", absent.stderr)
+            self.assertIn(str(missing), absent.stderr)
+
+            binary = base / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            launched = run(
+                sys.executable,
+                str(PUBLIC_LAUNCHER),
+                "version",
+                "--json",
+                env={**os.environ, "BM_GO_BINARY": str(binary), "PATH": ""},
+            )
+            self.assertEqual(launched.returncode, 0, launched.stderr)
+            payload = json.loads(launched.stdout)
+            self.assertEqual(payload["engine"], "go")
+            self.assertTrue(payload["official"])
+            self.assertFalse(payload["preview"])
+
+            launcher = PUBLIC_LAUNCHER.read_text(encoding="utf-8")
+            self.assertNotIn("runpy", launcher)
+            self.assertNotIn("bm_python_oracle", launcher)
+            self.assertTrue(PYTHON_ORACLE.is_file())
+
     def test_public_skills_resolve_only_the_native_binary(self) -> None:
         active_documents = [ROOT / "skills" / "_shared" / "METHOD_CONTRACT.md"]
         active_documents.extend(sorted((ROOT / "skills").glob("*/SKILL.md")))
+        active_documents.extend(
+            [ROOT / "codex" / "skills" / "executar-plano-codex" / "SKILL.md"]
+        )
+        active_documents.extend(
+            sorted(
+                (
+                    ROOT
+                    / "codex"
+                    / "skills"
+                    / "executar-plano-codex"
+                    / "references"
+                ).glob("*.md")
+            )
+        )
         content = "\n".join(
             path.read_text(encoding="utf-8") for path in active_documents
         )
@@ -124,7 +177,7 @@ class GoBackendScenarios(unittest.TestCase):
             for changed_file in cases:
                 with self.subTest(changed_file=changed_file):
                     argv = ("direct", "classify", "--changed-file", changed_file)
-                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    python = run("python3", str(PYTHON_ORACLE), *argv)
                     go = run(str(binary), *argv)
                     self.assertEqual(python.returncode, 0, python.stderr)
                     self.assertEqual(go.returncode, 0, go.stderr)
@@ -139,7 +192,7 @@ class GoBackendScenarios(unittest.TestCase):
             for changed_file in changed_files:
                 with self.subTest(changed_file=changed_file):
                     argv = ("direct", "classify", "--changed-file", changed_file)
-                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    python = run("python3", str(PYTHON_ORACLE), *argv)
                     go = run(str(binary), *argv)
                     self.assertEqual(go.returncode, python.returncode)
                     self.assertEqual(go.stdout, python.stdout)
@@ -167,7 +220,7 @@ class GoBackendScenarios(unittest.TestCase):
             for arguments in cases:
                 with self.subTest(arguments=arguments):
                     argv = ("policy", *arguments)
-                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    python = run("python3", str(PYTHON_ORACLE), *argv)
                     go = run(str(binary), *argv)
                     self.assertEqual(python.returncode, 0, python.stderr)
                     self.assertEqual(go.returncode, python.returncode, go.stderr)
@@ -183,7 +236,7 @@ class GoBackendScenarios(unittest.TestCase):
             for host in ("generic", "codex", "claude-compatible"):
                 with self.subTest(host=host):
                     argv = ("adapter", "render", "--host", host)
-                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    python = run("python3", str(PYTHON_ORACLE), *argv)
                     go = run(str(binary), *argv)
                     self.assertEqual(go.returncode, python.returncode)
                     self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
@@ -199,7 +252,7 @@ class GoBackendScenarios(unittest.TestCase):
                 target.write_bytes(foreign)
                 target.chmod(0o640)
             python = run(
-                "python3", str(ROOT / "scripts" / "bm.py"), "adapter", "install",
+                "python3", str(PYTHON_ORACLE), "adapter", "install",
                 "--host", "generic", "--repo", str(python_repo),
             )
             go = run(
@@ -231,7 +284,7 @@ class GoBackendScenarios(unittest.TestCase):
             for arguments in cases:
                 with self.subTest(arguments=arguments):
                     argv = ("validate-state", *arguments)
-                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    python = run("python3", str(PYTHON_ORACLE), *argv)
                     go = run(str(binary), *argv)
                     self.assertEqual(go.returncode, python.returncode)
                     self.assertEqual(go.stderr, python.stderr)
@@ -256,7 +309,7 @@ class GoBackendScenarios(unittest.TestCase):
                 self.assertEqual(initialized.returncode, 0, initialized.stderr)
 
             python = run(
-                "python3", str(ROOT / "scripts" / "bm.py"),
+                "python3", str(PYTHON_ORACLE),
                 "model", "init", "--repo", str(python_repo),
             )
             go = run(str(binary), "model", "init", "--repo", str(go_repo))
@@ -286,7 +339,7 @@ class GoBackendScenarios(unittest.TestCase):
             self.assertEqual(go_state, python_state)
 
             python_validate = run(
-                "python3", str(ROOT / "scripts" / "bm.py"),
+                "python3", str(PYTHON_ORACLE),
                 "model", "validate", "--repo", str(python_repo),
             )
             go_validate = run(
@@ -302,7 +355,7 @@ class GoBackendScenarios(unittest.TestCase):
             self.assertEqual(go_valid, python_valid)
 
             python_change = run(
-                "python3", str(ROOT / "scripts" / "bm.py"), "model", "init",
+                "python3", str(PYTHON_ORACLE), "model", "init",
                 "--repo", str(python_repo), "--change", "Checkout seguro",
             )
             go_change = run(
@@ -376,7 +429,7 @@ model_delta:
                 (directory / "plans" / "P01.md").write_text(plan, encoding="utf-8")
                 (directory / "COHERENCE.md").write_text(coherence, encoding="utf-8")
             python_change_validate = run(
-                "python3", str(ROOT / "scripts" / "bm.py"), "model", "validate",
+                "python3", str(PYTHON_ORACLE), "model", "validate",
                 "--repo", str(python_repo), "--change", "C001",
             )
             go_change_validate = run(
@@ -406,7 +459,7 @@ model_delta:
             draft.write_text(detailed_scope_body(), encoding="utf-8")
             repositories = {"python": base / "python-repo", "go": base / "go-repo"}
             commands = {
-                "python": ("python3", str(ROOT / "scripts" / "bm.py")),
+                "python": ("python3", str(PYTHON_ORACLE)),
                 "go": (str(binary),),
             }
             changes: dict[str, str] = {}
@@ -467,7 +520,7 @@ model_delta:
             repo, _change = scenario.make_repo(base)
             before = tree_digest(repo)
             python = run(
-                "python3", str(ROOT / "scripts" / "bm.py"), "roadmap", "next-wave",
+                "python3", str(PYTHON_ORACLE), "roadmap", "next-wave",
                 "--repo", str(repo), "--change", "C001", "--format", "json",
             )
             go = run(

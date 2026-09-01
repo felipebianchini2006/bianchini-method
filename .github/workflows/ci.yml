@@ -31,6 +31,8 @@ jobs:
       - name: Validate Python syntax
         run: |
           python3 -m py_compile \
+            scripts/bm.py \
+            scripts/bm_python_oracle.py \
             skills/_shared/scripts/bm.py \
             skills/_shared/scripts/bm_feature_support.py \
             skills/_shared/scripts/bm_context.py \

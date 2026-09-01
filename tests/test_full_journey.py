@@ -30,7 +30,7 @@ from test_method_v04_cli import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON_CLI = ROOT / "scripts/bm.py"
+PYTHON_CLI = ROOT / "scripts/bm_python_oracle.py"
 TRACEABLE_SCOPE_IDS = (
     "FLW-001",
     "REQ-001",

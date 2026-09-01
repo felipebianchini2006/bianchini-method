@@ -301,7 +301,12 @@ class SelfUpdateScenarios(unittest.TestCase):
         self.assertIn("update-bm --check", content)
         self.assertTrue((ROOT / "skills/_shared/VERSION").is_file())
         completed = subprocess.run(
-            [sys.executable, str(ROOT / "scripts/bm.py"), "update-bm", "--help"],
+            [
+                sys.executable,
+                str(ROOT / "scripts/bm_python_oracle.py"),
+                "update-bm",
+                "--help",
+            ],
             text=True,
             capture_output=True,
             check=False,

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Executar Plano — Codex
 
-**Anuncie:** "Executando <planos> pelo overlay Codex no modo <v1 legado|grouped|slice|strict>."
+**Anuncie:** "Executando <planos> pelo overlay Codex no modo <grouped|slice|strict>."
 
 Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar o status do projeto. Executar `all` somente quando o pedido atual já for explícito.
 
@@ -20,7 +20,9 @@ Leia integralmente, nesta ordem, somente:
 
 Não carregue qualquer outro contrato. `EXECUTION_CORE_CODEX.md` contém somente núcleo de execução reutilizado. `CODEX_CONVERGENCE.md` é autoridade exclusiva para revisão, fix loop, breaker, redesign e regras de parada no Codex.
 
-Não modificar `PROJECT_STATE`, schemas do método base ou `bm.py` para representar convergência. Usar um sidecar JSON por unidade:
+Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. Nos contratos abaixo, `bm` sempre significa esse binário resolvido.
+
+Não modificar `.bianchini/STATE.md`, schemas do método base ou o oráculo Python para representar convergência. Usar um sidecar JSON por unidade:
 
 ```text
 artifacts/bianchini/<planning_version>/codex/convergence/<plan_id>/<unit_id>.json
@@ -31,7 +33,7 @@ Resolver `scripts/review_guard.py` dentro desta skill. Operar o sidecar somente 
 ## Fluxo
 
 1. Cumprir preflight, rota e aprovação definidos no núcleo.
-2. Manter o plano congelado, classificar divergências com `bm.py change-policy`, implementar cada unidade e criar commit atômico.
+2. Manter o plano congelado, classificar divergências com `bm change-policy`, implementar cada unidade e criar commit atômico.
 3. Executar evidências pelo comando `proof`; reviewers referenciam somente `proof_id`. Na primeira revisão, congelar no máximo três blockers consolidados por causa raiz e declarar gates pelo comando `freeze`, usando como `unit_identity` o SHA-256 da unidade emitido por `task-brief`.
 4. Após qualquer implementação subsequente, fix ou redesign, usar `submit-delta`. Revisão seguinte só ocorre em `awaiting_review` e cobre blockers congelados abertos e regressões comprovadas do delta.
 5. Seguir `next_action` determinístico do guard. Nunca inventar uma transição.

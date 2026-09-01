@@ -2,7 +2,7 @@
 
 Contrato exclusivo para revisão, fix loop, breaker, redesign e parada. Estado vive em sidecar por unidade; nunca em `PROJECT_STATE` ou schema do método base.
 
-De `bm.py policy`, preservar modo, cadência e garantia. Ignorar somente limites de fix rounds e breaker do método base. Quando correção de bug ou homologação acionarem revisão, fix loop, breaker, redesign ou decisão de parada, este contrato prevalece.
+De `bm policy`, preservar modo, cadência e garantia. Ignorar somente limites de fix rounds e breaker do método base. Quando correção de bug ou homologação acionarem revisão, fix loop, breaker, redesign ou decisão de parada, este contrato prevalece.
 
 ## Sidecar
 
@@ -56,7 +56,7 @@ A parada é isolada por unidade. `parked`, bloqueio local ou `stopped` de uma un
 
 ## Blocker congelado
 
-Antes de cada revisão, gerar entrada determinística com `bm.py review-package --base <last_review_head> --head HEAD`. Entregar ao revisor somente esse pacote, o sidecar da unidade e o contrato `plan-reviewer-codex.md`. A primeira revisão usa a base da unidade; revisões seguintes usam exatamente o delta submetido.
+Antes de cada revisão, gerar entrada determinística com `bm review-package --cwd <workspace> --base <last_review_head> --head HEAD --brief <task-brief.md> --report <report.md> --output <review-package.md>`. Entregar ao revisor somente esse pacote, o sidecar da unidade e o contrato `plan-reviewer-codex.md`. A primeira revisão usa a base da unidade; revisões seguintes usam exatamente o delta submetido.
 
 Primeira revisão congela blockers. Blocker exige:
 
@@ -112,7 +112,7 @@ Guard nunca executa texto arbitrário do finding. O comando `proof` executa argv
 
 ## Plano congelado e classe da mudança
 
-`implementation_detail` ou `bounded_amendment` não autoriza nova decomposição, novo blocker, nova unidade ou novo ciclo de revisão. O executor registra a decisão e continua no mesmo sidecar. Somente `material_change` comprovada por `bm.py change-policy` pode interromper a unidade por mudança de escopo, contrato público, design aprovado ou invariante crítico.
+`implementation_detail` ou `bounded_amendment` não autoriza nova decomposição, novo blocker, nova unidade ou novo ciclo de revisão. O executor registra a decisão e continua no mesmo sidecar. Somente `material_change` comprovada por `bm change-policy` pode interromper a unidade por mudança de escopo, contrato público, design aprovado ou invariante crítico.
 
 Finding de qualidade dentro do contrato aprovado segue fix. Uma alternativa interna melhor não transforma o plano em inválido. Mudança material comprovada não vira blocker estrutural para obter redesign; usa `stop --kind material_change`.
 

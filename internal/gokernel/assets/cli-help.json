@@ -115,8 +115,8 @@
   "source": {
     "contract": "contracts/cli-surfaces.json",
     "contract_sha256": "436424b71608ecf87e75cf6d58e5f319717af7f46369ff4ee1846fce05540735",
-    "oracle": "scripts/bm.py",
-    "oracle_sha256": "d6ac6af9e149fde2e306852b64914a5868eda9cf83e41e4a5a1a042c9e6cf0cd"
+    "oracle": "scripts/bm_python_oracle.py",
+    "oracle_sha256": "315b24b3fe6b84e64b9ea7d37de28047006aae66580dbe469cdb6bac1dce8996"
   },
   "value_flags": {
     "adapter": [

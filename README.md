@@ -308,4 +308,4 @@ go build -trimpath -o bin/bm ./cmd/bm
 python3 scripts/run_cli_contract_fixtures.py --engine go --binary ./bin/bm
 ```
 
-O backend oficial é Go. `python3 scripts/bm.py` é somente o oráculo de paridade durante a janela de compatibilidade. Testes cobrem intake de PDF, selo e rastreabilidade do `SCOPE.md`, fases/tarefas tipadas, roadmap derivado, manifesto aprovado, workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.
+O backend oficial é Go. `python3 scripts/bm.py` executa somente `bin/bm` e falha com `BM_INSTALLATION_INVALID` quando o binário não existe; não há fallback. O legado permanece acessível apenas pelo nome explícito `python3 scripts/bm_python_oracle.py` durante a janela de paridade. Testes cobrem intake de PDF, selo e rastreabilidade do `SCOPE.md`, fases/tarefas tipadas, roadmap derivado, manifesto aprovado, workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.

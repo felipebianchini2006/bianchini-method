@@ -511,7 +511,7 @@ class CodexOverlayPackageTests(unittest.TestCase):
             "implementation_detail",
             "bounded_amendment",
             "material_change",
-            "bm.py change-policy",
+            "bm change-policy",
             "plano aprovado permanece congelado",
             "opção reversível de menor risco",
             "USER_ACTIONS.md",
@@ -522,6 +522,29 @@ class CodexOverlayPackageTests(unittest.TestCase):
         self.assertIn("não autoriza nova decomposição", convergence)
         self.assertIn("mudança material comprovada", reviewer)
         self.assertIn("cinco categorias de parada", skill)
+
+    def test_overlay_uses_current_native_cli_surfaces(self) -> None:
+        skill = (OVERLAY / "SKILL.md").read_text(encoding="utf-8")
+        core = (OVERLAY / "references/EXECUTION_CORE_CODEX.md").read_text(
+            encoding="utf-8"
+        )
+        convergence = (OVERLAY / "references/CODEX_CONVERGENCE.md").read_text(
+            encoding="utf-8"
+        )
+        reviewer = (OVERLAY / "references/plan-reviewer-codex.md").read_text(
+            encoding="utf-8"
+        )
+        combined = "\n".join((skill, core, convergence, reviewer))
+        self.assertIn("../_shared/bin/bm", skill)
+        self.assertNotIn("bm.py", combined)
+        for retired in ("bm route", "bm repo-hygiene", "bm legacy-transition"):
+            self.assertNotIn(retired, combined)
+        for retired_flag in ("--planning-version", "--state"):
+            self.assertNotIn(retired_flag, core)
+        self.assertIn("bm workspace create --repo <repo> --change <change_id>", core)
+        self.assertIn("bm review-package --cwd <workspace>", convergence)
+        for required in ("--brief <task-brief.md>", "--report <report.md>", "--output <review-package.md>"):
+            self.assertIn(required, convergence)
 
     def test_codex_activation_policy_is_explicit_and_base_implicit_is_disabled(
         self,
@@ -536,9 +559,13 @@ class CodexOverlayPackageTests(unittest.TestCase):
 
     def test_base_cli_and_schemas_remain_unmodified_by_overlay(self) -> None:
         wrapper = (ROOT / "scripts/bm.py").read_text(encoding="utf-8")
+        oracle = (ROOT / "scripts/bm_python_oracle.py").read_text(encoding="utf-8")
         packaged = (ROOT / "skills/_shared/scripts/bm.py").read_text(encoding="utf-8")
-        self.assertIn("runpy.run_path", wrapper)
+        self.assertIn("os.execv", wrapper)
+        self.assertNotIn("runpy.run_path", wrapper)
+        self.assertIn("runpy.run_path", oracle)
         self.assertNotIn("review_guard", wrapper)
+        self.assertNotIn("review_guard", oracle)
         self.assertNotIn("review_guard", packaged)
         self.assertEqual(
             (ROOT / "schemas/project-state.schema.json").read_bytes(),

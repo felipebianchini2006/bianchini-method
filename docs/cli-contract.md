@@ -236,10 +236,10 @@
 
 | ID | Estado | Argv | Exit | Mutações | Consumidores | Evidência |
 | --- | --- | --- | --- | --- | --- | --- |
-| `route.retired` | retired | route --repo {repo} --new-project | 2 | nenhuma | codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md | retired-route<br>tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public |
-| `legacy-transition.retired` | retired | legacy-transition --repo {repo} | 2 | nenhuma | codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md | retired-legacy-transition<br>tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public |
-| `repo-hygiene.retired` | retired | repo-hygiene check --repo {repo} | 2 | nenhuma | codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md | retired-repo-hygiene<br>tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public |
-| `workspace.companion-v2-flags` | known_incompatibility | workspace create --repo {repo} --plan P01 --planning-version v2 --state {repo}/legacy-state.json | 2 | nenhuma | codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md | workspace-old-companion-flags<br>tests/test_method_v04_cli.py::test_legacy_fallback_arguments_are_not_public_in_v04 |
+| `route.retired` | retired | route --repo {repo} --new-project | 2 | nenhuma | — | retired-route<br>tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public |
+| `legacy-transition.retired` | retired | legacy-transition --repo {repo} | 2 | nenhuma | — | retired-legacy-transition<br>tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public |
+| `repo-hygiene.retired` | retired | repo-hygiene check --repo {repo} | 2 | nenhuma | — | retired-repo-hygiene<br>tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public |
+| `workspace.companion-v2-flags` | known_incompatibility | workspace create --repo {repo} --plan P01 --planning-version v2 --state {repo}/legacy-state.json | 2 | nenhuma | — | workspace-old-companion-flags<br>tests/test_method_v04_cli.py::test_legacy_fallback_arguments_are_not_public_in_v04 |
 
 ## Perfis de comportamento
 

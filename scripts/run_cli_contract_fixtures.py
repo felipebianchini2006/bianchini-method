@@ -18,7 +18,7 @@ from typing import Any
 from _cli_contract import FIXTURES, ROOT
 
 
-PYTHON_ENGINE = ROOT / "scripts" / "bm.py"
+PYTHON_ENGINE = ROOT / "scripts" / "bm_python_oracle.py"
 FIXED_GIT_ENV = {
     "GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z",
     "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
