@@ -150,6 +150,50 @@ class GoPreviewScenarios(unittest.TestCase):
                     self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
                     self.assertEqual(go.stderr, python.stderr)
 
+    def test_go_adapter_render_and_install_match_python_oracle(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="bm-go-adapter-parity-") as temp:
+            base = Path(temp)
+            binary = base / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            for host in ("generic", "codex", "claude-compatible"):
+                with self.subTest(host=host):
+                    argv = ("adapter", "render", "--host", host)
+                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    go = run(str(binary), *argv)
+                    self.assertEqual(go.returncode, python.returncode)
+                    self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
+                    self.assertEqual(go.stderr, python.stderr)
+
+            python_repo = base / "python-repo"
+            go_repo = base / "go-repo"
+            python_repo.mkdir()
+            go_repo.mkdir()
+            foreign = b"# Regras estrangeiras\n\nPreservar.\n"
+            for repo in (python_repo, go_repo):
+                target = repo / "AGENTS.md"
+                target.write_bytes(foreign)
+                target.chmod(0o640)
+            python = run(
+                "python3", str(ROOT / "scripts" / "bm.py"), "adapter", "install",
+                "--host", "generic", "--repo", str(python_repo),
+            )
+            go = run(
+                str(binary), "adapter", "install", "--host", "generic",
+                "--repo", str(go_repo),
+            )
+            self.assertEqual(go.returncode, python.returncode)
+            self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
+            self.assertEqual(go.stderr, python.stderr)
+            self.assertEqual(
+                (go_repo / "AGENTS.md").read_bytes(),
+                (python_repo / "AGENTS.md").read_bytes(),
+            )
+            self.assertEqual(
+                (go_repo / "AGENTS.md").stat().st_mode & 0o777,
+                (python_repo / "AGENTS.md").stat().st_mode & 0o777,
+            )
+
     def test_preview_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),
