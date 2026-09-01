@@ -95,6 +95,18 @@ class MethodWorkspace:
             self.project_file: "# Projeto\n\nPropósito, limites e invariantes estáveis.\n",
             self.current_architecture: "# Arquitetura atual\n",
             self.current_system_model: self._empty_system_model(),
+            self.current_specs / "MANIFEST.json": json.dumps(
+                {
+                    "schema_version": 1,
+                    "spec_contract": 1,
+                    "specs": [],
+                    "risk_coverage": [],
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
             self.debug_knowledge: "# Conhecimento de debug\n",
         }
         for path, content in defaults.items():

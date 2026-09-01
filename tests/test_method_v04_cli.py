@@ -99,6 +99,59 @@ def planning_scope(*identifiers: str) -> str:
     return f"# Escopo\n\n## Itens rastreáveis\n\n{items}\n"
 
 
+def write_managed_specs(repo: Path, change_root: Path, *scope_ids: str) -> None:
+    expected = change_root / "specs/expected"
+    expected.mkdir(parents=True, exist_ok=True)
+    requirements = []
+    sections = ["# Spec do sistema"]
+    for index, scope_id in enumerate(scope_ids, start=1):
+        requirement_id = f"SPEC-{index:03d}"
+        requirements.append({"id": requirement_id, "scope": [scope_id]})
+        sections.extend(
+            [
+                "",
+                f"## {requirement_id}: Contrato de {scope_id}",
+                "",
+                f"O sistema deve entregar o comportamento rastreado por {scope_id}.",
+            ]
+        )
+    (expected / "system.md").write_text(
+        "\n".join(sections).rstrip() + "\n", encoding="utf-8"
+    )
+    (change_root / "specs/MANIFEST.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "spec_contract": 1,
+                "specs": [
+                    {
+                        "id": "system",
+                        "path": "system.md",
+                        "requirements": requirements,
+                    }
+                ],
+                "risk_coverage": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cli_json(
+        "spec-diff",
+        "--root",
+        str(repo),
+        "--base",
+        str(repo / ".bianchini/current/specs"),
+        "--target",
+        str(expected),
+        "--output",
+        str(change_root / "specs/diff.md"),
+    )
+
+
 def typed_task(
     identifier: str,
     *,
@@ -312,6 +365,29 @@ Nenhuma.
 
 
 class MethodV04Scenarios(unittest.TestCase):
+    def test_new_change_declares_managed_spec_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            change_id = str(
+                cli_json(
+                    "model", "init", "--repo", str(repo), "--change", "managed-specs"
+                )["change"]
+            )
+            change_root = repo / ".bianchini/changes" / change_id
+            coherence = json.loads(
+                (change_root / "COHERENCE.md")
+                .read_text(encoding="utf-8")
+                .split("---", 2)[1]
+            )
+
+            self.assertEqual(coherence["schema_version"], 2)
+            self.assertEqual(coherence["planning_contract"], 2)
+            self.assertEqual(coherence["spec_contract"], 1)
+            self.assertTrue((change_root / "specs/expected").is_dir())
+            self.assertTrue((change_root / "specs/MANIFEST.json").is_file())
+
     def test_typed_planning_binds_scope_roadmap_tasks_semantic_review_and_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
@@ -361,6 +437,7 @@ class MethodV04Scenarios(unittest.TestCase):
                 (change_root / "plans" / f"{plan['id']}.md").write_text(
                     markdown_document(plan, str(plan["id"])), encoding="utf-8"
                 )
+            write_managed_specs(repo, change_root, "REQ-001", "REQ-002")
 
             roadmap = cli_json(
                 "roadmap", "sync", "--repo", str(repo), "--change", change_id
@@ -376,6 +453,21 @@ class MethodV04Scenarios(unittest.TestCase):
                 "--structural-only",
             )
             self.assertEqual(structural["status"], "structurally_valid")
+            self.assertEqual(structural["spec_contract"], 1)
+            persisted_coherence = json.loads(
+                (change_root / "COHERENCE.md")
+                .read_text(encoding="utf-8")
+                .split("---", 2)[1]
+            )
+            self.assertEqual(persisted_coherence["schema_version"], 2)
+            self.assertEqual(persisted_coherence["spec_contract"], 1)
+            for field in (
+                "spec_base_digest",
+                "spec_target_digest",
+                "spec_manifest_digest",
+                "spec_diff_digest",
+            ):
+                self.assertRegex(str(persisted_coherence[field]), r"^[0-9a-f]{64}$")
             self.assertRegex(str(structural["review_input_digest"]), r"^[0-9a-f]{64}$")
             self.assertEqual(structural["schedule"]["plan_waves"], [["P01"], ["P02"]])
             self.assertEqual(
@@ -501,6 +593,7 @@ class MethodV04Scenarios(unittest.TestCase):
             (change_root / "plans/P01.md").write_text(
                 markdown_document(plan, "P01"), encoding="utf-8"
             )
+            write_managed_specs(repo, change_root, "REQ-001")
             cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
             structural = cli_json(
                 "coherence",
@@ -630,7 +723,9 @@ class MethodV04Scenarios(unittest.TestCase):
             change_root = repo / ".bianchini/changes" / change_id
             coherence_path = change_root / "COHERENCE.md"
             header = json.loads(coherence_path.read_text(encoding="utf-8").split("---", 2)[1])
+            header["schema_version"] = 1
             header.pop("planning_contract")
+            header.pop("spec_contract")
             coherence_path.write_text(
                 markdown_document(header, "Coerência legada"), encoding="utf-8"
             )
@@ -1061,6 +1156,7 @@ class MethodV04Scenarios(unittest.TestCase):
                 (change_root / "plans" / f"{plan['id']}.md").write_text(
                     markdown_document(plan, str(plan["id"])), encoding="utf-8"
                 )
+            write_managed_specs(repo, change_root, "REQ-001", "REQ-002")
             cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
 
             coherent = cli_json(
@@ -1119,6 +1215,7 @@ class MethodV04Scenarios(unittest.TestCase):
             (change_root / "plans/P01.md").write_text(
                 markdown_document(plan, "P01"), encoding="utf-8"
             )
+            write_managed_specs(repo, change_root, "REQ-001")
             cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
             structural = cli_json(
                 "coherence",
@@ -1217,6 +1314,9 @@ class MethodV04Scenarios(unittest.TestCase):
                 (change_root / "plans" / f"{plan['id']}.md").write_text(
                     markdown_document(plan, str(plan["id"])), encoding="utf-8"
                 )
+            write_managed_specs(
+                repo, change_root, "REQ-001", "REQ-002", "REQ-003"
+            )
             cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
             structural = cli_json(
                 "coherence",
@@ -1338,6 +1438,7 @@ class MethodV04Scenarios(unittest.TestCase):
             (change_root / "plans/P01.md").write_text(
                 markdown_document(plan, "P01"), encoding="utf-8"
             )
+            write_managed_specs(repo, change_root, "REQ-001")
             cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
             structural = cli_json(
                 "coherence",
@@ -1484,6 +1585,7 @@ class MethodV04Scenarios(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            write_managed_specs(repo, change_root, "REQ-001")
             cli_json("roadmap", "sync", "--repo", str(repo), "--change", change_id)
             structural = cli_json(
                 "coherence",
@@ -1559,7 +1661,23 @@ class MethodV04Scenarios(unittest.TestCase):
 
             self.assertEqual(closed["status"], "completed")
             self.assertFalse(change_root.exists())
-            self.assertTrue((repo / ".bianchini/archive" / change_id / "SUMMARY.md").is_file())
+            archive = repo / ".bianchini/archive" / change_id
+            self.assertTrue((archive / "SUMMARY.md").is_file())
+            self.assertEqual(
+                (repo / ".bianchini/current/specs/system.md").read_bytes(),
+                (archive / "specs/expected/system.md").read_bytes(),
+            )
+            self.assertEqual(
+                (repo / ".bianchini/current/specs/MANIFEST.json").read_bytes(),
+                (archive / "specs/MANIFEST.json").read_bytes(),
+            )
+            summary = json.loads(
+                (archive / "SUMMARY.md")
+                .read_text(encoding="utf-8")
+                .split("---", 2)[1]
+            )
+            self.assertTrue(summary["specs_promoted"])
+            self.assertEqual(summary["specs_status"], "managed")
             current = json.loads(
                 (repo / ".bianchini/current/SYSTEM_MODEL.md")
                 .read_text(encoding="utf-8")
@@ -1591,7 +1709,9 @@ class MethodV04Scenarios(unittest.TestCase):
             coherence_header = json.loads(
                 coherence_path.read_text(encoding="utf-8").split("---", 2)[1]
             )
+            coherence_header["schema_version"] = 1
             coherence_header.pop("planning_contract")
+            coherence_header.pop("spec_contract")
             coherence_path.write_text(
                 markdown_document(coherence_header, "Coerência legada"),
                 encoding="utf-8",

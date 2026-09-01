@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from bm_feature_support import confined_path, sha256_path
+from bm_spec_package import (
+    confined_no_symlink,
+    derive_directory_diff,
+    reject_foreign_namespace,
+)
 
 
 REQUIREMENT_HEADING = re.compile(
@@ -46,13 +51,81 @@ def parse_requirements(path: Path) -> dict[str, str]:
     return parsed
 
 
-def spec_diff(*, root: Path, base: Path, target: Path, output: Path) -> dict[str, Any]:
+def spec_diff(
+    *,
+    root: Path,
+    base: Path,
+    target: Path,
+    output: Path,
+    manifest: Path | None = None,
+) -> dict[str, Any]:
+    reject_foreign_namespace(root, "spec root")
+    reject_foreign_namespace(base, "spec base")
+    reject_foreign_namespace(target, "spec target")
+    reject_foreign_namespace(output, "spec diff output")
+    if manifest is not None:
+        reject_foreign_namespace(manifest, "spec manifest")
+    trusted_root = root.absolute()
+    raw_paths = {
+        "spec base": base if base.is_absolute() else trusted_root / base,
+        "spec target": target if target.is_absolute() else trusted_root / target,
+        "spec diff output": output if output.is_absolute() else trusted_root / output,
+    }
+    if manifest is not None:
+        raw_paths["spec manifest"] = (
+            manifest if manifest.is_absolute() else trusted_root / manifest
+        )
+    safe_raw_paths = {
+        label: confined_no_symlink(trusted_root, raw_path, label)
+        for label, raw_path in raw_paths.items()
+    }
     repository = root.resolve()
     base_path = confined_path(repository, base, "spec base")
     target_path = confined_path(repository, target, "spec target")
     output_path = confined_path(repository, output, "spec diff output")
     if output_path in {base_path, target_path}:
         raise ValueError("spec diff output deve ser diferente da base e do target")
+    if base_path.is_dir() or target_path.is_dir():
+        if not base_path.is_dir() or not target_path.is_dir():
+            raise ValueError("spec diff exige base e target do mesmo tipo")
+        try:
+            output_path.relative_to(base_path)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("spec diff output não pode ficar dentro da base")
+        try:
+            output_path.relative_to(target_path)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("spec diff output não pode ficar dentro do target")
+        manifest_value = (
+            manifest
+            if manifest is not None
+            else raw_paths["spec target"].parent / "MANIFEST.json"
+        )
+        raw_manifest = (
+            manifest_value
+            if manifest_value.is_absolute()
+            else repository / manifest_value
+        )
+        safe_manifest = confined_no_symlink(
+            trusted_root, raw_manifest, "spec manifest"
+        )
+        metadata, rendered = derive_directory_diff(
+            root=trusted_root,
+            base=safe_raw_paths["spec base"],
+            target=safe_raw_paths["spec target"],
+            manifest_path=safe_manifest,
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(rendered, encoding="utf-8")
+        return {
+            **metadata,
+            "output": output_path.relative_to(repository).as_posix(),
+            "output_digest": sha256_path(output_path),
+        }
     current = parse_requirements(base_path)
     future = parse_requirements(target_path)
     added = sorted(set(future) - set(current))
