@@ -11,6 +11,10 @@ func replacePath(source, target string) error {
 	return os.Rename(source, target)
 }
 
+func openFileForSync(path string) (*os.File, error) {
+	return os.Open(path)
+}
+
 func removeAllDurably(path string) error {
 	if err := os.RemoveAll(path); err != nil {
 		return err

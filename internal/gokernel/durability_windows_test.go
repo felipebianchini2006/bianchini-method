@@ -51,6 +51,22 @@ func TestWindowsDurableReplaceAndDirectoryMove(t *testing.T) {
 	}
 }
 
+func TestWindowsTreeSyncUsesWritableFileHandle(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "state.json")
+	if err := os.WriteFile(path, []byte("state"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := openFileForSync(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	if err := file.Sync(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWindowsDurableRemovalUsesRecoverableTombstone(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "journal.json")

@@ -55,6 +55,10 @@ func replacePath(source, target string) error {
 	return windowsMovePath(source, target, true)
 }
 
+func openFileForSync(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_WRONLY, 0)
+}
+
 // Windows não documenta FlushFileBuffers para handles de diretório. A barreira
 // durável é aplicada nos publishes e tombstones por MoveFileExW WRITE_THROUGH.
 func syncDirectory(path string) error {

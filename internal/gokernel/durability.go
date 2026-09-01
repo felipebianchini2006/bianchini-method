@@ -55,7 +55,7 @@ func syncTreeDurably(root string) error {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("arquivo não sincronizável: %s", path)
 		}
-		file, err := os.Open(path)
+		file, err := openFileForSync(path)
 		if err != nil {
 			return err
 		}
