@@ -98,6 +98,8 @@ func TestMigrationRejectsSymlinkBeforeMutation(t *testing.T) {
 func TestMigrationRejectsSymlinkAncestorBeforeReadingLegacyTree(t *testing.T) {
 	root := t.TempDir()
 	runGitMigration(t, root, "init")
+	runGitMigration(t, root, "config", "user.name", "BM Test")
+	runGitMigration(t, root, "config", "user.email", "test@example.invalid")
 	outside := t.TempDir()
 	for relative, content := range map[string][]byte{
 		"living/PROJECT_STATE.md":           []byte("{\"planning_status\":\"idle\"}\n"),
