@@ -9,7 +9,6 @@ import os
 import re
 import subprocess
 import tempfile
-import fcntl
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps
@@ -17,6 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 from bm_project_model import read_frontmatter
+from bm_file_lock import lock_exclusive_nonblocking, unlock
 
 
 CLASSIFICATIONS = frozenset(
@@ -172,14 +172,14 @@ def _exclusive_transition(root: Path) -> Iterable[None]:
     descriptor = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
     try:
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive_nonblocking(descriptor)
         except BlockingIOError as error:
             _fail("LEARNING_BUSY", "outra transição de aprendizado está em execução")
             raise AssertionError from error
         yield
     finally:
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            unlock(descriptor)
         finally:
             os.close(descriptor)
 

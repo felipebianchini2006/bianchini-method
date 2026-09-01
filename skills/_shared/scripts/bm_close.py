@@ -8,7 +8,6 @@ uma máquina de estados crash-recoverable; não promete atomicidade global.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -19,6 +18,8 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
+
+from bm_file_lock import lock_exclusive_nonblocking, unlock
 
 
 CLOSE_PHASES = (
@@ -293,7 +294,7 @@ def _exclusive_lock(root: Path) -> Iterator[None]:
     descriptor = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
     try:
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive_nonblocking(descriptor)
         except BlockingIOError as error:
             raise CloseRecoveryError(
                 "CLOSE_LOCKED", "outro fechamento está em execução"
@@ -301,7 +302,7 @@ def _exclusive_lock(root: Path) -> Iterator[None]:
         yield
     finally:
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            unlock(descriptor)
         finally:
             os.close(descriptor)
 
