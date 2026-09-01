@@ -1,0 +1,50 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "adapter.install"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "steps": [
+    {
+      "surface": "adapter.install",
+      "argv": [
+        "adapter",
+        "install",
+        "--host",
+        "generic",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "changed": true,
+            "digest": "cf8af66ed29c9bc147cf915ac1ff9c1e76886ed0c0d315db9d223c274b4b3105",
+            "host": "generic",
+            "schema_version": 1,
+            "status": "installed",
+            "target": "AGENTS.md"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            "AGENTS.md"
+          ],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}

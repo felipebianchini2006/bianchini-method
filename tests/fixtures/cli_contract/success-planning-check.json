@@ -1,0 +1,171 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "planning-check.record",
+    "planning-audit"
+  ],
+  "initial_tree": {
+    "docs/bianchini/changes/v1/PLANNING_REVIEW.md": {
+      "text": "# Planning Review\n\n```json\n{\n  \"verdict\": \"passed\",\n  \"findings\": []\n}\n```\n"
+    },
+    "docs/bianchini/changes/v1/READINESS.md": {
+      "text": "# Planning Readiness\n\n```json\n{\n  \"schema_version\": 1,\n  \"status\": \"ready\",\n  \"scope_digest\": \"db4b14251aed1fc747393e7fe240036ca8455c6af93671e8ba9a250b1174aafc\",\n  \"repository_revision\": \"new-project\",\n  \"design_required\": false,\n  \"impact_map\": {\n    \"applications\": [\n      \"web\"\n    ],\n    \"modules\": [\n      \"auth\"\n    ],\n    \"contracts\": [\n      \"session\"\n    ],\n    \"data\": [\n      \"users\"\n    ],\n    \"platforms\": [\n      \"browser\"\n    ]\n  },\n  \"decisions\": [\n    {\n      \"id\": \"D-001\",\n      \"statement\": \"Usar sessão autenticada.\",\n      \"evidence\": \"APPROVED_SCOPE.md\",\n      \"destinations\": [\n        \"docs/bianchini/changes/v1/specs/system-change.md\",\n        \"docs/bianchini/changes/v1/plans/P01-system.md\"\n      ]\n    }\n  ],\n  \"assumptions\": [\n    {\n      \"id\": \"A-001\",\n      \"statement\": \"Sessão local atende o ciclo.\",\n      \"impact\": \"high\",\n      \"status\": \"bounded\",\n      \"evidence\": \"STACK_RESEARCH.md#Inventário local\",\n      \"fallback\": \"Bloquear publicação externa.\",\n      \"destinations\": [\n        \"docs/bianchini/changes/v1/specs/system-change.md\",\n        \"docs/bianchini/changes/v1/plans/P01-system.md\"\n      ]\n    }\n  ],\n  \"pitfalls\": [\n    {\n      \"id\": \"P-001\",\n      \"statement\": \"Sessão inválida após reinício.\",\n      \"impact\": \"high\",\n      \"prevention\": \"Persistir estado mínimo.\",\n      \"recovery\": \"Invalidar e voltar ao login.\",\n      \"verification\": \"Teste de reinício controlado.\",\n      \"destinations\": [\n        \"docs/bianchini/changes/v1/specs/system-change.md\",\n        \"docs/bianchini/changes/v1/plans/P01-system.md\"\n      ]\n    }\n  ],\n  \"user_actions\": [\n    {\n      \"id\": \"U-001\",\n      \"action\": \"Fornecer credencial de sandbox.\",\n      \"needed_by\": \"P01\",\n      \"can_continue_without\": true,\n      \"fallback\": \"Fixture local.\",\n      \"evidence_required\": \"Credencial presente no ambiente.\",\n      \"destinations\": [\n        \"docs/bianchini/changes/v1/USER_ACTIONS.md\",\n        \"docs/bianchini/changes/v1/plans/P01-system.md\"\n      ]\n    }\n  ],\n  \"spikes\": [\n    {\n      \"id\": \"S-001\",\n      \"question\": \"Persistência local funciona no runner?\",\n      \"status\": \"passed\",\n      \"evidence\": \"STACK_RESEARCH.md#Inventário local\",\n      \"decision\": \"Usar fixture determinística.\",\n      \"destinations\": [\n        \"docs/bianchini/changes/v1/STACK_RESEARCH.md\"\n      ]\n    }\n  ],\n  \"design_surfaces\": [],\n  \"spec_deltas\": [\n    {\n      \"id\": \"SD-001\",\n      \"domain\": \"system\",\n      \"source\": \"docs/bianchini/changes/v1/spec-deltas/system.md\",\n      \"target\": \"docs/bianchini/current/specs/system.md\",\n      \"destinations\": [\n        \"docs/bianchini/changes/v1/specs/system-change.md\",\n        \"docs/bianchini/changes/v1/plans/P01-system.md\",\n        \"docs/bianchini/changes/v1/spec-deltas/system.md\"\n      ]\n    }\n  ]\n}\n```\n"
+    },
+    "docs/bianchini/changes/v1/STACK_RESEARCH.md": {
+      "text": "# Stack Research\n\nResearch mode: repo_only\nMotivo: stack local estabelecida e sem integração externa nova.\n\n## Stack detectada\n\n- Python e HTML.\n\n## Inventário local\n\n- Manifests: nenhum.\n- Lockfiles: nenhum.\n- CI: unittest.\n- Testes: unittest.\n- Padrões locais: biblioteca padrão.\n\n## Decisões aplicadas\n\n- D-001 mantém o menor fluxo robusto.\n\n## Riscos e lacunas\n\n- P-001 cobre recuperação da sessão.\n- S-001 validou a persistência local.\n"
+    },
+    "docs/bianchini/changes/v1/USER_ACTIONS.md": {
+      "text": "# User Actions\n\n## U-001\n\n- Ação: fornecer credencial de sandbox.\n- Necessário até: P01.\n- Pode continuar sem: sim, usando fixture local.\n- Evidência: segredo presente no ambiente de homologação.\n"
+    },
+    "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md": {
+      "text": "# Escopo aprovado\n\nCriar painel web com autenticação e cadastro.\n"
+    },
+    "docs/bianchini/changes/v1/plans/P01-system.md": {
+      "text": "---\nplan_id: P01\nmethod_version: 2\nrisk: medium\nexecution: slice\nreview: per_slice\ndepends_on: []\n---\n\n# P01 Sistema\n\n### Slice 1 — Entregar autenticação e painel\n\n**Execution:** slice\n**Review:** per_slice\n**Change:** state-machine\n**Readiness refs:** D-001, A-001, P-001, U-001, SD-001\n**Test seams:** sessão pública e navegação\n**Spec refs:** specs/system-change.md#contratos\n**Files:** src/auth.py, web/index.html, tests/test_auth.py\n**Contract:** login cria sessão; reinício preserva estado válido\n**Verification:** `python3 -m unittest tests.test_auth` retorna 0\n**Done when:** jornada crítica e recuperação passam\n"
+    },
+    "docs/bianchini/changes/v1/spec-deltas/system.md": {
+      "text": "# Sistema atual após v1\n\nSD-001. D-001: sessão autenticada, recuperação P-001 e ação U-001.\n"
+    },
+    "docs/bianchini/changes/v1/specs/system-change.md": {
+      "text": "# Change Spec\n\n## Contratos\n\nD-001 define autenticação por sessão. A-001 foi limitada por evidência local.\nP-001 exige recuperação após reinício. U-001 deve existir antes do gate P01.\nSD-001 substitui o contrato atual do domínio.\n"
+    },
+    "docs/living/PROJECT_STATE.md": {
+      "text": "{\n  \"method_version\": 2,\n  \"method_mode\": \"standalone-adaptive\",\n  \"planning_version\": \"v1\",\n  \"planning_status\": \"in_progress\",\n  \"execution_policy\": \"adaptive\",\n  \"assurance_profile\": \"standard\",\n  \"architecture_audit\": \"optional\",\n  \"architecture_audit_status\": \"not_run\",\n  \"manual_pdf\": \"scope\",\n  \"scope\": {\n    \"status\": \"approved\",\n    \"source\": \"docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md\",\n    \"approved_at\": \"2026-08-17T12:00:00Z\"\n  },\n  \"planning\": {\n    \"quality_version\": 2,\n    \"research_mode\": \"repo_only\",\n    \"research\": \"docs/bianchini/changes/v1/STACK_RESEARCH.md\",\n    \"readiness\": \"docs/bianchini/changes/v1/READINESS.md\",\n    \"user_actions\": \"docs/bianchini/changes/v1/USER_ACTIONS.md\",\n    \"spec\": \"docs/bianchini/changes/v1/specs/system-change.md\",\n    \"review\": \"docs/bianchini/changes/v1/PLANNING_REVIEW.md\",\n    \"checker\": {\n      \"status\": \"pending\",\n      \"rounds\": 0,\n      \"history_path\": \"artifacts/bianchini/v1/planning/checker.jsonl\",\n      \"package_digest\": null,\n      \"report_digest\": null\n    },\n    \"design_manifest\": null,\n    \"change_root\": \"docs/bianchini/changes/v1\",\n    \"current_specs\": \"docs/bianchini/current/specs\"\n  },\n  \"approval\": {\n    \"status\": \"pending\",\n    \"approved_at\": null,\n    \"approved_by\": null,\n    \"approved_plans\": [],\n    \"package\": {\n      \"algorithm\": \"sha256-manifest-v1\",\n      \"manifest_path\": \"artifacts/bianchini/v1/approval/manifest.sha256\",\n      \"manifest_digest\": null,\n      \"files\": [\n        \"docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md\",\n        \"docs/bianchini/changes/v1/STACK_RESEARCH.md\",\n        \"docs/bianchini/changes/v1/READINESS.md\",\n        \"docs/bianchini/changes/v1/USER_ACTIONS.md\",\n        \"docs/bianchini/changes/v1/specs/system-change.md\",\n        \"docs/bianchini/changes/v1/spec-deltas/system.md\",\n        \"docs/bianchini/changes/v1/PLANNING_REVIEW.md\",\n        \"docs/bianchini/changes/v1/plans/P01-system.md\"\n      ]\n    }\n  },\n  \"plans\": [\n    {\n      \"id\": \"P01\",\n      \"path\": \"docs/bianchini/changes/v1/plans/P01-system.md\",\n      \"status\": \"planned\",\n      \"risk\": \"medium\",\n      \"execution\": \"slice\",\n      \"review\": \"per_slice\",\n      \"test_seams\": [\n        \"session\",\n        \"navigation\"\n      ],\n      \"depends_on\": [],\n      \"ledger\": \"artifacts/bianchini/v1/ledgers/P01.md\",\n      \"gates\": [\n        \"test\",\n        \"e2e\"\n      ]\n    }\n  ],\n  \"verification\": {\n    \"fast\": {\n      \"commands\": [\n        \"python3 -m unittest tests.test_auth\"\n      ],\n      \"status\": \"pending\"\n    },\n    \"plan\": {\n      \"commands\": [\n        \"python3 -m unittest discover -s tests\"\n      ],\n      \"status\": \"pending\"\n    },\n    \"release\": {\n      \"commands\": [\n        \"python3 -m unittest discover -s tests\"\n      ],\n      \"status\": \"pending\"\n    }\n  },\n  \"release\": {\n    \"status\": \"pending\",\n    \"platforms\": [\n      \"web\"\n    ],\n    \"profiles\": [\n      \"admin\"\n    ],\n    \"candidate\": null,\n    \"final_gate\": \"homologar-sistema\",\n    \"homologation\": \"pending\",\n    \"final_review\": \"pending\",\n    \"delivery\": \"pending\"\n  },\n  \"blockers\": [],\n  \"next_action\": \"Executar P01.\",\n  \"complexity_review\": {\n    \"decision\": \"within_budget\",\n    \"justification\": null,\n    \"deferred_scope\": [],\n    \"scope_split_approved\": false,\n    \"scope_split_approved_by\": null,\n    \"scope_split_approved_at\": null\n  }\n}"
+    }
+  },
+  "steps": [
+    {
+      "surface": "planning-check.record",
+      "argv": [
+        "planning-check",
+        "record",
+        "--state",
+        "{repo}/docs/living/PROJECT_STATE.md",
+        "--root",
+        "{repo}",
+        "--report",
+        "{repo}/docs/bianchini/changes/v1/PLANNING_REVIEW.md"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "history_path": "artifacts/bianchini/v1/planning/checker.jsonl",
+            "next_action": "freeze_and_request_approval",
+            "package_digest": "f370d7878d2168399c6fa991ee1d38b8fb9ef7c7768078348d475b6a3afe3148",
+            "recorded": true,
+            "report_digest": "1435fb7c346bc80e031bd63d567b1c038556f2bdfd30bbdfe60a3312d3f30a9b",
+            "round": 1,
+            "status": "passed"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            "artifacts/bianchini/v1/planning/checker.jsonl"
+          ],
+          "altered": [
+            "docs/living/PROJECT_STATE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            "docs/bianchini/changes/v1/PLANNING_REVIEW.md",
+            "docs/bianchini/changes/v1/READINESS.md",
+            "docs/bianchini/changes/v1/STACK_RESEARCH.md",
+            "docs/bianchini/changes/v1/USER_ACTIONS.md",
+            "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md",
+            "docs/bianchini/changes/v1/plans/P01-system.md",
+            "docs/bianchini/changes/v1/spec-deltas/system.md",
+            "docs/bianchini/changes/v1/specs/system-change.md"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "planning-audit",
+      "argv": [
+        "planning-audit",
+        "{repo}/docs/living/PROJECT_STATE.md",
+        "--root",
+        "{repo}",
+        "--strict"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "budget_exceeded": [],
+            "limits": {
+              "execution_units": 40,
+              "max_execution_unit_words": 8000,
+              "max_plan_words": 16000,
+              "plans": 16,
+              "platforms": 6,
+              "shared_context_words": 24000
+            },
+            "metrics": {
+              "execution_units": 1,
+              "max_execution_unit_words": 64,
+              "max_plan_words": 77,
+              "package_words": 447,
+              "plans": 1,
+              "platforms": 1,
+              "shared_context_words": 33
+            },
+            "profile": "standard",
+            "quality_contract": "planning-quality-v2",
+            "readiness": {
+              "counts": {
+                "assumptions": 1,
+                "decisions": 1,
+                "design_surfaces": 0,
+                "pitfalls": 1,
+                "spec_deltas": 1,
+                "spikes": 1,
+                "user_actions": 1
+              },
+              "coverage_gaps": [],
+              "design": null,
+              "design_required": false,
+              "scope_digest": "db4b14251aed1fc747393e7fe240036ca8455c6af93671e8ba9a250b1174aafc",
+              "spec_deltas": [
+                {
+                  "id": "SD-001",
+                  "source": "docs/bianchini/changes/v1/spec-deltas/system.md",
+                  "target": "docs/bianchini/current/specs/system.md"
+                }
+              ],
+              "status": "ready"
+            },
+            "recommended_profile": "standard",
+            "research_mode": "repo_only",
+            "valid": true,
+            "warnings": []
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            "artifacts/bianchini/v1/planning/checker.jsonl",
+            "docs/bianchini/changes/v1/PLANNING_REVIEW.md",
+            "docs/bianchini/changes/v1/READINESS.md",
+            "docs/bianchini/changes/v1/STACK_RESEARCH.md",
+            "docs/bianchini/changes/v1/USER_ACTIONS.md",
+            "docs/bianchini/changes/v1/inputs/APPROVED_SCOPE.md",
+            "docs/bianchini/changes/v1/plans/P01-system.md",
+            "docs/bianchini/changes/v1/spec-deltas/system.md",
+            "docs/bianchini/changes/v1/specs/system-change.md",
+            "docs/living/PROJECT_STATE.md"
+          ]
+        }
+      }
+    }
+  ]
+}

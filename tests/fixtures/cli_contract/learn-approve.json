@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "surface": "learn.approve",
+  "argv": [
+    "learn",
+    "approve",
+    "--repo",
+    "{repo}"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "learn approve exige --candidate, --digest e --approved-by\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

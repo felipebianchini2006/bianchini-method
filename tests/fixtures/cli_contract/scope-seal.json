@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "surface": "scope.seal",
+  "argv": [
+    "scope",
+    "seal",
+    "--repo",
+    "{repo}",
+    "--change",
+    "fixture"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "scope seal exige --source, --draft, --pages e --extraction\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

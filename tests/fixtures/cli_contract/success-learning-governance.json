@@ -1,0 +1,190 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "learn.propose",
+    "learn.list",
+    "learn.approve",
+    "learn.deactivate"
+  ],
+  "git": {
+    "init": true,
+    "commit_initial": true
+  },
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    },
+    ".bianchini/debug/resolved/D001-retry.md": {
+      "text": "---\n{\n  \"evidence\": [\n    \"tests/test_checkout.py::test_retry_idempotent\"\n  ],\n  \"green\": \"teste de contrato aprovado\",\n  \"id\": \"D001-retry\",\n  \"learning_candidate\": {\n    \"classification\": \"repeatable_procedure\",\n    \"conflicts\": [],\n    \"statement\": \"Usar chave de idempotência estável no retry do checkout.\",\n    \"tags\": [\n      \"payments\",\n      \"checkout\",\n      \"src/payments.py\"\n    ],\n    \"validity\": \"enquanto o contrato checkout-v1 estiver ativo\"\n  },\n  \"root_cause\": \"retry sem chave estável\",\n  \"schema_version\": 1,\n  \"status\": \"resolved\"\n}\n---\n# Debug resolvido\n"
+    }
+  },
+  "steps": [
+    {
+      "surface": "learn.propose",
+      "argv": [
+        "learn",
+        "propose",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "candidates": [
+              {
+                "classification": "repeatable_procedure",
+                "digest": "99e6c101ba68154119cf7d11f6d6402d82974c669acdd408aa75c1e2ee215c35",
+                "id": "L813BC8BD6BAB",
+                "path": ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json"
+              }
+            ],
+            "created": 1,
+            "since": null,
+            "status": "proposed"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json"
+          ],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      },
+      "capture": {
+        "candidate_id": "candidates.0.id",
+        "candidate_digest": "candidates.0.digest"
+      }
+    },
+    {
+      "surface": "learn.list",
+      "argv": [
+        "learn",
+        "list",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "approved": [],
+            "pending": [
+              {
+                "classification": "repeatable_procedure",
+                "digest": "99e6c101ba68154119cf7d11f6d6402d82974c669acdd408aa75c1e2ee215c35",
+                "id": "L813BC8BD6BAB",
+                "path": ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json",
+                "status": "pending"
+              }
+            ],
+            "rejected": []
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json",
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "learn.approve",
+      "argv": [
+        "learn",
+        "approve",
+        "--repo",
+        "{repo}",
+        "--candidate",
+        "{candidate_id}",
+        "--digest",
+        "{candidate_digest}",
+        "--approved-by",
+        "human:fixture"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "digest": "99e6c101ba68154119cf7d11f6d6402d82974c669acdd408aa75c1e2ee215c35",
+            "id": "L813BC8BD6BAB",
+            "path": ".bianchini/current/lessons/L813BC8BD6BAB.json",
+            "status": "approved"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/current/lessons/L813BC8BD6BAB.json"
+          ],
+          "altered": [],
+          "deleted": [
+            ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json"
+          ],
+          "moved": [],
+          "preserved": [
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "learn.deactivate",
+      "argv": [
+        "learn",
+        "deactivate",
+        "--repo",
+        "{repo}",
+        "--candidate",
+        "{candidate_id}",
+        "--reason",
+        "contrato substituído",
+        "--approved-by",
+        "human:fixture"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "active": false,
+            "id": "L813BC8BD6BAB",
+            "path": ".bianchini/current/lessons/L813BC8BD6BAB.json",
+            "status": "approved"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/current/lessons/L813BC8BD6BAB.json"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}

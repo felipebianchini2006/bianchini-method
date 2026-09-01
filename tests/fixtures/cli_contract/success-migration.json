@@ -1,0 +1,186 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "migrate.check",
+    "migrate.apply"
+  ],
+  "git": {
+    "init": true,
+    "commit_initial": true
+  },
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    },
+    "docs/living/PROJECT_STATE.md": {
+      "text": "{\"planning_status\":\"idle\",\"next_action\":\"aguardar\"}\n"
+    },
+    "docs/bianchini/current/specs/system.md": {
+      "text": "# Sistema\n"
+    },
+    "artifacts/bianchini/C001/result.json": {
+      "text": "{}\n"
+    },
+    "docs/design/foreign/notes.md": {
+      "text": "not bianchini\n"
+    },
+    "docs/design/C001/DESIGN_MANIFEST.json": {
+      "text": "{\"schema_version\":1,\"status\":\"approved\"}\n"
+    },
+    "docs/design/C001/prototype.html": {
+      "text": "<main>approved</main>\n"
+    }
+  },
+  "steps": [
+    {
+      "surface": "migrate.check",
+      "argv": [
+        "migrate",
+        "check",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "archive": ".bianchini/archive/import-2026-09-01",
+            "eligible": true,
+            "entries": [
+              {
+                "sha256": "b2726c3438a5fc08756c61cca7e7a091826cf966490bee790f39644712d0205a",
+                "source": "docs/living/PROJECT_STATE.md",
+                "target": ".bianchini/archive/import-2026-09-01/legacy/PROJECT_STATE.md"
+              },
+              {
+                "sha256": "72493351300307bdebd861c48adddc91dad738fcb14f6d00810a89643476134f",
+                "source": "docs/bianchini/current/specs/system.md",
+                "target": ".bianchini/current/specs/system.md"
+              },
+              {
+                "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+                "source": "artifacts/bianchini/C001/result.json",
+                "target": ".bianchini/archive/import-2026-09-01/artifacts-bianchini/C001/result.json"
+              },
+              {
+                "sha256": "e613c6eb9bb2a277b39cbfc3aac62585c11a9ee978cd55a7a2623c8f51d87bfd",
+                "source": "docs/design/C001/prototype.html",
+                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/prototype.html"
+              },
+              {
+                "sha256": "b597b6c57b9cf6c70995555fdfb5f74a17668c8c65b6bc4c15de5508e15310f9",
+                "source": "docs/design/C001/DESIGN_MANIFEST.json",
+                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/DESIGN_MANIFEST.json"
+              }
+            ]
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            "artifacts/bianchini/C001/result.json",
+            "docs/bianchini/current/specs/system.md",
+            "docs/design/C001/DESIGN_MANIFEST.json",
+            "docs/design/C001/prototype.html",
+            "docs/design/foreign/notes.md",
+            "docs/living/PROJECT_STATE.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "migrate.apply",
+      "argv": [
+        "migrate",
+        "apply",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "entries": [
+              {
+                "sha256": "b2726c3438a5fc08756c61cca7e7a091826cf966490bee790f39644712d0205a",
+                "source": "docs/living/PROJECT_STATE.md",
+                "target": ".bianchini/archive/import-2026-09-01/legacy/PROJECT_STATE.md"
+              },
+              {
+                "sha256": "72493351300307bdebd861c48adddc91dad738fcb14f6d00810a89643476134f",
+                "source": "docs/bianchini/current/specs/system.md",
+                "target": ".bianchini/current/specs/system.md"
+              },
+              {
+                "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+                "source": "artifacts/bianchini/C001/result.json",
+                "target": ".bianchini/archive/import-2026-09-01/artifacts-bianchini/C001/result.json"
+              },
+              {
+                "sha256": "e613c6eb9bb2a277b39cbfc3aac62585c11a9ee978cd55a7a2623c8f51d87bfd",
+                "source": "docs/design/C001/prototype.html",
+                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/prototype.html"
+              },
+              {
+                "sha256": "b597b6c57b9cf6c70995555fdfb5f74a17668c8c65b6bc4c15de5508e15310f9",
+                "source": "docs/design/C001/DESIGN_MANIFEST.json",
+                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/DESIGN_MANIFEST.json"
+              }
+            ],
+            "manifest": "{repo}/.bianchini/archive/import-2026-09-01/MANIFEST.md",
+            "state": "{repo}/.bianchini/STATE.md",
+            "status": "migrated"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.gitignore",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/archive/import-2026-09-01/MANIFEST.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md"
+          ],
+          "altered": [],
+          "deleted": [],
+          "moved": [
+            {
+              "from": "artifacts/bianchini/C001/result.json",
+              "to": ".bianchini/archive/import-2026-09-01/artifacts-bianchini/C001/result.json"
+            },
+            {
+              "from": "docs/bianchini/current/specs/system.md",
+              "to": ".bianchini/current/specs/system.md"
+            },
+            {
+              "from": "docs/design/C001/DESIGN_MANIFEST.json",
+              "to": ".bianchini/archive/import-2026-09-01/docs-design/C001/DESIGN_MANIFEST.json"
+            },
+            {
+              "from": "docs/design/C001/prototype.html",
+              "to": ".bianchini/archive/import-2026-09-01/docs-design/C001/prototype.html"
+            },
+            {
+              "from": "docs/living/PROJECT_STATE.md",
+              "to": ".bianchini/archive/import-2026-09-01/legacy/PROJECT_STATE.md"
+            }
+          ],
+          "preserved": [
+            "docs/design/foreign/notes.md",
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}

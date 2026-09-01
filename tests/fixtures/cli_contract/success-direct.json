@@ -1,0 +1,355 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "direct.start",
+    "direct.status",
+    "direct.checkpoint",
+    "direct.finish"
+  ],
+  "git": {
+    "init": true
+  },
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "steps": [
+    {
+      "argv": [
+        "model",
+        "init",
+        "--repo",
+        "{repo}"
+      ]
+    },
+    {
+      "surface": "direct.start",
+      "argv": [
+        "direct",
+        "start",
+        "--repo",
+        "{repo}",
+        "--objective",
+        "Renomear variável interna",
+        "--scope",
+        "Refactor sem efeito observável",
+        "--acceptance",
+        "Testes existentes continuam verdes",
+        "--verification",
+        "python3 -m unittest"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "acceptance": [
+              "Testes existentes continuam verdes"
+            ],
+            "base_head": "UNBORN",
+            "created_at": "{timestamp}",
+            "digest": "{sha256}",
+            "docviva_before": {
+              ".bianchini/current/ARCHITECTURE.md": "1a303e5e11cc8ffb4b5b57d1e9d6ca44f85f7ba687a05fc04004f171e1266cb0",
+              ".bianchini/current/SYSTEM_MODEL.md": "9d6fa478d66dc1a1bca209349b0670a768806158d138048e70fbe56393ad958a",
+              ".bianchini/current/specs/MANIFEST.json": "8fe693a685236415f33fea34c70ddc1ce4516e1a02f2df031c3cdf4c972f1be3"
+            },
+            "docviva_contract": 1,
+            "flow": {
+              "payment": false,
+              "webhook": false
+            },
+            "guards": [],
+            "id": "Q001-renomear-variavel-interna",
+            "missing_guards": [],
+            "model_before": {
+              "capabilities": [],
+              "contracts": [],
+              "data": [],
+              "effects": [],
+              "integrations": [],
+              "interfaces": [],
+              "invariants": [],
+              "journeys": [],
+              "modules": [],
+              "ownership": [],
+              "schema_version": 1
+            },
+            "objective": "Renomear variável interna",
+            "path": "{repo}/.bianchini/quick/Q001-renomear-variavel-interna",
+            "production_checkpoint_required": false,
+            "required_guards": [],
+            "risk": {
+              "additional_guards": [],
+              "declared_score": 0,
+              "derived_floor": 0,
+              "diff_floor": 0,
+              "dimensions": {
+                "concurrency": 0,
+                "external_effect": 0,
+                "migration": 0,
+                "money": 0,
+                "scope": 0
+              },
+              "effective_score": 0,
+              "initial_floor": 0,
+              "overrides": [],
+              "phase": "start",
+              "reasons": [],
+              "reclassified": false,
+              "risk_contract": "quick-risk-floor-v1",
+              "risk_inputs": {
+                "declared_paths": [],
+                "flags": {
+                  "concurrency": 0,
+                  "external_effect": 0,
+                  "migration": 0,
+                  "money": 0,
+                  "payment": false,
+                  "scope": 0,
+                  "webhook": false
+                }
+              },
+              "route": "normal",
+              "schema_version": 1,
+              "score": 0,
+              "workflow": "quick"
+            },
+            "schema_version": 1,
+            "scope": "Refactor sem efeito observável",
+            "status": "active",
+            "verification": [
+              "python3 -m unittest"
+            ]
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/quick/Q001-renomear-variavel-interna/BRIEF.md",
+            ".bianchini/quick/Q001-renomear-variavel-interna/PROGRESS.md"
+          ],
+          "altered": [
+            ".bianchini/STATE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/PROJECT.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            "keep.txt"
+          ]
+        }
+      },
+      "capture": {
+        "quick_id": "id"
+      }
+    },
+    {
+      "surface": "direct.status",
+      "argv": [
+        "direct",
+        "status",
+        "--repo",
+        "{repo}",
+        "--slug",
+        "{quick_id}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "id": "Q001-renomear-variavel-interna",
+            "missing_guards": [],
+            "path": "{repo}/.bianchini/quick/Q001-renomear-variavel-interna",
+            "route": "normal",
+            "status": "active"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".bianchini/quick/Q001-renomear-variavel-interna/BRIEF.md",
+            ".bianchini/quick/Q001-renomear-variavel-interna/PROGRESS.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "direct.checkpoint",
+      "argv": [
+        "direct",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--slug",
+        "{quick_id}",
+        "--checkpoint",
+        "Refactor verificado",
+        "--next-action",
+        "Finalizar",
+        "--command",
+        "python3 -m unittest",
+        "--evidence",
+        "suíte verde"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "checkpoint": 1,
+            "id": "Q001-renomear-variavel-interna",
+            "missing_guards": [],
+            "risk": {
+              "additional_guards": [],
+              "declared_score": 0,
+              "derived_floor": 0,
+              "diff_floor": 0,
+              "effective_score": 0,
+              "initial_floor": 0,
+              "phase": "finish",
+              "reasons": [],
+              "reclassified": false,
+              "risk_contract": "quick-risk-floor-v1",
+              "route": "normal",
+              "schema_version": 1,
+              "start_floor": 0,
+              "workflow": "quick"
+            },
+            "status": "active"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/STATE.md",
+            ".bianchini/quick/Q001-renomear-variavel-interna/PROGRESS.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".bianchini/quick/Q001-renomear-variavel-interna/BRIEF.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "direct.finish",
+      "argv": [
+        "direct",
+        "finish",
+        "--repo",
+        "{repo}",
+        "--slug",
+        "{quick_id}",
+        "--status",
+        "completed",
+        "--next-action",
+        "Concluído",
+        "--verification",
+        "suíte verde",
+        "--docviva-kind",
+        "internal",
+        "--docviva-outcome",
+        "not_applicable",
+        "--docviva-justification",
+        "Somente nomes internos mudaram; comportamento e contratos ficaram iguais."
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "docviva": {
+              "after_digest": "240d6f555a63d2b35288f2d62f8a34d88b01a6d8eb7d1bbecb68aa6a6f4e600e",
+              "artifacts": [],
+              "before_digest": "240d6f555a63d2b35288f2d62f8a34d88b01a6d8eb7d1bbecb68aa6a6f4e600e",
+              "changed": [],
+              "created": [],
+              "justification": "Somente nomes internos mudaram; comportamento e contratos ficaram iguais.",
+              "kind": "internal",
+              "modified": [],
+              "outcome": "not_applicable",
+              "removed": [],
+              "required": false,
+              "schema_version": 1,
+              "status": "verified"
+            },
+            "id": "Q001-renomear-variavel-interna",
+            "path": "{repo}/.bianchini/quick/Q001-renomear-variavel-interna/RESULT.md",
+            "risk": {
+              "additional_guards": [],
+              "declared_score": 0,
+              "derived_floor": 0,
+              "diff_floor": 0,
+              "effective_score": 0,
+              "initial_floor": 0,
+              "phase": "finish",
+              "reasons": [],
+              "reclassified": false,
+              "risk_contract": "quick-risk-floor-v1",
+              "route": "normal",
+              "schema_version": 1,
+              "start_floor": 0,
+              "workflow": "quick"
+            },
+            "status": "completed"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/quick/Q001-renomear-variavel-interna/RESULT.md"
+          ],
+          "altered": [
+            ".bianchini/STATE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".bianchini/quick/Q001-renomear-variavel-interna/BRIEF.md",
+            ".bianchini/quick/Q001-renomear-variavel-interna/PROGRESS.md",
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "surface": "review-package",
+  "argv": [
+    "review-package",
+    "--cwd",
+    "{repo}",
+    "--base",
+    "HEAD",
+    "--brief",
+    "{repo}/missing-brief.md",
+    "--report",
+    "{repo}/missing-report.md",
+    "--output",
+    "{repo}/review.md"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "fatal: not a git repository (or any of the parent directories): .git\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

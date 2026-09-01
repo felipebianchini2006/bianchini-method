@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "surface": "checkpoint",
+  "argv": [
+    "checkpoint",
+    "--state",
+    "{repo}/missing-state.json",
+    "--ledger",
+    "{repo}/missing-ledger.jsonl",
+    "--cwd",
+    "{repo}",
+    "--output",
+    "{repo}/checkpoint.md"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "estado não encontrado: {repo}/missing-state.json\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

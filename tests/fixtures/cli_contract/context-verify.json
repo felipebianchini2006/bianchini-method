@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "surface": "context.verify",
+  "argv": [
+    "context",
+    "verify",
+    "--repo",
+    "{repo}"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "context verify exige --path\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

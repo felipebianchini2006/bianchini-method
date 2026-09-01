@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "surface": "debug.status",
+  "argv": [
+    "debug",
+    "status",
+    "--repo",
+    "{repo}"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 3,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "DIRTY_WORKSPACE: o diretório não é uma raiz Git\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

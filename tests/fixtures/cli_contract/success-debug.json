@@ -1,0 +1,436 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "debug.start",
+    "debug.list",
+    "debug.status",
+    "debug.resume",
+    "debug.checkpoint",
+    "debug.finish"
+  ],
+  "git": {
+    "init": true
+  },
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "steps": [
+    {
+      "argv": [
+        "model",
+        "init",
+        "--repo",
+        "{repo}"
+      ]
+    },
+    {
+      "surface": "debug.start",
+      "argv": [
+        "debug",
+        "start",
+        "--repo",
+        "{repo}",
+        "--objective",
+        "Eliminar processamento duplicado do webhook",
+        "--expected",
+        "Evento duplicado não altera o estado novamente",
+        "--actual",
+        "Evento duplicado cria uma segunda transição",
+        "--environment",
+        "pytest local"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "id": "D001-eliminar-processamento-duplicado-do-webhook",
+            "stage": "intake",
+            "status": "active"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md"
+          ],
+          "altered": [
+            ".bianchini/STATE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/PROJECT.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            "keep.txt"
+          ]
+        }
+      },
+      "capture": {
+        "debug_id": "id"
+      }
+    },
+    {
+      "surface": "debug.list",
+      "argv": [
+        "debug",
+        "list",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "items": [
+              {
+                "id": "D001-eliminar-processamento-duplicado-do-webhook",
+                "resolved": false,
+                "stage": "intake",
+                "status": "active"
+              }
+            ]
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "debug.status",
+      "argv": [
+        "debug",
+        "status",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "id": "D001-eliminar-processamento-duplicado-do-webhook",
+            "path": "{repo}/.bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md",
+            "stage": "intake",
+            "status": "active"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "debug.resume",
+      "argv": [
+        "debug",
+        "resume",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "id": "D001-eliminar-processamento-duplicado-do-webhook",
+            "path": "{repo}/.bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md",
+            "stage": "intake",
+            "status": "active"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "debug.checkpoint",
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--event",
+        "reproduced",
+        "--evidence",
+        "evidência reproduced"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "id": "D001-eliminar-processamento-duplicado-do-webhook",
+            "stage": "reproduced",
+            "status": "active"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/STATE.md",
+            ".bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--event",
+        "diagnosed",
+        "--evidence",
+        "evidência diagnosed",
+        "--root-cause",
+        "provider_event_id não era persistido como chave única"
+      ]
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--event",
+        "red",
+        "--evidence",
+        "evidência red"
+      ]
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--event",
+        "fixing",
+        "--evidence",
+        "evidência fixing"
+      ]
+    },
+    {
+      "write_tree": {
+        "fix.py": {
+          "text": "DEDUPLICATION = True\n"
+        }
+      }
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--event",
+        "green",
+        "--evidence",
+        "regressão focal passou no patch"
+      ]
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--event",
+        "regression_checked",
+        "--evidence",
+        "fluxos vizinhos passaram",
+        "--neighbor-regression",
+        "webhook válido continua atualizando o pedido"
+      ]
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--event",
+        "documented",
+        "--evidence",
+        "causa e contrato registrados",
+        "--residual-risk",
+        "nenhum risco conhecido no escopo testado"
+      ]
+    },
+    {
+      "write_tree": {
+        ".bianchini/current/specs/webhook.md": {
+          "text": "# Webhook\n\n## WHK-001: Deduplicação por provider_event_id\n"
+        }
+      }
+    },
+    {
+      "surface": "debug.finish",
+      "argv": [
+        "debug",
+        "finish",
+        "--repo",
+        "{repo}",
+        "--id",
+        "{debug_id}",
+        "--docviva-kind",
+        "behavioral",
+        "--docviva-outcome",
+        "updated",
+        "--docviva-artifact",
+        ".bianchini/current/specs/webhook.md",
+        "--docviva-justification",
+        "O contrato de deduplicação corrigido foi registrado."
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "docviva": {
+              "after_digest": "d3273829059637cc590127cfe7d8f68220b1d61a87e85378ee43a3e91782a8ad",
+              "artifacts": [
+                ".bianchini/current/specs/webhook.md"
+              ],
+              "before_digest": "240d6f555a63d2b35288f2d62f8a34d88b01a6d8eb7d1bbecb68aa6a6f4e600e",
+              "changed": [
+                ".bianchini/current/specs/webhook.md"
+              ],
+              "created": [
+                ".bianchini/current/specs/webhook.md"
+              ],
+              "justification": "O contrato de deduplicação corrigido foi registrado.",
+              "kind": "behavioral",
+              "modified": [],
+              "outcome": "updated",
+              "removed": [],
+              "required": true,
+              "schema_version": 1,
+              "status": "verified"
+            },
+            "id": "D001-eliminar-processamento-duplicado-do-webhook",
+            "path": "{repo}/.bianchini/debug/resolved/D001-eliminar-processamento-duplicado-do-webhook.md",
+            "stage": "documented",
+            "status": "resolved"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/debug/resolved/D001-eliminar-processamento-duplicado-do-webhook.md"
+          ],
+          "altered": [
+            ".bianchini/STATE.md"
+          ],
+          "deleted": [
+            ".bianchini/debug/active/D001-eliminar-processamento-duplicado-do-webhook.md"
+          ],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/current/specs/webhook.md",
+            ".bianchini/debug/KNOWLEDGE.md",
+            "fix.py",
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}

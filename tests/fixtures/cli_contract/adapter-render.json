@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "surface": "adapter.render",
+  "argv": [
+    "adapter",
+    "render",
+    "--host",
+    "generic",
+    "--repo",
+    "{repo}"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 0,
+    "stdout": {
+      "kind": "json",
+      "value": {
+        "host": "generic",
+      "content": "<!-- bianchini-method:host-adapter:start -->\n## Bianchini Method — adapter de host\n\n- Host: `generic`\n- Arquivo: `AGENTS.md`\n- Capabilities: `AGENTS.md`, `Agent Skills`\n\n### Contrato comum\n\n- Consuma somente o context pack validado para a unidade; não releia o contrato completo quando o pack estiver válido.\n- Exija a mesma `pack_identity`, o mesmo `pack_digest` e o mesmo `package_digest` usados pelo CLI antes de executar ou revisar a unidade.\n- Trate o CLI `bm` como autoridade para schema, digest, DAG, impacto, evidência e gates.\n- Peça a próxima onda ao CLI; o host agenda agentes, modelos e paralelismo sem gravar decisões de host no kernel.\n- Preserve o fluxo público e nunca acesse o namespace estrangeiro `.planning/`.\n\n### Política do host\n\n- Descubra e carregue as Agent Skills declaradas pelo projeto antes de executar uma unidade.\n- Execute cada unidade com o pack recebido e devolva evidência ao CLI sem reimplementar gates.\n<!-- bianchini-method:host-adapter:end -->\n",
+        "digest": "cf8af66ed29c9bc147cf915ac1ff9c1e76886ed0c0d315db9d223c274b4b3105"
+      }
+    },
+    "stderr": "",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

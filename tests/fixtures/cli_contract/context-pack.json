@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "surface": "context.pack",
+  "argv": [
+    "context",
+    "pack",
+    "--repo",
+    "{repo}"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "context pack exige --unit\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

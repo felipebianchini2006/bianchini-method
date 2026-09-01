@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "surface": "plan.complete",
+  "argv": [
+    "plan",
+    "complete",
+    "--repo",
+    "{repo}",
+    "--change",
+    "fixture",
+    "--plan",
+    "P01",
+    "--result",
+    "done"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "plan complete exige --actual-delta\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

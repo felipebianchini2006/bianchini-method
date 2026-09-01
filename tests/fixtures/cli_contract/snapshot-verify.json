@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "surface": "snapshot.verify",
+  "argv": [
+    "snapshot",
+    "verify",
+    "{repo}/missing-state.json",
+    "--root",
+    "{repo}"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "estado não encontrado: {repo}/missing-state.json\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

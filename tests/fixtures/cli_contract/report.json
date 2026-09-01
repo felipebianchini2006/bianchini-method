@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "surface": "report",
+  "argv": [
+    "report",
+    "--brief",
+    "{repo}/missing-brief.md",
+    "--output",
+    "{repo}/report.md"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "erro de entrada/IO: [Errno 2] No such file or directory: '{repo}/missing-brief.md'\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

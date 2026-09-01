@@ -1,0 +1,305 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "context.pack",
+    "context.verify"
+  ],
+  "git": {
+    "init": true
+  },
+  "initial_tree": {
+    ".bianchini/STATE.md": {
+      "text": "---\n{\n  \"active_work\": {\n    \"id\": \"C001-context\",\n    \"kind\": \"change\"\n  },\n  \"blockers\": [\n    \"aguardar ambiente real\"\n  ],\n  \"current_unit\": \"P01/T01\",\n  \"digest\": null,\n  \"last_completed\": {\n    \"id\": \"P00\",\n    \"kind\": \"plan\"\n  },\n  \"method\": \"0.4\",\n  \"next_action\": \"Executar T01\",\n  \"pointers\": {\n    \"architecture\": \".bianchini/current/ARCHITECTURE.md\",\n    \"coherence\": \".bianchini/changes/C001-context/COHERENCE.md\",\n    \"specs\": \".bianchini/current/specs\",\n    \"system_model\": \".bianchini/current/SYSTEM_MODEL.md\"\n  },\n  \"schema_version\": 1,\n  \"status\": \"active\",\n  \"updated_at\": \"2026-09-01T12:00:00Z\"\n}\n---\n# Estado atual\n"
+    },
+    ".bianchini/archive/C000-old/SECRET.md": {
+      "text": "ARCHIVE_MUST_NOT_LOAD\n"
+    },
+    ".bianchini/changes/C001-context/ARCHITECTURE.md": {
+      "text": "# Arquitetura\n\n## D-001 — Persistência\n\nUsar escrita durável.\n\n## D-999 — Irrelevante\n\nNão carregar.\n"
+    },
+    ".bianchini/changes/C001-context/COHERENCE.md": {
+      "text": "---\n{\n  \"findings\": [\n    {\n      \"code\": \"OPEN_P01\",\n      \"evidence\": \"guard pendente\",\n      \"phases\": [\n        \"P01\"\n      ],\n      \"status\": \"open\"\n    },\n    {\n      \"code\": \"RESOLVED_P01\",\n      \"phases\": [\n        \"P01\"\n      ],\n      \"status\": \"resolved\"\n    },\n    {\n      \"code\": \"OPEN_P99\",\n      \"phases\": [\n        \"P99\"\n      ],\n      \"status\": \"open\"\n    }\n  ],\n  \"planning_contract\": 2,\n  \"schema_version\": 2,\n  \"spec_contract\": 1\n}\n---\n# Coerência\n"
+    },
+    ".bianchini/changes/C001-context/ROADMAP.md": {
+      "text": "---\n{\n  \"phases\": [\n    \"P00\",\n    \"P01\",\n    \"P02\",\n    \"P99\"\n  ],\n  \"schema_version\": 1,\n  \"status\": {\n    \"P00\": \"completed\",\n    \"P01\": \"active\"\n  }\n}\n---\n# Roadmap\n"
+    },
+    ".bianchini/changes/C001-context/SCOPE.md": {
+      "text": "# Escopo\n\n## REQ-001 — Criar pedido\n\nFluxo obrigatório.\n\n## RSK-001 — Concorrência\n\nExige guard de escrita.\n\n## REQ-002 — Relatório irrelevante\n\nNão pertence à unidade.\n"
+    },
+    ".bianchini/changes/C001-context/SYSTEM_MODEL.md": {
+      "text": "---\n{\n  \"capabilities\": [],\n  \"contracts\": [\n    {\n      \"id\": \"session\"\n    },\n    {\n      \"id\": \"order\"\n    },\n    {\n      \"id\": \"other\"\n    }\n  ],\n  \"data\": [],\n  \"effects\": [],\n  \"integrations\": [],\n  \"interfaces\": [],\n  \"invariants\": [],\n  \"journeys\": [],\n  \"modules\": [\n    {\n      \"contracts\": [\n        \"session\"\n      ],\n      \"id\": \"auth\"\n    },\n    {\n      \"id\": \"other\"\n    }\n  ],\n  \"ownership\": [],\n  \"schema_version\": 1\n}\n---\n# Modelo final\n"
+    },
+    ".bianchini/changes/C001-context/plans/P00.md": {
+      "text": "---\n{\n  \"acceptance\": [\n    \"Aceite P00\"\n  ],\n  \"consumes\": [],\n  \"data\": [],\n  \"depends_on\": [],\n  \"effects\": [],\n  \"execution\": \"slice\",\n  \"future_constraints\": [],\n  \"id\": \"P00\",\n  \"interfaces\": [],\n  \"migrations\": [],\n  \"model_delta\": {},\n  \"modules\": [],\n  \"ownership\": [],\n  \"provides\": [\n    \"session\"\n  ],\n  \"requirements\": [\n    \"REQ-001\"\n  ],\n  \"result\": \"Resultado P00\",\n  \"review\": \"per_slice\",\n  \"rollback\": \"Reverter P00\",\n  \"schema_version\": 2,\n  \"status\": \"planned\",\n  \"tasks\": [\n    {\n      \"action\": \"Aplicar D-001 pelo contrato session.\",\n      \"covers\": [\n        \"REQ-001\"\n      ],\n      \"depends_on\": [],\n      \"done\": \"T01 observável\",\n      \"files\": [\n        \"src/t01.py\"\n      ],\n      \"id\": \"T01\",\n      \"name\": \"Entregar T01\",\n      \"result\": \"Resultado T01\",\n      \"risk_seam\": \"session-state\",\n      \"verify\": {\n        \"kind\": \"command\",\n        \"proves\": \"T01 entregue\",\n        \"run\": \"python3 -m unittest tests.test_t01\"\n      }\n    }\n  ],\n  \"verifications\": [\n    \"python3 -m unittest tests.test_p00\"\n  ]\n}\n---\n# P00\n"
+    },
+    ".bianchini/changes/C001-context/plans/P01.md": {
+      "text": "---\n{\n  \"acceptance\": [\n    \"Aceite P01\"\n  ],\n  \"consumes\": [\n    \"session\"\n  ],\n  \"data\": [],\n  \"depends_on\": [\n    \"P00\"\n  ],\n  \"effects\": [],\n  \"execution\": \"slice\",\n  \"future_constraints\": [\n    \"Respeitar D-001\"\n  ],\n  \"id\": \"P01\",\n  \"interfaces\": [],\n  \"migrations\": [],\n  \"model_delta\": {\n    \"contracts\": {\n      \"add\": [\n        {\n          \"id\": \"order\"\n        }\n      ]\n    }\n  },\n  \"modules\": [\n    \"auth\"\n  ],\n  \"ownership\": [],\n  \"provides\": [\n    \"order\"\n  ],\n  \"requirements\": [\n    \"REQ-001\",\n    \"RSK-001\"\n  ],\n  \"result\": \"Resultado P01\",\n  \"review\": \"per_slice\",\n  \"rollback\": \"Reverter P01\",\n  \"schema_version\": 2,\n  \"status\": \"planned\",\n  \"tasks\": [\n    {\n      \"action\": \"Aplicar D-001 pelo contrato session.\",\n      \"covers\": [\n        \"REQ-001\"\n      ],\n      \"depends_on\": [],\n      \"done\": \"T00 observável\",\n      \"files\": [\n        \"src/t00.py\"\n      ],\n      \"id\": \"T00\",\n      \"name\": \"Entregar T00\",\n      \"result\": \"Resultado T00\",\n      \"risk_seam\": \"session-state\",\n      \"verify\": {\n        \"kind\": \"command\",\n        \"proves\": \"T00 entregue\",\n        \"run\": \"python3 -m unittest tests.test_t00\"\n      }\n    },\n    {\n      \"action\": \"Aplicar D-001 pelo contrato session.\",\n      \"covers\": [\n        \"REQ-001\",\n        \"RSK-001\"\n      ],\n      \"depends_on\": [\n        \"T00\"\n      ],\n      \"done\": \"T01 observável\",\n      \"files\": [\n        \"src/t01.py\"\n      ],\n      \"id\": \"T01\",\n      \"name\": \"Entregar T01\",\n      \"result\": \"Resultado T01\",\n      \"risk_seam\": \"session-state\",\n      \"verify\": {\n        \"kind\": \"command\",\n        \"proves\": \"T01 entregue\",\n        \"run\": \"python3 -m unittest tests.test_t01\"\n      }\n    },\n    {\n      \"action\": \"Aplicar D-001 pelo contrato session.\",\n      \"covers\": [\n        \"REQ-001\"\n      ],\n      \"depends_on\": [],\n      \"done\": \"T02 observável\",\n      \"files\": [\n        \"src/t02.py\"\n      ],\n      \"id\": \"T02\",\n      \"name\": \"Entregar T02\",\n      \"result\": \"Resultado T02\",\n      \"risk_seam\": \"session-state\",\n      \"verify\": {\n        \"kind\": \"command\",\n        \"proves\": \"T02 entregue\",\n        \"run\": \"python3 -m unittest tests.test_t02\"\n      }\n    }\n  ],\n  \"verifications\": [\n    \"python3 -m unittest tests.test_p01\"\n  ]\n}\n---\n# P01\n"
+    },
+    ".bianchini/changes/C001-context/plans/P02.md": {
+      "text": "---\n{\n  \"acceptance\": [\n    \"Aceite P02\"\n  ],\n  \"consumes\": [\n    \"order\"\n  ],\n  \"data\": [],\n  \"depends_on\": [],\n  \"effects\": [],\n  \"execution\": \"slice\",\n  \"future_constraints\": [],\n  \"id\": \"P02\",\n  \"interfaces\": [],\n  \"migrations\": [],\n  \"model_delta\": {},\n  \"modules\": [],\n  \"ownership\": [],\n  \"provides\": [],\n  \"requirements\": [\n    \"REQ-002\"\n  ],\n  \"result\": \"Resultado P02\",\n  \"review\": \"per_slice\",\n  \"rollback\": \"Reverter P02\",\n  \"schema_version\": 2,\n  \"status\": \"planned\",\n  \"tasks\": [\n    {\n      \"action\": \"Aplicar D-001 pelo contrato session.\",\n      \"covers\": [\n        \"REQ-002\"\n      ],\n      \"depends_on\": [],\n      \"done\": \"T01 observável\",\n      \"files\": [\n        \"src/t01.py\"\n      ],\n      \"id\": \"T01\",\n      \"name\": \"Entregar T01\",\n      \"result\": \"Resultado T01\",\n      \"risk_seam\": \"session-state\",\n      \"verify\": {\n        \"kind\": \"command\",\n        \"proves\": \"T01 entregue\",\n        \"run\": \"python3 -m unittest tests.test_t01\"\n      }\n    }\n  ],\n  \"verifications\": [\n    \"python3 -m unittest tests.test_p02\"\n  ]\n}\n---\n# P02\n"
+    },
+    ".bianchini/changes/C001-context/plans/P99.md": {
+      "text": "---\n{\n  \"acceptance\": [\n    \"Aceite P99\"\n  ],\n  \"consumes\": [],\n  \"data\": [],\n  \"depends_on\": [],\n  \"effects\": [],\n  \"execution\": \"slice\",\n  \"future_constraints\": [],\n  \"id\": \"P99\",\n  \"interfaces\": [],\n  \"migrations\": [],\n  \"model_delta\": {},\n  \"modules\": [],\n  \"ownership\": [],\n  \"provides\": [],\n  \"requirements\": [\n    \"REQ-002\"\n  ],\n  \"result\": \"Resultado P99\",\n  \"review\": \"per_slice\",\n  \"rollback\": \"Reverter P99\",\n  \"schema_version\": 2,\n  \"status\": \"planned\",\n  \"tasks\": [\n    {\n      \"action\": \"Aplicar D-001 pelo contrato session.\",\n      \"covers\": [\n        \"REQ-002\"\n      ],\n      \"depends_on\": [],\n      \"done\": \"T01 observável\",\n      \"files\": [\n        \"src/t01.py\"\n      ],\n      \"id\": \"T01\",\n      \"name\": \"Entregar T01\",\n      \"result\": \"Resultado T01\",\n      \"risk_seam\": \"session-state\",\n      \"verify\": {\n        \"kind\": \"command\",\n        \"proves\": \"T01 entregue\",\n        \"run\": \"python3 -m unittest tests.test_t01\"\n      }\n    }\n  ],\n  \"verifications\": [\n    \"python3 -m unittest tests.test_p99\"\n  ]\n}\n---\n# P99\n"
+    },
+    ".bianchini/changes/C001-context/results/LEDGER.jsonl": {
+      "text": "{\"event\": 0}\n{\"event\": 1}\n{\"event\": 2}\n{\"event\": 3}\n{\"event\": 4}\n{\"event\": 5}\n{\"event\": 6}\n{\"event\": 7}\n{\"event\": 8}\n{\"event\": 9}\n{\"event\": 10}\n{\"event\": 11}\n{\"event\": 12}\n{\"event\": 13}\n{\"event\": 14}\n{\"event\": 15}\n{\"event\": 16}\n{\"event\": 17}\n{\"event\": 18}\n{\"event\": 19}\n{\"event\": 20}\n{\"event\": 21}\n{\"event\": 22}\n{\"event\": 23}\n{\"event\": 24}\n"
+    },
+    ".bianchini/changes/C001-context/results/P00.md": {
+      "text": "---\n{\n  \"label\": \"PROVIDER_RESULT_REQUIRED\",\n  \"status\": \"completed\"\n}\n---\n# PROVIDER_RESULT_REQUIRED\n"
+    },
+    ".bianchini/changes/C001-context/results/P99.md": {
+      "text": "---\n{\n  \"label\": \"IRRELEVANT_RESULT_MUST_NOT_LOAD\",\n  \"status\": \"completed\"\n}\n---\n# IRRELEVANT_RESULT_MUST_NOT_LOAD\n"
+    },
+    ".bianchini/changes/C001-context/results/tasks/P01/T00.md": {
+      "text": "---\n{\n  \"label\": \"TASK_DEPENDENCY_REQUIRED\",\n  \"status\": \"completed\"\n}\n---\n# TASK_DEPENDENCY_REQUIRED\n"
+    },
+    ".bianchini/changes/C001-context/results/tasks/P01/T02.md": {
+      "text": "---\n{\n  \"label\": \"IRRELEVANT_TASK_RESULT\",\n  \"status\": \"completed\"\n}\n---\n# IRRELEVANT_TASK_RESULT\n"
+    },
+    ".bianchini/changes/C001-context/specs/MANIFEST.json": {
+      "text": "{\n  \"risk_coverage\": [\n    {\n      \"kind\": \"guard\",\n      \"scope\": \"RSK-001\",\n      \"target\": \"optimistic-lock\"\n    }\n  ],\n  \"schema_version\": 1,\n  \"spec_contract\": 1,\n  \"specs\": [\n    {\n      \"id\": \"system\",\n      \"path\": \"system.md\",\n      \"requirements\": [\n        {\n          \"id\": \"SPEC-001\",\n          \"scope\": [\n            \"REQ-001\"\n          ]\n        },\n        {\n          \"id\": \"SPEC-002\",\n          \"scope\": [\n            \"REQ-002\"\n          ]\n        }\n      ]\n    }\n  ]\n}\n"
+    },
+    ".bianchini/changes/C001-context/specs/expected/system.md": {
+      "text": "# Contratos\n\n## SPEC-001: Pedido\n\nContrato necessário para REQ-001.\n\n## SPEC-002: Relatório\n\nCONTEUDO_IRRELEVANTE_SPEC.\n"
+    },
+    ".bianchini/current/ARCHITECTURE.md": {
+      "text": "# Atual\n"
+    },
+    ".bianchini/current/SYSTEM_MODEL.md": {
+      "text": "---\n{\n  \"capabilities\": [],\n  \"contracts\": [\n    {\n      \"id\": \"session\"\n    },\n    {\n      \"id\": \"order\"\n    },\n    {\n      \"id\": \"other\"\n    }\n  ],\n  \"data\": [],\n  \"effects\": [],\n  \"integrations\": [],\n  \"interfaces\": [],\n  \"invariants\": [],\n  \"journeys\": [],\n  \"modules\": [\n    {\n      \"contracts\": [\n        \"session\"\n      ],\n      \"id\": \"auth\"\n    },\n    {\n      \"id\": \"other\"\n    }\n  ],\n  \"ownership\": [],\n  \"schema_version\": 1\n}\n---\n# Modelo atual\n"
+    },
+    ".bianchini/current/specs/MANIFEST.json": {
+      "text": "{\n  \"risk_coverage\": [\n    {\n      \"kind\": \"guard\",\n      \"scope\": \"RSK-001\",\n      \"target\": \"optimistic-lock\"\n    }\n  ],\n  \"schema_version\": 1,\n  \"spec_contract\": 1,\n  \"specs\": [\n    {\n      \"id\": \"system\",\n      \"path\": \"system.md\",\n      \"requirements\": [\n        {\n          \"id\": \"SPEC-001\",\n          \"scope\": [\n            \"REQ-001\"\n          ]\n        },\n        {\n          \"id\": \"SPEC-002\",\n          \"scope\": [\n            \"REQ-002\"\n          ]\n        }\n      ]\n    }\n  ]\n}\n"
+    },
+    ".bianchini/current/specs/system.md": {
+      "text": "# Contratos\n\n## SPEC-001: Pedido\n\nContrato necessário para REQ-001.\n\n## SPEC-002: Relatório\n\nCONTEUDO_IRRELEVANTE_SPEC.\n"
+    },
+    ".bianchini/debug/active/D004-login.md": {
+      "text": "---\n{\n  \"blockers\": [\n    \"aguardar fixture\"\n  ],\n  \"events\": [\n    {\n      \"event\": \"reproduced\",\n      \"evidence\": \"teste\"\n    }\n  ],\n  \"id\": \"D004-login\",\n  \"objective\": \"Corrigir login\",\n  \"root_cause\": \"cache\",\n  \"stage\": \"diagnosed\"\n}\n---\n# Debug\n"
+    },
+    ".bianchini/quick/Q012-small/BRIEF.md": {
+      "text": "---\n{\n  \"blockers\": [],\n  \"gates\": [\n    \"python3 -m unittest tests.test_small\"\n  ],\n  \"id\": \"Q012-small\",\n  \"objective\": \"Ajuste pequeno\",\n  \"scope\": [\n    \"REQ-001\"\n  ]\n}\n---\n# Quick\n"
+    },
+    ".bianchini/quick/Q012-small/PROGRESS.md": {
+      "text": "---\n{\n  \"events\": [\n    {\n      \"summary\": \"em andamento\"\n    }\n  ]\n}\n---\n# Progresso\n"
+    }
+  },
+  "steps": [
+    {
+      "surface": "context.pack",
+      "argv": [
+        "context",
+        "pack",
+        "--repo",
+        "{repo}",
+        "--unit",
+        "C001/P01/T01"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "bytes": 5890,
+            "cache_hit": false,
+            "digest": "e21e58bce2e260956eee7b948bd73af67117cc7f52ecffcbbf3bd9878b1d70ae",
+            "path": ".bianchini/.runtime/context/C001-P01-T01.json",
+            "required_refs": [
+              "architecture:D-001",
+              "dependency-result:C001/P00",
+              "dependency-result:C001/P01/T00",
+              "plan:C001/P01",
+              "risk-coverage:RSK-001:guard:optimistic-lock",
+              "roadmap:C001/P01",
+              "scope:REQ-001",
+              "scope:RSK-001",
+              "spec:system#SPEC-001",
+              "state:.bianchini/STATE.md",
+              "task:C001/P01/T01"
+            ],
+            "source_digests": {
+              ".bianchini/STATE.md": "8af92afea366ca5993f336c4d8f5a367eb9eef19d4d55214c28bd69e1732b960",
+              ".bianchini/changes/C001-context/ARCHITECTURE.md": "8ef7ea1c64e766b85b5f44c6db3e901e481fd739ce1cc5dbd121102228c7414d",
+              ".bianchini/changes/C001-context/COHERENCE.md": "9b39e4c654030fc7c6867165241e59b4e942a51a66cef0359cf399f54d028be8",
+              ".bianchini/changes/C001-context/ROADMAP.md": "702f613dec61b7c9578b7fbba34950edf6d0944f145e3115f073f3cc737aa2df",
+              ".bianchini/changes/C001-context/SCOPE.md": "a91a16615ed0e377af5c58a8313935ed0bda7f22d004bc41a515f8aead3610b2",
+              ".bianchini/changes/C001-context/SYSTEM_MODEL.md": "fcfcad16e68f380f6041fa36da612045bc5042ed522a38c54abec25d88fb1f32",
+              ".bianchini/changes/C001-context/plans/P00.md": "23b7792c54a1f6c8373e47095dd029f989e94465d69e85464c6326472ec92096",
+              ".bianchini/changes/C001-context/plans/P01.md": "ca9b84ae569c66383b2d24d604828ec69d9a34e3a54bc318c8ee18e9c1dea16c",
+              ".bianchini/changes/C001-context/plans/P02.md": "e2d6b15eb574fa36e6a8a24de5b515ea536e188ef7f78d42fb9fbb566aec946c",
+              ".bianchini/changes/C001-context/plans/P99.md": "a5c38ac62c36b4e2932b09528a909a16328f34ad09ddb4477d49771d8805169c",
+              ".bianchini/changes/C001-context/results/LEDGER.jsonl": "44a8653d765c7d2d30cde874248631d86c7416c5f41b054aa43751e92281fe97",
+              ".bianchini/changes/C001-context/results/P00.md": "dfb659ceec79a392697f57ef11ed4f108561992c80ecaba80b2fe2ad5a76d03c",
+              ".bianchini/changes/C001-context/results/tasks/P01/T00.md": "72362fd7905809a7cbb0fb5987537b30b557e74aa9ba7a420fa27fcb9c51904c",
+              ".bianchini/changes/C001-context/specs/MANIFEST.json": "f7d91cf294f5531cfb135e9b4032323253aed2c7ff594a8a13797fd19b165022",
+              ".bianchini/changes/C001-context/specs/expected/system.md": "af4ad1eaafa1e7d1fe7bf97d9e38996912f9042d59d6b60592b724705d03ec77"
+            },
+            "sources": [
+              ".bianchini/STATE.md",
+              ".bianchini/changes/C001-context/ARCHITECTURE.md",
+              ".bianchini/changes/C001-context/COHERENCE.md",
+              ".bianchini/changes/C001-context/ROADMAP.md",
+              ".bianchini/changes/C001-context/SCOPE.md",
+              ".bianchini/changes/C001-context/SYSTEM_MODEL.md",
+              ".bianchini/changes/C001-context/plans/P00.md",
+              ".bianchini/changes/C001-context/plans/P01.md",
+              ".bianchini/changes/C001-context/plans/P02.md",
+              ".bianchini/changes/C001-context/plans/P99.md",
+              ".bianchini/changes/C001-context/results/LEDGER.jsonl",
+              ".bianchini/changes/C001-context/results/P00.md",
+              ".bianchini/changes/C001-context/results/tasks/P01/T00.md",
+              ".bianchini/changes/C001-context/specs/MANIFEST.json",
+              ".bianchini/changes/C001-context/specs/expected/system.md"
+            ],
+            "unit": "C001/P01/T01"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.runtime/context/C001-P01-T01.json"
+          ],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/STATE.md",
+            ".bianchini/archive/C000-old/SECRET.md",
+            ".bianchini/changes/C001-context/ARCHITECTURE.md",
+            ".bianchini/changes/C001-context/COHERENCE.md",
+            ".bianchini/changes/C001-context/ROADMAP.md",
+            ".bianchini/changes/C001-context/SCOPE.md",
+            ".bianchini/changes/C001-context/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-context/plans/P00.md",
+            ".bianchini/changes/C001-context/plans/P01.md",
+            ".bianchini/changes/C001-context/plans/P02.md",
+            ".bianchini/changes/C001-context/plans/P99.md",
+            ".bianchini/changes/C001-context/results/LEDGER.jsonl",
+            ".bianchini/changes/C001-context/results/P00.md",
+            ".bianchini/changes/C001-context/results/P99.md",
+            ".bianchini/changes/C001-context/results/tasks/P01/T00.md",
+            ".bianchini/changes/C001-context/results/tasks/P01/T02.md",
+            ".bianchini/changes/C001-context/specs/MANIFEST.json",
+            ".bianchini/changes/C001-context/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/current/specs/system.md",
+            ".bianchini/debug/active/D004-login.md",
+            ".bianchini/quick/Q012-small/BRIEF.md",
+            ".bianchini/quick/Q012-small/PROGRESS.md"
+          ]
+        }
+      },
+      "capture": {
+        "pack_path": "path"
+      }
+    },
+    {
+      "surface": "context.verify",
+      "argv": [
+        "context",
+        "verify",
+        "--repo",
+        "{repo}",
+        "--path",
+        "{pack_path}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "bytes": 5890,
+            "cache_hit": true,
+            "digest": "e21e58bce2e260956eee7b948bd73af67117cc7f52ecffcbbf3bd9878b1d70ae",
+            "path": ".bianchini/.runtime/context/C001-P01-T01.json",
+            "required_refs": [
+              "architecture:D-001",
+              "dependency-result:C001/P00",
+              "dependency-result:C001/P01/T00",
+              "plan:C001/P01",
+              "risk-coverage:RSK-001:guard:optimistic-lock",
+              "roadmap:C001/P01",
+              "scope:REQ-001",
+              "scope:RSK-001",
+              "spec:system#SPEC-001",
+              "state:.bianchini/STATE.md",
+              "task:C001/P01/T01"
+            ],
+            "source_digests": {
+              ".bianchini/STATE.md": "8af92afea366ca5993f336c4d8f5a367eb9eef19d4d55214c28bd69e1732b960",
+              ".bianchini/changes/C001-context/ARCHITECTURE.md": "8ef7ea1c64e766b85b5f44c6db3e901e481fd739ce1cc5dbd121102228c7414d",
+              ".bianchini/changes/C001-context/COHERENCE.md": "9b39e4c654030fc7c6867165241e59b4e942a51a66cef0359cf399f54d028be8",
+              ".bianchini/changes/C001-context/ROADMAP.md": "702f613dec61b7c9578b7fbba34950edf6d0944f145e3115f073f3cc737aa2df",
+              ".bianchini/changes/C001-context/SCOPE.md": "a91a16615ed0e377af5c58a8313935ed0bda7f22d004bc41a515f8aead3610b2",
+              ".bianchini/changes/C001-context/SYSTEM_MODEL.md": "fcfcad16e68f380f6041fa36da612045bc5042ed522a38c54abec25d88fb1f32",
+              ".bianchini/changes/C001-context/plans/P00.md": "23b7792c54a1f6c8373e47095dd029f989e94465d69e85464c6326472ec92096",
+              ".bianchini/changes/C001-context/plans/P01.md": "ca9b84ae569c66383b2d24d604828ec69d9a34e3a54bc318c8ee18e9c1dea16c",
+              ".bianchini/changes/C001-context/plans/P02.md": "e2d6b15eb574fa36e6a8a24de5b515ea536e188ef7f78d42fb9fbb566aec946c",
+              ".bianchini/changes/C001-context/plans/P99.md": "a5c38ac62c36b4e2932b09528a909a16328f34ad09ddb4477d49771d8805169c",
+              ".bianchini/changes/C001-context/results/LEDGER.jsonl": "44a8653d765c7d2d30cde874248631d86c7416c5f41b054aa43751e92281fe97",
+              ".bianchini/changes/C001-context/results/P00.md": "dfb659ceec79a392697f57ef11ed4f108561992c80ecaba80b2fe2ad5a76d03c",
+              ".bianchini/changes/C001-context/results/tasks/P01/T00.md": "72362fd7905809a7cbb0fb5987537b30b557e74aa9ba7a420fa27fcb9c51904c",
+              ".bianchini/changes/C001-context/specs/MANIFEST.json": "f7d91cf294f5531cfb135e9b4032323253aed2c7ff594a8a13797fd19b165022",
+              ".bianchini/changes/C001-context/specs/expected/system.md": "af4ad1eaafa1e7d1fe7bf97d9e38996912f9042d59d6b60592b724705d03ec77"
+            },
+            "sources": [
+              ".bianchini/STATE.md",
+              ".bianchini/changes/C001-context/ARCHITECTURE.md",
+              ".bianchini/changes/C001-context/COHERENCE.md",
+              ".bianchini/changes/C001-context/ROADMAP.md",
+              ".bianchini/changes/C001-context/SCOPE.md",
+              ".bianchini/changes/C001-context/SYSTEM_MODEL.md",
+              ".bianchini/changes/C001-context/plans/P00.md",
+              ".bianchini/changes/C001-context/plans/P01.md",
+              ".bianchini/changes/C001-context/plans/P02.md",
+              ".bianchini/changes/C001-context/plans/P99.md",
+              ".bianchini/changes/C001-context/results/LEDGER.jsonl",
+              ".bianchini/changes/C001-context/results/P00.md",
+              ".bianchini/changes/C001-context/results/tasks/P01/T00.md",
+              ".bianchini/changes/C001-context/specs/MANIFEST.json",
+              ".bianchini/changes/C001-context/specs/expected/system.md"
+            ],
+            "unit": "C001/P01/T01"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.runtime/context/C001-P01-T01.json",
+            ".bianchini/STATE.md",
+            ".bianchini/archive/C000-old/SECRET.md",
+            ".bianchini/changes/C001-context/ARCHITECTURE.md",
+            ".bianchini/changes/C001-context/COHERENCE.md",
+            ".bianchini/changes/C001-context/ROADMAP.md",
+            ".bianchini/changes/C001-context/SCOPE.md",
+            ".bianchini/changes/C001-context/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-context/plans/P00.md",
+            ".bianchini/changes/C001-context/plans/P01.md",
+            ".bianchini/changes/C001-context/plans/P02.md",
+            ".bianchini/changes/C001-context/plans/P99.md",
+            ".bianchini/changes/C001-context/results/LEDGER.jsonl",
+            ".bianchini/changes/C001-context/results/P00.md",
+            ".bianchini/changes/C001-context/results/P99.md",
+            ".bianchini/changes/C001-context/results/tasks/P01/T00.md",
+            ".bianchini/changes/C001-context/results/tasks/P01/T02.md",
+            ".bianchini/changes/C001-context/specs/MANIFEST.json",
+            ".bianchini/changes/C001-context/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/current/specs/system.md",
+            ".bianchini/debug/active/D004-login.md",
+            ".bianchini/quick/Q012-small/BRIEF.md",
+            ".bianchini/quick/Q012-small/PROGRESS.md"
+          ]
+        }
+      }
+    }
+  ]
+}

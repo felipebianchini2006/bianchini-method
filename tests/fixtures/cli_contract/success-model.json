@@ -1,0 +1,95 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "model.init",
+    "model.validate"
+  ],
+  "git": {
+    "init": true
+  },
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "steps": [
+    {
+      "surface": "model.init",
+      "argv": [
+        "model",
+        "init",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "created": true,
+            "method": "0.4",
+            "status": "idle",
+            "workspace": "{repo}/.bianchini"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.gitignore",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md"
+          ],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "model.validate",
+      "argv": [
+        "model",
+        "validate",
+        "--repo",
+        "{repo}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "method": "0.4",
+            "state": "{repo}/.bianchini/STATE.md",
+            "status": "idle",
+            "system_model": "{repo}/.bianchini/current/SYSTEM_MODEL.md",
+            "valid": true
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}

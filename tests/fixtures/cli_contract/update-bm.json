@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "surface": "update-bm",
+  "argv": [
+    "update-bm",
+    "--check",
+    "--skills-root",
+    "{repo}/missing-skills",
+    "--timeout",
+    "0.001",
+    "--format",
+    "json"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "raiz de skills não encontrada ou insegura: {repo}/missing-skills\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

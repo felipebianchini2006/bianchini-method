@@ -1,0 +1,1356 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "scope.seal",
+    "scope.verify",
+    "design-audit.seal",
+    "design-audit.verify",
+    "roadmap.sync",
+    "coherence.check",
+    "coherence.approve",
+    "impact.analyze",
+    "workspace.create",
+    "workspace.locate",
+    "workspace.resume",
+    "workspace.check",
+    "roadmap.next-wave",
+    "plan.complete",
+    "cycle-close"
+  ],
+  "git": {
+    "init": true
+  },
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    },
+    ".gitignore": {
+      "text": "/.bianchini/.runtime/\n"
+    },
+    "scope.pdf": {
+      "base64": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUiA1IDAgUl0gL0NvdW50IDIgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA3IDAgUiA+PiA+PiAvQ29udGVudHMgNCAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA0OCA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDcyIDcyMCBUZCAoUG9ydGFsIGRlIHN1cG9ydGUpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDYxMiA3OTJdIC9SZXNvdXJjZXMgPDwgL0ZvbnQgPDwgL0YxIDcgMCBSID4+ID4+IC9Db250ZW50cyA2IDAgUiA+PgplbmRvYmoKNiAwIG9iago8PCAvTGVuZ3RoIDQ2ID4+CnN0cmVhbQpCVCAvRjEgMTIgVGYgNzIgNzIwIFRkIChSZWdyYXMgZSBhY2VpdGUpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNyAwIG9iago8PCAvVHlwZSAvRm9udCAvU3VidHlwZSAvVHlwZTEgL0Jhc2VGb250IC9IZWx2ZXRpY2EgPj4KZW5kb2JqCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMjEgMDAwMDAgbiAKMDAwMDAwMDI0NyAwMDAwMCBuIAowMDAwMDAwMzQ1IDAwMDAwIG4gCjAwMDAwMDA0NzEgMDAwMDAgbiAKMDAwMDAwMDU2NyAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDggL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjYzNwolJUVPRgo="
+    },
+    "scope-draft.md": {
+      "text": "# Escopo — Portal de solicitações\n\n## Objetivo\n\nPermitir que clientes registrem e acompanhem solicitações de suporte.\n\n## Resultados esperados\n\n- Solicitação registrada com identificador público.\n- Histórico de estados consultável pelo cliente responsável.\n\n## Atores e perfis\n\n### ACT-001 — Cliente\n- Responsabilidade: registrar e consultar as próprias solicitações.\n- Fonte: PDF p. 1\n\n## Fluxos\n\n### FLW-001 — Registrar solicitação\n- Ator: Cliente autenticado.\n- Gatilho: envio do formulário de suporte.\n- Pré-condições: cliente possui sessão válida.\n- Caminho principal: informar assunto e descrição; confirmar envio.\n- Resultado: solicitação criada no estado recebida e identificador exibido.\n- Falhas: assunto vazio é recusado sem criar registro.\n- Fonte: PDF p. 1\n\n## Requisitos funcionais\n\n### REQ-001 — Registrar solicitação\n- Origem: explícito.\n- Fonte: PDF p. 1\n- Aceite:\n  - GIVEN cliente autenticado e assunto preenchido.\n  - WHEN confirmar o envio.\n  - THEN criar uma solicitação no estado recebida e exibir seu identificador.\n\n## Requisitos não funcionais\n\nNão especificado no PDF.\n\n## Regras de negócio\n\n### BR-001 — Isolamento por cliente\n- Regra: cliente consulta somente solicitações criadas por sua conta.\n- Fonte: PDF p. 1\n\n## Dados e estados\n\n### DAT-001 — Solicitação\n- Campos: identificador, cliente, assunto, descrição, estado e datas.\n- Estados: recebida, em atendimento e concluída.\n- Fonte: PDF p. 1\n\n## Integrações e efeitos externos\n\nNão aplicável: o PDF não exige integração externa.\n\n## Critérios gerais de aceite\n\n- O cliente conclui o FLW-001 sem acessar dados de outra conta.\n- Entrada inválida não cria uma solicitação parcial.\n\n## Comportamentos de erro\n\n### ERR-001 — Assunto ausente\n- Condição: assunto vazio no envio.\n- Resposta: recusar a entrada e preservar o formulário.\n- Fonte: PDF p. 1\n\n## Riscos e casos para o planejamento\n\n### RSK-001 — Concorrência de atualização\n- Avaliar: impedir perda de estado quando dois operadores atualizarem a mesma solicitação.\n- Efeito no escopo: risco para análise; não adiciona requisito funcional.\n- Fonte: PDF p. 1\n\n## Dentro do escopo\n\n- Cadastro de solicitação.\n- Consulta das próprias solicitações.\n- Transição entre os três estados declarados.\n\n## Fora do escopo\n\n- Chat em tempo real.\n- Integração com mensageria externa.\n\n## Decisões consolidadas\n\nNenhuma.\n\n## Questões abertas\n\nNenhuma.\n\n## Decisões bloqueantes\n\nNenhuma.\n\n## Contradições\n\nNenhuma.\n\n## Proveniência e cobertura\n\n- Páginas processadas: 1-2 de 2.\n"
+    }
+  },
+  "steps": [
+    {
+      "argv": [
+        "model",
+        "init",
+        "--repo",
+        "{repo}"
+      ]
+    },
+    {
+      "argv": [
+        "model",
+        "init",
+        "--repo",
+        "{repo}",
+        "--change",
+        "health journey"
+      ],
+      "capture": {
+        "change_id": "change"
+      }
+    },
+    {
+      "surface": "scope.seal",
+      "argv": [
+        "scope",
+        "seal",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--source",
+        "{repo}/scope.pdf",
+        "--draft",
+        "{repo}/scope-draft.md",
+        "--pages",
+        "2",
+        "--extraction",
+        "native"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "change": "C001-health-journey",
+            "coverage": {
+              "blocking_decisions": 0,
+              "identified_items": 7,
+              "open_contradictions": 0,
+              "open_questions": 0,
+              "sourced_items": 7,
+              "unsourced_items": 0
+            },
+            "next_action": "/sdd-planning",
+            "scope": "{repo}/.bianchini/changes/C001-health-journey/SCOPE.md",
+            "scope_digest": "{sha256}",
+            "source_sha256": "0c09539099e975201dd3fa0a7d4c7f101fe89c2b8036430301e89ea4e546dac7",
+            "status": "ready_for_sdd"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf"
+          ]
+        }
+      },
+      "capture": {
+        "scope_digest": "scope_digest"
+      }
+    },
+    {
+      "surface": "scope.verify",
+      "argv": [
+        "scope",
+        "verify",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--source",
+        "{repo}/scope.pdf"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "change": "C001-health-journey",
+            "coverage": {
+              "blocking_decisions": 0,
+              "identified_items": 7,
+              "open_contradictions": 0,
+              "open_questions": 0,
+              "sourced_items": 7,
+              "unsourced_items": 0
+            },
+            "scope": "{repo}/.bianchini/changes/C001-health-journey/SCOPE.md",
+            "scope_digest": "{sha256}",
+            "source_sha256": "0c09539099e975201dd3fa0a7d4c7f101fe89c2b8036430301e89ea4e546dac7",
+            "status": "ready_for_sdd",
+            "verified": true
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf"
+          ]
+        }
+      }
+    },
+    {
+      "write_tree": {
+        ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md": {
+          "text": "# Design Contract\n\nDS-001 mantém o health check legível.\n"
+        },
+        ".bianchini/changes/C001-health-journey/design/imported/prototype.html": {
+          "text": "<!doctype html><title>Health</title><main>Status OK</main>\n"
+        },
+        ".bianchini/changes/C001-health-journey/design/imported/tokens.css": {
+          "text": ":root { --status-ok: #087f5b; }\n"
+        },
+        ".bianchini/changes/C001-health-journey/design/imported/desktop.png": {
+          "base64": "iVBORw0KGgpjbGktY29udHJhY3QtZGVzaWdu"
+        },
+        ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json": {
+          "text": "{\n  \"breakpoints\": [\n    \"terminal\"\n  ],\n  \"contract\": \".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md\",\n  \"design_digest\": null,\n  \"files\": [\n    \".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md\",\n    \".bianchini/changes/C001-health-journey/design/imported/prototype.html\",\n    \".bianchini/changes/C001-health-journey/design/imported/tokens.css\",\n    \".bianchini/changes/C001-health-journey/design/imported/desktop.png\"\n  ],\n  \"prototype\": \".bianchini/changes/C001-health-journey/design/imported/prototype.html\",\n  \"schema_version\": 1,\n  \"scope_digest\": null,\n  \"scope_source\": null,\n  \"screenshots\": [\n    \".bianchini/changes/C001-health-journey/design/imported/desktop.png\"\n  ],\n  \"source\": \"imported\",\n  \"status\": \"draft\",\n  \"surfaces\": [\n    \"health-cli\"\n  ],\n  \"tokens\": \".bianchini/changes/C001-health-journey/design/imported/tokens.css\"\n}\n"
+        }
+      }
+    },
+    {
+      "surface": "design-audit.seal",
+      "argv": [
+        "design-audit",
+        "seal",
+        "--root",
+        "{repo}",
+        "--scope",
+        "{repo}/.bianchini/changes/{change_id}/SCOPE.md",
+        "--manifest",
+        "{repo}/.bianchini/changes/{change_id}/design/imported/DESIGN_MANIFEST.json"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "action": "seal",
+            "breakpoints": [
+              "terminal"
+            ],
+            "design_digest": "fe9baa80347f552102c5798d07d952245194bf7c191f6ce516f91d7dd7df3d33",
+            "files": [
+              ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+              ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+              ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+              ".bianchini/changes/C001-health-journey/design/imported/tokens.css"
+            ],
+            "manifest": ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            "scope_digest": "{sha256}",
+            "scope_source": ".bianchini/changes/C001-health-journey/SCOPE.md",
+            "status": "draft",
+            "surfaces": [
+              "health-cli"
+            ],
+            "valid": true
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf"
+          ]
+        }
+      },
+      "capture": {
+        "design_digest": "design_digest"
+      }
+    },
+    {
+      "json_update": {
+        "path": ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+        "values": {
+          "status": "approved"
+        }
+      }
+    },
+    {
+      "surface": "design-audit.verify",
+      "argv": [
+        "design-audit",
+        "verify",
+        "--root",
+        "{repo}",
+        "--scope",
+        "{repo}/.bianchini/changes/{change_id}/SCOPE.md",
+        "--manifest",
+        "{repo}/.bianchini/changes/{change_id}/design/imported/DESIGN_MANIFEST.json"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "action": "verify",
+            "breakpoints": [
+              "terminal"
+            ],
+            "design_digest": "fe9baa80347f552102c5798d07d952245194bf7c191f6ce516f91d7dd7df3d33",
+            "files": [
+              ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+              ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+              ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+              ".bianchini/changes/C001-health-journey/design/imported/tokens.css"
+            ],
+            "manifest": ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            "scope_digest": "{sha256}",
+            "scope_source": ".bianchini/changes/C001-health-journey/SCOPE.md",
+            "status": "approved",
+            "surfaces": [
+              "health-cli"
+            ],
+            "valid": true
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf"
+          ]
+        }
+      }
+    },
+    {
+      "write_tree": {
+        ".bianchini/changes/C001-health-journey/RESEARCH.md": {
+          "text": "# Pesquisa\n\nPython 3 e a interface CLI local são suficientes.\n"
+        },
+        ".bianchini/changes/C001-health-journey/ARCHITECTURE.md": {
+          "text": "# Arquitetura global\n\nCLI sem estado externo; saída JSON determinística.\n\nDesign aprovado: `{design_digest}`.\n"
+        },
+        ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md": {
+          "text": "---\n{\n  \"capabilities\": [],\n  \"contracts\": [\n    {\n      \"id\": \"health_checked\"\n    }\n  ],\n  \"data\": [],\n  \"effects\": [],\n  \"integrations\": [],\n  \"interfaces\": [],\n  \"invariants\": [],\n  \"journeys\": [],\n  \"modules\": [],\n  \"ownership\": [],\n  \"schema_version\": 1\n}\n---\n\n# Sistema final\n"
+        },
+        ".bianchini/changes/C001-health-journey/plans/P01.md": {
+          "text": "---\n{\n  \"acceptance\": [\n    \"Aceite observável de P01\"\n  ],\n  \"consumes\": [],\n  \"data\": [],\n  \"depends_on\": [],\n  \"effects\": [],\n  \"execution\": \"slice\",\n  \"future_constraints\": [],\n  \"id\": \"P01\",\n  \"interfaces\": [],\n  \"migrations\": [],\n  \"model_delta\": {\n    \"contracts\": {\n      \"add\": [\n        {\n          \"id\": \"health_checked\"\n        }\n      ]\n    }\n  },\n  \"modules\": [],\n  \"ownership\": [],\n  \"provides\": [\n    \"health_checked\"\n  ],\n  \"requirements\": [\n    \"FLW-001\",\n    \"REQ-001\",\n    \"BR-001\",\n    \"DAT-001\",\n    \"ERR-001\",\n    \"RSK-001\"\n  ],\n  \"result\": \"Resultado observável de P01\",\n  \"review\": \"per_slice\",\n  \"rollback\": \"Reverter o commit de P01.\",\n  \"schema_version\": 2,\n  \"status\": \"planned\",\n  \"tasks\": [\n    {\n      \"action\": \"Implementar pelo seam público existente.\",\n      \"covers\": [\n        \"FLW-001\",\n        \"REQ-001\",\n        \"BR-001\",\n        \"DAT-001\",\n        \"ERR-001\",\n        \"RSK-001\"\n      ],\n      \"depends_on\": [],\n      \"done\": \"T01 passa pela interface pública.\",\n      \"files\": [\n        \"app.py\"\n      ],\n      \"id\": \"T01\",\n      \"name\": \"Entregar T01\",\n      \"result\": \"Resultado observável de T01\",\n      \"risk_seam\": \"typed-planning\",\n      \"verify\": {\n        \"kind\": \"command\",\n        \"proves\": \"A interface pública do RC responde status ok.\",\n        \"run\": \"python3 app.py --health\"\n      }\n    }\n  ],\n  \"verifications\": [\n    \"python3 -m unittest tests.test_p01\"\n  ]\n}\n---\n\n# P01 — Health journey\n"
+        },
+        ".bianchini/changes/C001-health-journey/specs/expected/system.md": {
+          "text": "# Spec do sistema\n\n## SPEC-001: Contrato de FLW-001\n\nO sistema deve entregar o comportamento rastreado por FLW-001.\n\n## SPEC-002: Contrato de REQ-001\n\nO sistema deve entregar o comportamento rastreado por REQ-001.\n\n## SPEC-003: Contrato de BR-001\n\nO sistema deve entregar o comportamento rastreado por BR-001.\n\n## SPEC-004: Contrato de DAT-001\n\nO sistema deve entregar o comportamento rastreado por DAT-001.\n\n## SPEC-005: Contrato de ERR-001\n\nO sistema deve entregar o comportamento rastreado por ERR-001.\n\n## SPEC-006: Contrato de RSK-001\n\nO sistema deve entregar o comportamento rastreado por RSK-001.\n"
+        },
+        ".bianchini/changes/C001-health-journey/specs/MANIFEST.json": {
+          "text": "{\n  \"risk_coverage\": [],\n  \"schema_version\": 1,\n  \"spec_contract\": 1,\n  \"specs\": [\n    {\n      \"id\": \"system\",\n      \"path\": \"system.md\",\n      \"requirements\": [\n        {\n          \"id\": \"SPEC-001\",\n          \"scope\": [\n            \"FLW-001\"\n          ]\n        },\n        {\n          \"id\": \"SPEC-002\",\n          \"scope\": [\n            \"REQ-001\"\n          ]\n        },\n        {\n          \"id\": \"SPEC-003\",\n          \"scope\": [\n            \"BR-001\"\n          ]\n        },\n        {\n          \"id\": \"SPEC-004\",\n          \"scope\": [\n            \"DAT-001\"\n          ]\n        },\n        {\n          \"id\": \"SPEC-005\",\n          \"scope\": [\n            \"ERR-001\"\n          ]\n        },\n        {\n          \"id\": \"SPEC-006\",\n          \"scope\": [\n            \"RSK-001\"\n          ]\n        }\n      ]\n    }\n  ]\n}\n"
+        }
+      }
+    },
+    {
+      "argv": [
+        "spec-diff",
+        "--root",
+        "{repo}",
+        "--base",
+        "{repo}/.bianchini/current/specs",
+        "--target",
+        "{repo}/.bianchini/changes/{change_id}/specs/expected",
+        "--output",
+        "{repo}/.bianchini/changes/{change_id}/specs/diff.md"
+      ]
+    },
+    {
+      "surface": "roadmap.sync",
+      "argv": [
+        "roadmap",
+        "sync",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "change": "C001-health-journey",
+            "digest": "af1686485fab6fd15110a2d26a8fa919c219d5480b931554bc9cff5a44f7cfbc",
+            "phases": [
+              "P01"
+            ],
+            "planning_contract": 2,
+            "roadmap": "{repo}/.bianchini/changes/C001-health-journey/ROADMAP.md"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/changes/C001-health-journey/ROADMAP.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "model",
+        "validate",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}"
+      ]
+    },
+    {
+      "surface": "coherence.check",
+      "argv": [
+        "coherence",
+        "check",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--structural-only"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "artifact_manifest": {
+              "ARCHITECTURE.md": "d3912383352c9bc7768b798a9c74f4b76e34fb67fc9c5ca615ec98a17cc2b6d0",
+              "RESEARCH.md": "5a5116af9cb83775cbaf4f668517301a9231b24d0417dc60bbd5909bed7a5620",
+              "ROADMAP.md": "af1686485fab6fd15110a2d26a8fa919c219d5480b931554bc9cff5a44f7cfbc",
+              "SCOPE.md": "{sha256}",
+              "SYSTEM_MODEL.md": "20d54265277ba3ce79ccc107cba7bbd364b81cb9651da8514f45fb7969b34b59",
+              "plans/P01.md": "c07c3f23ace3c371311c2f6d3f9333d03d32965e5340e0d9dedbb48c7b56f5b7"
+            },
+            "change": "C001-health-journey",
+            "digest": "{sha256}",
+            "findings": [],
+            "planning_contract": 2,
+            "review_input_digest": "{sha256}",
+            "schedule": {
+              "plan_waves": [
+                [
+                  "P01"
+                ]
+              ],
+              "task_waves": {
+                "P01": [
+                  [
+                    "T01"
+                  ]
+                ]
+              }
+            },
+            "semantic_available": null,
+            "spec_contract": 1,
+            "status": "structurally_valid",
+            "structural_findings": 0
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf"
+          ]
+        }
+      },
+      "capture": {
+        "review_digest": "review_input_digest"
+      }
+    },
+    {
+      "write_tree": {
+        "semantic.json": {
+          "text": "{\"prompt\":\"revisão semântica da fixture\",\"inputs\":\"{review_digest}\",\"sources\":[\"escopo selado\",\"contrato público\"],\"findings\":[]}\n"
+        }
+      }
+    },
+    {
+      "argv": [
+        "coherence",
+        "check",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--semantic-report",
+        "{repo}/semantic.json"
+      ],
+      "capture": {
+        "approval_digest": "digest"
+      }
+    },
+    {
+      "surface": "coherence.approve",
+      "argv": [
+        "coherence",
+        "approve",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--digest",
+        "{approval_digest}",
+        "--approved-by",
+        "human:fixture"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "approved_by": "human:fixture",
+            "change": "C001-health-journey",
+            "digest": "{sha256}",
+            "status": "approved"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "impact.analyze",
+      "argv": [
+        "impact",
+        "analyze",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--plan",
+        "P01",
+        "--changed-contract",
+        "health_checked"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "affected_journeys": [],
+            "changed_plan": "P01",
+            "direct_plans": [],
+            "preview": false,
+            "radius": "local",
+            "stale_plans": [],
+            "transitive_plans": [],
+            "verifications": [
+              "python3 -m unittest tests.test_p01"
+            ]
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    },
+    {
+      "git": {
+        "action": "commit_all",
+        "message": "aprovar plano da fixture"
+      }
+    },
+    {
+      "surface": "workspace.create",
+      "tree_root": "{tmp}/execution-worktree",
+      "argv": [
+        "workspace",
+        "create",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--plan",
+        "P01",
+        "--target",
+        "{tmp}/execution-worktree"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "base_commit": "{git_sha}",
+            "branch": "bm/c001-p01",
+            "change": "C001-health-journey",
+            "plan": "P01",
+            "workspace": "{tmp}/execution-worktree"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/workspace-c001-p01.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "surface": "workspace.locate",
+      "argv": [
+        "workspace",
+        "locate",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--plan",
+        "P01"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "branch": "bm/c001-p01",
+            "change": "C001-health-journey",
+            "plan": "P01",
+            "workspace": "{tmp}/execution-worktree"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "workspace.resume",
+      "argv": [
+        "workspace",
+        "resume",
+        "--repo",
+        "{repo}",
+        "--change",
+        "{change_id}",
+        "--plan",
+        "P01"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "branch": "bm/c001-p01",
+            "change": "C001-health-journey",
+            "metadata": {
+              "base_commit": "{git_sha}",
+              "branch": "bm/c001-p01",
+              "change": "C001-health-journey",
+              "coherence_digest": "{sha256}",
+              "created_at": "{timestamp}",
+              "plan": "P01",
+              "schema_version": 1,
+              "source_repo": "{repo}"
+            },
+            "plan": "P01",
+            "workspace": "{tmp}/execution-worktree"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/id-counters.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "workspace.check",
+      "tree_root": "{tmp}/execution-worktree",
+      "argv": [
+        "workspace",
+        "check",
+        "--repo",
+        "{tmp}/execution-worktree"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "branch": "bm/c001-p01",
+            "metadata": {
+              "base_commit": "{git_sha}",
+              "branch": "bm/c001-p01",
+              "change": "C001-health-journey",
+              "coherence_digest": "{sha256}",
+              "created_at": "{timestamp}",
+              "plan": "P01",
+              "schema_version": 1,
+              "source_repo": "{repo}"
+            },
+            "valid": true,
+            "workspace": "{tmp}/execution-worktree"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/workspace-c001-p01.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "roadmap.next-wave",
+      "tree_root": "{tmp}/execution-worktree",
+      "argv": [
+        "roadmap",
+        "next-wave",
+        "--repo",
+        "{tmp}/execution-worktree",
+        "--change",
+        "{change_id}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "blocked_units": [],
+            "change": "C001-health-journey",
+            "completed_units": [],
+            "eligible_wave": [
+              "C001/P01/T01"
+            ],
+            "package_digest": "{sha256}",
+            "parallel_units": [
+              {
+                "dependencies_satisfied": [],
+                "identity": "C001/P01/T01",
+                "pack_identity": "C001/P01/T01",
+                "plan": "P01",
+                "task": "T01"
+              }
+            ],
+            "roadmap_digest": "af1686485fab6fd15110a2d26a8fa919c219d5480b931554bc9cff5a44f7cfbc",
+            "schema_version": 1,
+            "stale_units": [],
+            "waiting_units": []
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/workspace-c001-p01.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/STATE.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "context",
+        "pack",
+        "--repo",
+        "{tmp}/execution-worktree",
+        "--unit",
+        "C001/P01/T01"
+      ],
+      "capture": {
+        "task_pack": "path"
+      }
+    },
+    {
+      "write_tree": {
+        "app.py": {
+          "text": "#!/usr/bin/env python3\nimport json\nprint(json.dumps({\"status\": \"ok\", \"surface\": \"public-cli\"}, sort_keys=True))\n"
+        }
+      },
+      "root": "{tmp}/execution-worktree"
+    },
+    {
+      "surface": "plan.complete",
+      "tree_root": "{tmp}/execution-worktree",
+      "argv": [
+        "plan",
+        "complete",
+        "--repo",
+        "{tmp}/execution-worktree",
+        "--change",
+        "{change_id}",
+        "--plan",
+        "P01",
+        "--task",
+        "T01",
+        "--context-pack",
+        "{tmp}/execution-worktree/{task_pack}",
+        "--result",
+        "health check implementado",
+        "--verification",
+        "python3 app.py --health => status ok"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "change": "C001-health-journey",
+            "pack_digest": "{sha256}",
+            "pack_identity": "C001/P01/T01",
+            "package_digest": "{sha256}",
+            "plan": "P01",
+            "status": "completed",
+            "task": "T01"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/changes/C001-health-journey/results/tasks/P01/T01.md"
+          ],
+          "altered": [
+            ".bianchini/STATE.md"
+          ],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/context/C001-P01-T01.json",
+            ".bianchini/.runtime/workspace-c001-p01.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+            ".bianchini/changes/C001-health-journey/COHERENCE.md",
+            ".bianchini/changes/C001-health-journey/RESEARCH.md",
+            ".bianchini/changes/C001-health-journey/ROADMAP.md",
+            ".bianchini/changes/C001-health-journey/SCOPE.md",
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+            ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+            ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+            ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+            ".bianchini/changes/C001-health-journey/plans/P01.md",
+            ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+            ".bianchini/changes/C001-health-journey/specs/diff.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "app.py",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    },
+    {
+      "write_tree": {
+        "actual-delta.json": {
+          "text": "{\"contracts\": {\"add\": [{\"id\": \"health_checked\"}]}}\n"
+        }
+      },
+      "root": "{tmp}"
+    },
+    {
+      "argv": [
+        "plan",
+        "complete",
+        "--repo",
+        "{tmp}/execution-worktree",
+        "--change",
+        "{change_id}",
+        "--plan",
+        "P01",
+        "--actual-delta",
+        "{tmp}/actual-delta.json",
+        "--result",
+        "release candidate executável entregue",
+        "--verification",
+        "python3 app.py --health => status ok"
+      ]
+    },
+    {
+      "git": {
+        "action": "commit_all",
+        "message": "executar plano da fixture"
+      },
+      "root": "{tmp}/execution-worktree"
+    },
+    {
+      "surface": "cycle-close",
+      "tree_root": "{tmp}/execution-worktree",
+      "cwd": "{tmp}/execution-worktree",
+      "argv": [
+        "cycle-close",
+        "--repo",
+        "{tmp}/execution-worktree",
+        "--change",
+        "{change_id}"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "archive": "{tmp}/execution-worktree/.bianchini/archive/C001-health-journey",
+            "archive_digest": "{sha256}",
+            "change": "C001-health-journey",
+            "current_digest": "0a0dc83045b079a51402ed2349817c5c4efadfc21954eae491b2d5f58e51f33d",
+            "model_digest": "90c3a915137df5c479727306bbc7b15a5a1ee5b11488cfc68cccbb23549c6970",
+            "recovered": false,
+            "specs_promoted": true,
+            "specs_status": "managed",
+            "state_digest": "{sha256}",
+            "status": "completed"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.runtime/cycle-close.lock",
+            ".bianchini/archive/C001-health-journey/SUMMARY.md",
+            ".bianchini/archive/C001-health-journey/specs/expected/system.md",
+            ".bianchini/current/specs/system.md"
+          ],
+          "altered": [
+            ".bianchini/STATE.md",
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md",
+            ".bianchini/current/specs/MANIFEST.json"
+          ],
+          "deleted": [
+            ".bianchini/changes/C001-health-journey/SUMMARY.md",
+            ".bianchini/changes/C001-health-journey/specs/expected/system.md"
+          ],
+          "moved": [
+            {
+              "from": ".bianchini/changes/C001-health-journey/ARCHITECTURE.md",
+              "to": ".bianchini/archive/C001-health-journey/ARCHITECTURE.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/COHERENCE.md",
+              "to": ".bianchini/archive/C001-health-journey/COHERENCE.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/RESEARCH.md",
+              "to": ".bianchini/archive/C001-health-journey/RESEARCH.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/ROADMAP.md",
+              "to": ".bianchini/archive/C001-health-journey/ROADMAP.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/SCOPE.md",
+              "to": ".bianchini/archive/C001-health-journey/SCOPE.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/SYSTEM_MODEL.md",
+              "to": ".bianchini/archive/C001-health-journey/SYSTEM_MODEL.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/design/imported/DESIGN_CONTRACT.md",
+              "to": ".bianchini/archive/C001-health-journey/design/imported/DESIGN_CONTRACT.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/design/imported/DESIGN_MANIFEST.json",
+              "to": ".bianchini/archive/C001-health-journey/design/imported/DESIGN_MANIFEST.json"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/design/imported/desktop.png",
+              "to": ".bianchini/archive/C001-health-journey/design/imported/desktop.png"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/design/imported/prototype.html",
+              "to": ".bianchini/archive/C001-health-journey/design/imported/prototype.html"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/design/imported/tokens.css",
+              "to": ".bianchini/archive/C001-health-journey/design/imported/tokens.css"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/plans/P01.md",
+              "to": ".bianchini/archive/C001-health-journey/plans/P01.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/results/P01.md",
+              "to": ".bianchini/archive/C001-health-journey/results/P01.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/results/tasks/P01/T01.md",
+              "to": ".bianchini/archive/C001-health-journey/results/tasks/P01/T01.md"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/specs/MANIFEST.json",
+              "to": ".bianchini/archive/C001-health-journey/specs/MANIFEST.json"
+            },
+            {
+              "from": ".bianchini/changes/C001-health-journey/specs/diff.md",
+              "to": ".bianchini/archive/C001-health-journey/specs/diff.md"
+            }
+          ],
+          "preserved": [
+            ".bianchini/.gitignore",
+            ".bianchini/.runtime/context/C001-P01-T01.json",
+            ".bianchini/.runtime/workspace-c001-p01.json",
+            ".bianchini/PROJECT.md",
+            ".bianchini/debug/KNOWLEDGE.md",
+            ".gitignore",
+            "app.py",
+            "keep.txt",
+            "scope-draft.md",
+            "scope.pdf",
+            "semantic.json"
+          ]
+        }
+      }
+    }
+  ]
+}

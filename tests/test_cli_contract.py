@@ -26,6 +26,77 @@ def run_script(name: str, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 class CliContractScenarios(unittest.TestCase):
+    def test_every_registered_public_surface_has_golden_fixture(self) -> None:
+        payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        positive = payload["surfaces"]
+        negative = payload["negative_surfaces"]
+        surfaces = [*positive, *negative]
+        missing = sorted(
+            surface["id"]
+            for surface in surfaces
+            if not surface.get("fixtures")
+        )
+        self.assertEqual(missing, [])
+
+        fixture_root = ROOT / "tests" / "fixtures" / "cli_contract"
+        declared_fixtures = {
+            fixture_name
+            for surface in surfaces
+            for fixture_name in surface["fixtures"]
+        }
+        self.assertEqual(
+            declared_fixtures,
+            {path.stem for path in fixture_root.glob("*.json")},
+        )
+
+        for surface in surfaces:
+            observed_steps: list[dict[str, object]] = []
+            for fixture_name in surface["fixtures"]:
+                fixture_path = fixture_root / (fixture_name + ".json")
+                fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+                fixture_surfaces = set(
+                    fixture.get("surfaces", [fixture.get("surface")])
+                )
+                self.assertIn(surface["id"], fixture_surfaces, fixture_name)
+                steps = fixture.get("steps") or [
+                    {
+                        "surface": fixture.get("surface"),
+                        "argv": fixture["argv"],
+                        "expected": fixture["expected"],
+                    }
+                ]
+                observed_steps.extend(
+                    step
+                    for step in steps
+                    if step.get("surface") == surface["id"]
+                    and "expected" in step
+                )
+            self.assertTrue(observed_steps, surface["id"])
+
+            for step in observed_steps:
+                expected_prefix = [surface.get("command"), surface.get("action")]
+                expected_prefix = [item for item in expected_prefix if item is not None]
+                if "argv" in surface:
+                    self.assertEqual(step["argv"], surface["argv"])
+                    continue
+                self.assertEqual(
+                    step["argv"][: len(expected_prefix)],
+                    expected_prefix,
+                    surface["id"],
+                )
+
+            has_success = any(
+                step["expected"]["exit_code"] == 0 for step in observed_steps
+            )
+            if surface in positive and not has_success:
+                if surface["id"] == "direct.reopen":
+                    self.assertEqual(surface["behavior"], "parser_terminal_error")
+                else:
+                    self.assertTrue(
+                        surface.get("golden_success_exception"),
+                        f"superfície positiva sem golden de sucesso: {surface['id']}",
+                    )
+
     def test_canonical_registry_matches_parser_dispatch_and_skill_consumers(self) -> None:
         verified = run_script("verify_cli_contract.py")
         self.assertEqual(verified.returncode, 0, verified.stderr)
@@ -55,7 +126,11 @@ class CliContractScenarios(unittest.TestCase):
         result = json.loads(completed.stdout)
         self.assertEqual(result["engine"], "python")
         self.assertEqual(result["failed"], 0)
-        self.assertEqual(result["passed"], 12)
+        fixture_count = len(
+            list((ROOT / "tests" / "fixtures" / "cli_contract").glob("*.json"))
+        )
+        self.assertEqual(result["total"], fixture_count)
+        self.assertEqual(result["passed"], fixture_count)
 
     def test_phase0_baseline_metrics_are_measured_not_estimated(self) -> None:
         payload = json.loads(BASELINE.read_text(encoding="utf-8"))

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "surface": "roadmap.next-wave",
+  "argv": [
+    "roadmap",
+    "next-wave",
+    "--repo",
+    "{repo}",
+    "--change",
+    "fixture"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 3,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "WAVE_INCOMPLETE: repo 0.4 exige .bianchini\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

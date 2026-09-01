@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "surface": "coherence.check",
+  "argv": [
+    "coherence",
+    "check",
+    "--repo",
+    "{repo}",
+    "--change",
+    "fixture"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "erro de entrada/IO: STATE.md ausente: {repo}/.bianchini/STATE.md\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

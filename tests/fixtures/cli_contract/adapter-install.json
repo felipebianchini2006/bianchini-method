@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "surface": "adapter.install",
+  "argv": [
+    "adapter",
+    "install",
+    "--host",
+    "generic",
+    "--repo",
+    "{repo}/missing"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 3,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "HOST_ADAPTER_PATH_INVALID: raiz do repositório ausente\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

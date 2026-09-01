@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "surface": "design-audit.seal",
+  "argv": [
+    "design-audit",
+    "seal",
+    "--root",
+    "{repo}",
+    "--scope",
+    "{repo}/missing-scope.md",
+    "--manifest",
+    "{repo}/manifest.json"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "scope de design ausente: {repo}/missing-scope.md\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "surface": "workspace.create",
+  "argv": [
+    "workspace",
+    "create",
+    "--repo",
+    "{repo}",
+    "--change",
+    "fixture",
+    "--plan",
+    "P01"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 3,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "DIRTY_WORKSPACE: o diretório não é uma raiz Git\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

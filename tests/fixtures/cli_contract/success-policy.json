@@ -1,0 +1,116 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "policy"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "steps": [
+    {
+      "surface": "policy",
+      "argv": [
+        "policy",
+        "--profile",
+        "lean",
+        "--risk",
+        "low"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "architecture_audit_mode": "manual_report_only",
+            "architecture_audit_required": false,
+            "autonomy_policy": {
+              "decision_order": [
+                "approved_owner_decision",
+                "existing_repository_pattern",
+                "existing_stack_and_dependencies",
+                "official_documentation",
+                "lowest_risk_reversible_option"
+              ],
+              "stop_categories": [
+                "essential_external_credential",
+                "new_cost",
+                "destructive_or_irreversible_action",
+                "material_scope_contract_or_design_change",
+                "proven_real_impossibility"
+              ]
+            },
+            "breaker": false,
+            "breaker_scope": "unit",
+            "effective_fix_round": 0,
+            "execution": "grouped",
+            "homologation_order": [
+              "automated_regression",
+              "coded_e2e",
+              "proof_map",
+              "real_system_pass",
+              "visual_sweep"
+            ],
+            "hypothesis_invalidated": false,
+            "manual_level": "none",
+            "manual_required": false,
+            "max_fix_rounds": 2,
+            "mutation_policy": {
+              "blocking_rule": "survivor_changes_approved_high_or_critical_behavior",
+              "global_score_gate": false,
+              "install_new_tool_during_execution": false,
+              "mode": "not_required",
+              "run_stage": "plan_and_release_only",
+              "scope": "changed_material_risk_seams"
+            },
+            "plan_change_policy": {
+              "authorization_material_change": "pause_for_owner_authorization_without_replanning",
+              "bounded_amendment": "record_in_ledger_without_editing_approved_plan",
+              "implementation_detail": "decide_and_continue",
+              "plan_invalidating_material_change": "invalidate_and_replan_affected_scope"
+            },
+            "redesign_required": false,
+            "review": "plan_gate",
+            "risk_seam": null,
+            "structural_findings": [],
+            "test_cadence": "group_seam",
+            "test_strategy": {
+              "fast": [
+                "targeted_unit_if_logic_changed",
+                "targeted_integration_if_boundary_changed",
+                "related_regression"
+              ],
+              "plan": [
+                "affected_unit_suite",
+                "affected_integration_and_contracts",
+                "affected_regression",
+                "critical_journey_e2e",
+                "selective_mutation_if_required"
+              ],
+              "release": [
+                "complete_unit_suite",
+                "applicable_integration_and_contracts",
+                "critical_journey_e2e",
+                "full_regression",
+                "current_mutation_evidence_if_required",
+                "release_build"
+              ]
+            },
+            "visual_validation": "behavioral_seam"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}

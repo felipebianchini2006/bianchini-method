@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "surface": "planning-check.record",
+  "argv": [
+    "planning-check",
+    "record",
+    "--state",
+    "{repo}/missing-state.json",
+    "--root",
+    "{repo}",
+    "--report",
+    "{repo}/report.md"
+  ],
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    }
+  },
+  "expected": {
+    "exit_code": 2,
+    "stdout": {
+      "kind": "empty"
+    },
+    "stderr": "estado não encontrado: {repo}/missing-state.json\n",
+    "mutations": {
+      "created": [],
+      "altered": [],
+      "deleted": [],
+      "moved": [],
+      "preserved": [
+        "keep.txt"
+      ]
+    }
+  }
+}

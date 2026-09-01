@@ -1,0 +1,70 @@
+{
+  "schema_version": 2,
+  "surfaces": [
+    "learn.reject"
+  ],
+  "git": {
+    "init": true,
+    "commit_initial": true
+  },
+  "initial_tree": {
+    "keep.txt": {
+      "text": "preservar\n"
+    },
+    ".bianchini/debug/resolved/D001-retry.md": {
+      "text": "---\n{\n  \"evidence\": [\n    \"tests/test_checkout.py::test_retry_idempotent\"\n  ],\n  \"green\": \"teste de contrato aprovado\",\n  \"id\": \"D001-retry\",\n  \"learning_candidate\": {\n    \"classification\": \"repeatable_procedure\",\n    \"conflicts\": [],\n    \"statement\": \"Usar chave de idempotência estável no retry do checkout.\",\n    \"tags\": [\n      \"payments\",\n      \"checkout\",\n      \"src/payments.py\"\n    ],\n    \"validity\": \"enquanto o contrato checkout-v1 estiver ativo\"\n  },\n  \"root_cause\": \"retry sem chave estável\",\n  \"schema_version\": 1,\n  \"status\": \"resolved\"\n}\n---\n# Debug resolvido\n"
+    }
+  },
+  "steps": [
+    {
+      "argv": [
+        "learn",
+        "propose",
+        "--repo",
+        "{repo}"
+      ],
+      "capture": {
+        "candidate_id": "candidates.0.id"
+      }
+    },
+    {
+      "surface": "learn.reject",
+      "argv": [
+        "learn",
+        "reject",
+        "--repo",
+        "{repo}",
+        "--candidate",
+        "{candidate_id}",
+        "--reason",
+        "caso isolado"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "id": "L813BC8BD6BAB",
+            "path": ".bianchini/.runtime/learning/rejected/L813BC8BD6BAB.json",
+            "status": "rejected"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [
+            ".bianchini/.runtime/learning/rejected/L813BC8BD6BAB.json"
+          ],
+          "altered": [],
+          "deleted": [
+            ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json"
+          ],
+          "moved": [],
+          "preserved": [
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      }
+    }
+  ]
+}
