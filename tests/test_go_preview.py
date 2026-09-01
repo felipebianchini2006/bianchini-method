@@ -109,8 +109,12 @@ class GoBackendScenarios(unittest.TestCase):
         self.assertIn("Redistribution and use in source and binary forms", notices)
 
     def test_go_unit_suite_is_green(self) -> None:
-        completed = run("go", "test", "./...")
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        completed = run("go", "test", "-p", "1", "./...")
+        self.assertEqual(
+            completed.returncode,
+            0,
+            completed.stderr or completed.stdout,
+        )
 
     def test_official_has_no_python_or_shell_fallback_and_reports_its_backend(self) -> None:
         sources = "\n".join(
