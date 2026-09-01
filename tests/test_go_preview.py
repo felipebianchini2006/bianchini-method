@@ -121,6 +121,35 @@ class GoPreviewScenarios(unittest.TestCase):
                     self.assertEqual(go.stdout, python.stdout)
                     self.assertEqual(go.stderr, python.stderr)
 
+    def test_go_policy_matches_python_oracle(self) -> None:
+        cases = (
+            ("--profile", "lean", "--risk", "low", "--change", "visual"),
+            (
+                "--profile", "standard", "--risk", "medium",
+                "--change", "business-rule", "--manual-pdf", "scope",
+                "--manual-in-scope", "--round", "1", "--risk-seam",
+                "payments-ledger", "--seam-round", "3",
+            ),
+            (
+                "--profile", "full", "--risk", "critical", "--round", "1",
+                "--structural-finding", "crash_window",
+                "--structural-finding", "toctou",
+            ),
+        )
+        with tempfile.TemporaryDirectory(prefix="bm-go-policy-parity-") as temp:
+            binary = Path(temp) / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            for arguments in cases:
+                with self.subTest(arguments=arguments):
+                    argv = ("policy", *arguments)
+                    python = run("python3", str(ROOT / "scripts" / "bm.py"), *argv)
+                    go = run(str(binary), *argv)
+                    self.assertEqual(python.returncode, 0, python.stderr)
+                    self.assertEqual(go.returncode, python.returncode, go.stderr)
+                    self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
+                    self.assertEqual(go.stderr, python.stderr)
+
     def test_preview_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),

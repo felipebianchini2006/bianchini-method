@@ -11,6 +11,7 @@ const (
 
 var ImplementedSurfaces = []string{
 	"change-policy",
+	"policy",
 	"direct:classify",
 	"direct:reopen",
 	"spec-diff:file",

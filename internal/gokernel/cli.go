@@ -30,6 +30,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runVersion(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
+	case "policy":
+		result, err = runPolicy(args[1:])
 	case "direct":
 		result, err = runDirect(args[1:])
 	case "spec-diff":
