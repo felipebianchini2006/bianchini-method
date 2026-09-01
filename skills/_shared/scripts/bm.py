@@ -37,6 +37,13 @@ from bm_risk import RiskInputError, assess_quick_risk
 from bm_spec_diff import spec_diff
 from bm_wave import WaveError, next_wave
 from bm_host_adapters import HostAdapterError, install_adapter, render_adapter
+from bm_learning import (
+    LearningError,
+    approve_learning,
+    list_learning,
+    propose_learning,
+    reject_learning,
+)
 from bm_update import (
     UpdateError as BMUpdateError,
     render_update_result,
@@ -4019,6 +4026,15 @@ def parser() -> argparse.ArgumentParser:
     adapter.add_argument("--repo", type=Path, default=Path.cwd())
     adapter.add_argument("--overwrite", action="store_true")
 
+    learn = commands.add_parser("learn")
+    learn.add_argument("action", choices=["propose", "list", "approve", "reject"])
+    learn.add_argument("--repo", type=Path, default=Path.cwd())
+    learn.add_argument("--since")
+    learn.add_argument("--candidate")
+    learn.add_argument("--digest")
+    learn.add_argument("--approved-by")
+    learn.add_argument("--reason")
+
     debug = commands.add_parser("debug")
     debug.add_argument(
         "action", choices=["start", "list", "status", "resume", "checkpoint", "finish"]
@@ -4404,6 +4420,25 @@ def main() -> int:
                         overwrite=args.overwrite,
                     )
                 )
+        elif args.command == "learn":
+            if args.action == "propose":
+                emit(propose_learning(args.repo, since=args.since))
+            elif args.action == "list":
+                emit(list_learning(args.repo))
+            elif args.action == "approve":
+                if not all((args.candidate, args.digest, args.approved_by)):
+                    raise BMError(
+                        "learn approve exige --candidate, --digest e --approved-by"
+                    )
+                emit(
+                    approve_learning(
+                        args.repo, args.candidate, args.digest, args.approved_by
+                    )
+                )
+            else:
+                if not args.candidate or not args.reason:
+                    raise BMError("learn reject exige --candidate e --reason")
+                emit(reject_learning(args.repo, args.candidate, args.reason))
         elif args.command == "migrate":
             if args.action == "check":
                 emit(v04.migration_check(args.repo))
@@ -4726,7 +4761,7 @@ def main() -> int:
     except ContextPackError as error:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
-    except (RiskInputError, WaveError, HostAdapterError) as error:
+    except (RiskInputError, WaveError, HostAdapterError, LearningError) as error:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
     except (OSError, UnicodeError, subprocess.SubprocessError, KeyError, TypeError, ValueError) as error:

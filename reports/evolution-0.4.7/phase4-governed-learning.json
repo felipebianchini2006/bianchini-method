@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "phase": 4,
+  "interface": [
+    "bm learn propose --repo <repo> [--since <ref>]",
+    "bm learn list --repo <repo>",
+    "bm learn approve --repo <repo> --candidate <id> --digest <digest> --approved-by human:<id>",
+    "bm learn reject --repo <repo> --candidate <id> --reason <texto>"
+  ],
+  "opt_in": true,
+  "automatic_approval": false,
+  "approval_requires_human": true,
+  "approval_requires_current_digest": true,
+  "forbidden_automatic_targets": [
+    "METHOD_CONTRACT",
+    "schemas",
+    "risk guards",
+    "skills"
+  ],
+  "approved_destination": ".bianchini/current/lessons/",
+  "evidence": [
+    "tests/test_learning.py",
+    "tests/test_context_pack.py::test_only_relevant_approved_lesson_enters_pack_and_conflict_blocks"
+  ]
+}

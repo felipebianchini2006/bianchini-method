@@ -5,8 +5,8 @@
 - Schema do registry: `1`
 - Contrato: `0.4`
 - Base congelada: `7c9fa23f524623f3360ebae579048e1765095220`
-- Comandos do parser: `30`
-- Superfícies do parser: `53`
+- Comandos do parser: `31`
+- Superfícies do parser: `57`
 
 ## Convenções
 
@@ -58,6 +58,11 @@
 
 - Geração: `operational`
 - Parser: `action;choices=render,install;required | --host;choices=generic,codex,claude-compatible;required | --repo;type=Path;default="$CWD" | --overwrite;action=store_true;default=false`
+
+### `bm learn`
+
+- Geração: `core_0_4`
+- Parser: `action;choices=propose,list,approve,reject;required | --repo;type=Path;default="$CWD" | --since;default=null | --candidate;default=null | --digest;default=null | --approved-by;default=null | --reason;default=null`
 
 ### `bm debug`
 
@@ -183,6 +188,10 @@
 | `context.verify` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | verify_context_pack | skills/_shared/scripts/bm_context.py | — | tests/test_context_cli.py::test_context_pack_and_verify_are_public_and_json_observable |
 | `adapter.render` | operational | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | render_adapter | skills/_shared/scripts/bm_host_adapters.py | — | tests/test_phase3_cli.py::test_adapter_render_and_explicit_install_are_public |
 | `adapter.install` | operational | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | bloco gerenciado em AGENTS.md ou CLAUDE.md no --repo explícito | install_adapter | skills/_shared/scripts/bm_host_adapters.py | — | tests/test_phase3_cli.py::test_adapter_render_and_explicit_install_are_public |
+| `learn.propose` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/.runtime/learning/pending/** | propose_learning | skills/_shared/scripts/bm_learning.py | — | tests/test_learning.py::test_cli_exposes_opt_in_propose_list_approve_and_reject |
+| `learn.list` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | list_learning | skills/_shared/scripts/bm_learning.py | — | tests/test_learning.py::test_cli_exposes_opt_in_propose_list_approve_and_reject |
+| `learn.approve` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/current/lessons/<candidate>.json<br>remove candidato correspondente de .bianchini/.runtime/learning/pending | approve_learning | skills/_shared/scripts/bm_learning.py | — | tests/test_learning.py::test_human_approval_promotes_only_governed_project_lesson |
+| `learn.reject` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/.runtime/learning/rejected/<candidate>.json<br>remove candidato correspondente de .bianchini/.runtime/learning/pending | reject_learning | skills/_shared/scripts/bm_learning.py | — | tests/test_learning.py::test_rejection_preserves_history_without_active_lesson |
 | `debug.start` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/debug/active/<id>/**<br>.bianchini/STATE.md | v04.debug_start | skills/_shared/scripts/bm_v04_workflows.py | skills/corrigir-bug/SKILL.md | tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order |
 | `debug.list` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04.debug_status | skills/_shared/scripts/bm_v04_workflows.py | skills/corrigir-bug/SKILL.md | tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order |
 | `debug.status` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04.debug_status | skills/_shared/scripts/bm_v04_workflows.py | skills/corrigir-bug/SKILL.md<br>skills/status-projeto/SKILL.md | tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order |

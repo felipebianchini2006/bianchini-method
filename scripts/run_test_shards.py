@@ -59,6 +59,10 @@ PHASE3_SHARDS = (
     ("test_phase3_cli", "Phase3CliScenarios"),
 )
 
+PHASE4_SHARDS = (
+    ("test_learning", "GovernedLearningScenarios"),
+)
+
 SELF_UPDATE_SHARDS = (
     "SelfUpdateScenarios",
 )
@@ -114,6 +118,9 @@ def main() -> int:
     for module, shard in PHASE3_SHARDS:
         if run_shard(module, shard, environment) != 0:
             return 1
+    for module, shard in PHASE4_SHARDS:
+        if run_shard(module, shard, environment) != 0:
+            return 1
     for shard in SELF_UPDATE_SHARDS:
         if run_shard("test_self_update", shard, environment) != 0:
             return 1
@@ -131,6 +138,7 @@ def main() -> int:
         + len(PHASE1_SHARDS)
         + len(PHASE2_SHARDS)
         + len(PHASE3_SHARDS)
+        + len(PHASE4_SHARDS)
         + len(SELF_UPDATE_SHARDS)
         + len(LINEAGE_SHARDS)
         + len(CODEX_SHARDS)
