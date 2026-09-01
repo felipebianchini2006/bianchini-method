@@ -4,7 +4,7 @@ Data: 2026-09-01
 
 Branch: `dev/evolucao-sustentavel-0.4.7-0.5`
 
-Base e `origin/main`: `7c9fa23f524623f3360ebae579048e1765095220`
+Base original aprovada: `7c9fa23f524623f3360ebae579048e1765095220`
 
 Head funcional auditado: `ed2841c478dcbda3da2563d62d12110a38558b84`
 
@@ -39,11 +39,11 @@ A instalação local ativa está em `~/.codex/skills`. O binário instalado foi 
 
 O aprendizado continua opt-in, exige identidade humana para aprovação/desativação e não edita automaticamente kernel, schemas, `METHOD_CONTRACT` ou skills.
 
-Não houve merge na main, release ou publicação de artifacts. Somente a branch de implementação deve ser publicada para restauração da prova normativa e nova auditoria. A branch não está liberada para merge enquanto o plano não for relido integralmente.
+Durante a implementação e a auditoria não houve merge na main, release ou publicação de artifacts. Depois da instalação e validação local no macOS, o usuário autorizou explicitamente a promoção da branch para `main` por fast-forward. A aceitação documental permanece bloqueada até o plano ser restaurado; nenhum release foi publicado.
 
 ## 2. Preflight e isolamento
 
-- `origin/main`, `main` local e merge-base permaneceram em `7c9fa23f524623f3360ebae579048e1765095220`.
+- `origin/main`, `main` local e merge-base permaneceram em `7c9fa23f524623f3360ebae579048e1765095220` durante toda a implementação, auditoria e ativação local, até a autorização explícita de promoção.
 - A suite da baseline foi reexecutada em worktree destacado de `origin/main`: `python3 scripts/run_test_shards.py` terminou com `22 shards aprovados`.
 - A implementação ocorreu em worktree e branch dedicadas.
 - O remoto não avançou durante a execução final.
@@ -300,8 +300,8 @@ rmdir "$audit_release_root"
 
 ## 12. Estado de entrega
 
-- Main intacta.
-- Branch dedicada publicada para continuação da auditoria, mas ainda não apta para merge.
+- `main` promovida por fast-forward somente após autorização explícita do usuário, preservando todo o histórico da branch.
+- Branch dedicada preservada e publicada como origem rastreável da integração.
 - Ambiente macOS validado nativamente.
 - Bianchini Method `0.5.0` instalado em `~/.codex/skills` e pronto para uso local.
 - Instalação anterior `0.4.5` preservada em `~/.codex/.bianchini-method-backups/20260901T211225Z-v0.4.5-skills`.
