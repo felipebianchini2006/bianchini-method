@@ -94,3 +94,42 @@ func TestStatusV2TextMatchesPublicShape(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusV2SummaryUsesOneValidatedStateSnapshot(t *testing.T) {
+	fixture := filepath.Join("..", "..", "tests", "fixtures", "project-state-v2.json")
+	content, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	validated, err := validateStateFile(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{invalid\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := statusV2Summary(validated, path, t.TempDir()); err != nil {
+		t.Fatalf("status releu o arquivo após validar o snapshot: %v", err)
+	}
+}
+
+func TestStatusV2TextPreservesDeclaredPlanOrder(t *testing.T) {
+	state := map[string]any{
+		"plans": []any{
+			map[string]any{"id": "P02", "status": "approved", "execution": "grouped", "depends_on": []any{}},
+			map[string]any{"id": "P01", "status": "approved", "execution": "isolated", "depends_on": []any{}},
+		},
+	}
+	summary, err := statusV2Summary(state, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := renderStatusV2(summary, statusPlanOrder(state))
+	if !strings.Contains(text, "- Planos: P02=approved, P01=approved\n") {
+		t.Fatalf("ordem declarada não preservada:\n%s", text)
+	}
+}

@@ -1,16 +1,9 @@
 package gokernel
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"regexp"
-	"sort"
 	"strings"
-	"unicode/utf8"
 )
-
-var methodVersionOne = regexp.MustCompile(`(?m)^method_version:\s*1\s*$`)
 
 func runStatus(args []string) (any, error) {
 	if len(args) == 0 {
@@ -44,14 +37,11 @@ func runStatus(args []string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(path)
+	snapshot, err := loadStateFile(path)
 	if err != nil {
-		return nil, domainError("STATUS_ERROR", "falha ao ler estado")
+		return nil, err
 	}
-	if len(data) == 0 || !utf8.Valid(data) || bytes.IndexByte(data, 0) >= 0 {
-		return nil, domainError("STATUS_ERROR", "estado deve ser UTF-8 textual")
-	}
-	if methodVersionOne.Match(data) {
+	if stateInt(snapshot["method_version"]) == 1 {
 		if format == "json" {
 			return map[string]any{
 				"implicit_legacy": false,
@@ -63,7 +53,7 @@ func runStatus(args []string) (any, error) {
 		}
 		return "# Status do projeto\n\n- Método: v1 legado (Superpowers)\n- Marcador implícito: não\n", nil
 	}
-	validated, err := validateStateFile(path, "")
+	validated, err := validateStateValue(snapshot, "")
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +64,7 @@ func runStatus(args []string) (any, error) {
 	if format == "json" {
 		return summary, nil
 	}
-	return renderStatusV2(summary), nil
+	return renderStatusV2(summary, statusPlanOrder(validated)), nil
 }
 
 func statusV2Summary(state map[string]any, statePath, root string) (map[string]any, error) {
@@ -126,7 +116,7 @@ func statusV2Summary(state map[string]any, statePath, root string) (map[string]a
 	telemetry := map[string]any{"enabled": stateBool(telemetryConfig["enabled"]), "path": telemetryConfig["path"]}
 	if root != "" {
 		var err error
-		telemetry, err = legacyTelemetrySummary(statePath, root)
+		telemetry, err = legacyTelemetrySummaryFromState(state, root)
 		if err != nil {
 			return nil, err
 		}
@@ -212,8 +202,8 @@ func nullableInt(value any) any {
 	return stateInt(value)
 }
 
-func renderStatusV2(summary map[string]any) string {
-	plans := formatStatusPairs(stateObject(summary["plans"]), stateArrayKeys(summary["plans"]))
+func renderStatusV2(summary map[string]any, planOrder []string) string {
+	plans := formatStatusPairs(stateObject(summary["plans"]), planOrder)
 	verification := formatStatusPairs(stateObject(summary["verification"]), []string{"fast", "plan", "release"})
 	release := stateObject(summary["release"])
 	blockers := stateArray(summary["blockers"])
@@ -280,13 +270,12 @@ func formatStatusPairs(values map[string]any, keys []string) string {
 	return strings.Join(parts, ", ")
 }
 
-func stateArrayKeys(value any) []string {
-	object := stateObject(value)
-	keys := make([]string, 0, len(object))
-	for key := range object {
-		keys = append(keys, key)
+func statusPlanOrder(state map[string]any) []string {
+	result := make([]string, 0, len(stateArray(state["plans"])))
+	for _, raw := range stateArray(state["plans"]) {
+		if identifier := stateString(stateObject(raw)["id"]); identifier != "" {
+			result = append(result, identifier)
+		}
 	}
-	// Planos são IDs Pxx; ordenação lexical preserva a ordem canônica aprovada.
-	sort.Strings(keys)
-	return keys
+	return result
 }

@@ -57,6 +57,10 @@ func validateStateFile(path, schemaPath string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return validateStateValue(state, schemaPath)
+}
+
+func validateStateValue(state map[string]any, schemaPath string) (map[string]any, error) {
 	if stateInt(state["method_version"]) != 2 {
 		return nil, stateError("schema v2 não deve validar projeto legado", 2)
 	}

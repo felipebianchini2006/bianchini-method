@@ -200,6 +200,10 @@ func legacyTelemetrySummary(stateValue, rootValue string) (map[string]any, error
 	if err != nil {
 		return nil, err
 	}
+	return legacyTelemetrySummaryFromState(state, rootValue)
+}
+
+func legacyTelemetrySummaryFromState(state map[string]any, rootValue string) (map[string]any, error) {
 	destination, enabled, err := legacyTelemetryDestination(state, rootValue)
 	if err != nil {
 		return nil, err
