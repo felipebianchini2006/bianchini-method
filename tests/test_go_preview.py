@@ -45,15 +45,19 @@ class GoPreviewScenarios(unittest.TestCase):
         completed = run("go", "test", "./...")
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
-    def test_preview_has_no_python_fallback_and_reports_its_backend(self) -> None:
+    def test_preview_has_no_python_or_shell_fallback_and_reports_its_backend(self) -> None:
         sources = "\n".join(
             path.read_text(encoding="utf-8")
             for root in (ROOT / "cmd", ROOT / "internal")
             for path in sorted(root.rglob("*.go"))
+            if not path.name.endswith("_test.go")
         )
-        self.assertNotIn("os/exec", sources)
-        self.assertNotIn("exec.Command", sources)
         self.assertNotIn("scripts/bm.py", sources)
+        self.assertNotIn("bm_legacy.py", sources)
+        self.assertNotIn('exec.Command("python', sources)
+        self.assertNotIn('exec.Command("python3', sources)
+        self.assertNotIn('exec.Command("sh", "-c"', sources)
+        self.assertNotIn('exec.Command("bash", "-c"', sources)
         with tempfile.TemporaryDirectory(prefix="bm-go-preview-") as temp:
             binary = Path(temp) / "bm-preview"
             built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
@@ -66,7 +70,7 @@ class GoPreviewScenarios(unittest.TestCase):
             self.assertFalse(payload["official"])
             self.assertGreater(len(payload["implemented_surfaces"]), 0)
 
-    def test_all_phase0_fixtures_have_byte_level_parity(self) -> None:
+    def test_all_registered_fixtures_have_byte_level_parity(self) -> None:
         with tempfile.TemporaryDirectory(prefix="bm-go-parity-") as temp:
             binary = Path(temp) / "bm-preview"
             built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
@@ -81,7 +85,11 @@ class GoPreviewScenarios(unittest.TestCase):
             )
             self.assertEqual(parity.returncode, 0, parity.stdout + parity.stderr)
             payload = json.loads(parity.stdout)
-            self.assertEqual(payload["passed"], 12)
+            fixture_total = len(
+                tuple((ROOT / "tests" / "fixtures" / "cli_contract").glob("*.json"))
+            )
+            self.assertEqual(payload["total"], fixture_total)
+            self.assertEqual(payload["passed"], fixture_total)
             self.assertEqual(payload["failed"], 0)
 
     def test_go_risk_path_policy_matches_python_oracle(self) -> None:
