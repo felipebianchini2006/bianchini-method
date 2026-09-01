@@ -103,6 +103,15 @@ func updateBianchiniMethod(request updateRequest) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return withUpdateLock(root, func() (map[string]any, error) {
+		if err := recoverUpdateTransaction(root, request.fs); err != nil {
+			return nil, err
+		}
+		return updateBianchiniMethodLocked(request, root)
+	})
+}
+
+func updateBianchiniMethodLocked(request updateRequest, root string) (map[string]any, error) {
 	installed, err := readInstalledUpdateVersion(root)
 	if err != nil {
 		return nil, err

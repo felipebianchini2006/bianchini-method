@@ -257,6 +257,45 @@ func TestUpdateFailureRollsBackCompleteInstallation(t *testing.T) {
 	assertUpdateMarker(t, skills, "3.1.0", "local")
 }
 
+func TestUpdateRecoversInterruptedDirectorySwap(t *testing.T) {
+	parent := t.TempDir()
+	skills := filepath.Join(parent, "skills")
+	writeUpdateInstallation(t, skills, "3.1.0", "local")
+	stage, err := os.MkdirTemp(parent, ".bianchini-method-stage.*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeUpdateInstallation(t, stage, "3.2.0", "remote")
+	backup := filepath.Join(parent, ".bianchini-method-backups", "interrupted-v3.1.0")
+	if err := os.MkdirAll(backup, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	journal, err := newUpdateTransaction(skills, stage, backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeUpdateJournal(journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(skills, "_shared"), filepath.Join(backup, "_shared")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(stage, "_shared"), filepath.Join(skills, "_shared")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := recoverUpdateTransaction(skills, defaultUpdateFS()); err != nil {
+		t.Fatal(err)
+	}
+	assertUpdateMarker(t, skills, "3.1.0", "local")
+	if _, statErr := os.Lstat(updateJournalPath(skills)); !os.IsNotExist(statErr) {
+		t.Fatalf("journal residual: %v", statErr)
+	}
+	if _, statErr := os.Lstat(stage); !os.IsNotExist(statErr) {
+		t.Fatalf("stage residual: %v", statErr)
+	}
+}
+
 func TestUpdateArchiveRejectsTraversalLinksDuplicatesAndSize(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -33,7 +33,12 @@ func installSkillsAtomically(skillsRoot, remoteSkills, installed string, fsops u
 	if err != nil {
 		return "", userError("não foi possível preparar stage: " + err.Error())
 	}
-	defer fsops.removeAll(stage)
+	journalCreated := false
+	defer func() {
+		if !journalCreated {
+			_ = fsops.removeAll(stage)
+		}
+	}()
 	backup, err := uniqueUpdateBackup(skillsRoot, installed)
 	if err != nil {
 		return "", err
@@ -43,34 +48,44 @@ func installSkillsAtomically(skillsRoot, remoteSkills, installed string, fsops u
 			return "", err
 		}
 	}
-	completed := make([]updateCompletedMove, 0, len(managedSkillDirectories))
-	currentName := ""
-	currentOldMoved := false
-	for _, name := range managedSkillDirectories {
-		currentName = name
-		currentOldMoved = false
+	transaction, err := newUpdateTransaction(skillsRoot, stage, backup)
+	if err != nil {
+		return "", err
+	}
+	if err := writeUpdateJournal(transaction); err != nil {
+		return "", err
+	}
+	journalCreated = true
+	fail := func(cause error) (string, error) {
+		if recoveryErr := recoverUpdateTransaction(skillsRoot, fsops); recoveryErr != nil {
+			return "", updateError("falha na atualização; "+recoveryErr.Error()+"; causa: "+cause.Error(), 3)
+		}
+		journalCreated = false
+		return "", updateError("falha na atualização; rollback concluído; causa: "+cause.Error(), 3)
+	}
+	for _, move := range transaction.Moves {
+		name := move.Name
 		target := filepath.Join(skillsRoot, name)
-		if info, err := os.Lstat(target); err == nil {
-			if info.Mode()&os.ModeSymlink != 0 {
-				return "", rollbackUpdateFailure(skillsRoot, backup, completed, currentName, currentOldMoved, fsops, userError("target gerenciado não pode ser symlink: "+target))
-			}
-			if !info.IsDir() {
-				return "", rollbackUpdateFailure(skillsRoot, backup, completed, currentName, currentOldMoved, fsops, userError("target gerenciado não é diretório: "+target))
-			}
+		if move.HadOld {
 			if err := fsops.rename(target, filepath.Join(backup, name)); err != nil {
-				return "", rollbackUpdateFailure(skillsRoot, backup, completed, currentName, currentOldMoved, fsops, err)
+				return fail(err)
 			}
-			currentOldMoved = true
-		} else if !os.IsNotExist(err) {
-			return "", rollbackUpdateFailure(skillsRoot, backup, completed, currentName, currentOldMoved, fsops, err)
 		}
 		if err := fsops.rename(filepath.Join(stage, name), target); err != nil {
-			return "", rollbackUpdateFailure(skillsRoot, backup, completed, currentName, currentOldMoved, fsops, err)
+			return fail(err)
 		}
-		completed = append(completed, updateCompletedMove{name: name, hadOld: currentOldMoved})
-		currentName = ""
-		currentOldMoved = false
 	}
+	transaction.Committed = true
+	if err := writeUpdateJournal(transaction); err != nil {
+		return fail(err)
+	}
+	if err := fsops.removeAll(stage); err != nil {
+		return "", updateError("atualização concluída, mas stage não pôde ser removido: "+err.Error(), 3)
+	}
+	if err := os.Remove(updateJournalPath(skillsRoot)); err != nil && !os.IsNotExist(err) {
+		return "", updateError("atualização concluída, mas journal foi preservado", 3)
+	}
+	journalCreated = false
 	pruneUpdateBackups(backup, fsops, 3)
 	return backup, nil
 }
