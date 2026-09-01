@@ -257,7 +257,7 @@ func TestSpecDiffFixtureAndPathSafety(t *testing.T) {
 	}
 
 	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", filepath.Join(repo, ".planning", "base.md"), "--target", target, "--output", filepath.Join(repo, "unsafe.md"))
-	if code != 2 || !strings.Contains(stderr, "PATH_SAFETY") {
+	if code != 2 || stderr != "SPEC_PATH_INVALID: spec base usa namespace estrangeiro\n" {
 		t.Fatalf("expected .planning rejection, code=%d stderr=%q", code, stderr)
 	}
 }

@@ -35,7 +35,13 @@ func runSpecDiff(args []string) (any, error) {
 			return nil, argparseError("the following arguments are required: " + required)
 		}
 	}
-	return createSpecDiff(lastValue(flags, "--root"), lastValue(flags, "--base"), lastValue(flags, "--target"), lastValue(flags, "--output"))
+	result, err := createSpecDiff(lastValue(flags, "--root"), lastValue(flags, "--base"), lastValue(flags, "--target"), lastValue(flags, "--output"))
+	if err != nil {
+		// O CLI Python transforma falhas internas de spec-diff em erro público
+		// de entrada (exit 2), preservando o código de domínio no stderr.
+		return nil, fmt.Errorf("%s", err)
+	}
+	return result, nil
 }
 
 func createSpecDiff(rootValue, baseValue, targetValue, outputValue string) (map[string]any, error) {
