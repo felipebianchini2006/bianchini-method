@@ -195,13 +195,16 @@ func sealScope(repo, change, source, draft string, pages int, extraction string)
 	if err != nil {
 		return nil, err
 	}
-	root, err := repositoryRoot(repo)
+	root, err := safeRoot(repo)
 	if err != nil {
-		return nil, scopeError("SCOPE_CHANGE_INVALID", "mudança não encontrada: "+change)
+		return nil, err
 	}
 	workspace := newMethodWorkspace(root)
 	state, err := workspace.readState()
 	if err != nil {
+		if _, statErr := os.Lstat(workspace.state); os.IsNotExist(statErr) {
+			return nil, fmt.Errorf("erro de entrada/IO: STATE.md ausente: %s", workspace.state)
+		}
 		return nil, err
 	}
 	active, ok := state["active_work"].(map[string]any)
@@ -271,13 +274,16 @@ func sealScope(repo, change, source, draft string, pages int, extraction string)
 }
 
 func verifyScope(repo, change, source string) (map[string]any, error) {
-	root, err := repositoryRoot(repo)
+	root, err := safeRoot(repo)
 	if err != nil {
-		return nil, scopeError("SCOPE_CHANGE_INVALID", "mudança não encontrada: "+change)
+		return nil, err
 	}
 	workspace := newMethodWorkspace(root)
 	state, err := workspace.readState()
 	if err != nil {
+		if _, statErr := os.Lstat(workspace.state); os.IsNotExist(statErr) {
+			return nil, fmt.Errorf("erro de entrada/IO: STATE.md ausente: %s", workspace.state)
+		}
 		return nil, err
 	}
 	directory, err := scopeDirectory(workspace, change)
