@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "skills" / "_shared" / "scripts"
+BM = ROOT / "skills" / "_shared" / "scripts" / "bm.py"
 sys.path.insert(0, str(SCRIPTS))
 
 import bm_spec_package  # noqa: E402
@@ -127,7 +128,9 @@ def task_result_payload(
     *,
     result: str = "Entrega comprovada",
     verification: list[str] | None = None,
+    package_digest: str,
 ) -> dict[str, object]:
+    identity = f"{change_id.split('-', 1)[0]}/{plan_id}/{task_value['id']}"
     return {
         "schema_version": 1,
         "change": change_id,
@@ -138,6 +141,9 @@ def task_result_payload(
         "result": result,
         "covers": task_value["covers"],
         "verification": verification or ["fixture verification"],
+        "pack_identity": identity,
+        "pack_digest": stable_digest({"fixture_pack": identity}),
+        "package_digest": package_digest,
         "completed_at": "2026-09-01T12:30:00+00:00",
     }
 
@@ -150,6 +156,7 @@ def write_task_result(
     result: str = "Entrega comprovada",
     verification: list[str] | None = None,
 ) -> None:
+    package_digest = str(read_payload(change / "COHERENCE.md")["digest"])
     destination = (
         change
         / "results/tasks"
@@ -165,6 +172,7 @@ def write_task_result(
                 task_value,
                 result=result,
                 verification=verification,
+                package_digest=package_digest,
             ),
             str(task_value["id"]),
         ),
@@ -471,7 +479,7 @@ class NextWaveScenarios(unittest.TestCase):
             )
             self.assertEqual(
                 first["eligible_wave"],
-                ["C001/P01/T01", "C001/P01/T02", "C001/P02/T01"],
+                ["C001/P01/T01", "C001/P01/T02"],
             )
             self.assertEqual(
                 [item["pack_identity"] for item in first["parallel_units"]],
@@ -500,6 +508,11 @@ class NextWaveScenarios(unittest.TestCase):
                     {
                         "identity": "C001/P01/T03",
                         "reason": "task_dependencies_pending",
+                        "pending": ["C001/P01/T01"],
+                    },
+                    {
+                        "identity": "C001/P02/T01",
+                        "reason": "resource_overlap",
                         "pending": ["C001/P01/T01"],
                     },
                     {
@@ -533,6 +546,114 @@ class NextWaveScenarios(unittest.TestCase):
             self.assertEqual(t03["dependencies_satisfied"], ["C001/P01/T01"])
             self.assertIn("C001/P01/T01", projected["completed_units"])
 
+    def test_public_task_completion_verifies_pack_and_advances_wave(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root, change = self.make_repo(Path(temp))
+            wrong_pack_process = subprocess.run(
+                [
+                    "python3",
+                    str(BM),
+                    "context",
+                    "pack",
+                    "--repo",
+                    str(root),
+                    "--unit",
+                    "C001/P01/T02",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(wrong_pack_process.returncode, 0, wrong_pack_process.stderr)
+            wrong_pack = json.loads(wrong_pack_process.stdout)
+            wrong_completion = subprocess.run(
+                [
+                    "python3",
+                    str(BM),
+                    "plan",
+                    "complete",
+                    "--repo",
+                    str(root),
+                    "--change",
+                    "C001",
+                    "--plan",
+                    "P01",
+                    "--task",
+                    "T01",
+                    "--context-pack",
+                    str(root / wrong_pack["path"]),
+                    "--result",
+                    "resultado indevidamente associado",
+                    "--verification",
+                    "evidência incompatível",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(wrong_completion.returncode, 0)
+            self.assertIn("STALE_EVIDENCE", wrong_completion.stderr)
+            self.assertFalse((change / "results/tasks/P01/T01.md").exists())
+            packed = subprocess.run(
+                [
+                    "python3",
+                    str(BM),
+                    "context",
+                    "pack",
+                    "--repo",
+                    str(root),
+                    "--unit",
+                    "C001/P01/T01",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(packed.returncode, 0, packed.stderr)
+            pack = json.loads(packed.stdout)
+
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(BM),
+                    "plan",
+                    "complete",
+                    "--repo",
+                    str(root),
+                    "--change",
+                    "C001",
+                    "--plan",
+                    "P01",
+                    "--task",
+                    "T01",
+                    "--context-pack",
+                    str(root / pack["path"]),
+                    "--result",
+                    "Tarefa comprovada pelo contrato público",
+                    "--verification",
+                    "python3 -m unittest tests.test_t01",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            payload = json.loads(completed.stdout)
+            self.assertEqual(payload["pack_identity"], "C001/P01/T01")
+            self.assertEqual(payload["pack_digest"], pack["digest"])
+            task_result = read_payload(change / "results/tasks/P01/T01.md")
+            self.assertEqual(task_result["package_digest"], payload["package_digest"])
+
+            projected = next_wave(root, "C001")
+            self.assertEqual(
+                projected["eligible_wave"],
+                ["C001/P01/T02", "C001/P01/T03", "C001/P02/T01"],
+            )
+
     def test_completed_plan_unlocks_dependent_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root, change = self.make_repo(Path(temp))
@@ -544,14 +665,15 @@ class NextWaveScenarios(unittest.TestCase):
 
             projected = next_wave(root, "C001")
             self.assertEqual(
-                projected["eligible_wave"], ["C001/P02/T01", "C001/P03/T01"]
+                projected["eligible_wave"], ["C001/P02/T01"]
             )
             p03 = next(
                 item
-                for item in projected["parallel_units"]
+                for item in projected["waiting_units"]
                 if item["identity"] == "C001/P03/T01"
             )
-            self.assertEqual(p03["dependencies_satisfied"], ["C001/P01"])
+            self.assertEqual(p03["reason"], "resource_overlap")
+            self.assertEqual(p03["pending"], ["C001/P02/T01"])
 
     def test_any_approved_artifact_or_spec_digest_drift_fails_closed(self) -> None:
         drift_targets = [

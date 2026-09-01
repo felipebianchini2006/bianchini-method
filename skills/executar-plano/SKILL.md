@@ -144,7 +144,17 @@ bm.py impact analyze --repo <repo> --change C001 --plan P01 \
 
 5. marcar somente consumidores realmente atingidos como `stale`;
 6. repetir jornadas e gates apontados pelo impacto;
-7. materializar o delta real em JSON e executar:
+7. ao concluir cada tarefa schema 2, registrar o resultado com o context pack
+   verificado usado por ela:
+
+```bash
+bm.py plan complete --repo <repo> --change C001 --plan P01 --task T01 \
+  --context-pack .bianchini/.runtime/context/C001-P01-T01.json \
+  --result "<resultado da tarefa>" \
+  --verification "<evidência da tarefa>"
+```
+
+8. depois de todas as tarefas, materializar o delta real em JSON e executar:
 
 ```bash
 bm.py plan complete --repo <repo> --change C001 --plan P01 \
@@ -155,9 +165,12 @@ bm.py plan complete --repo <repo> --change C001 --plan P01 \
   --completed-task T02
 ```
 
-Repita `--completed-task` para todos os `Txx`, na ordem aprovada. O CLI rejeita tarefa ausente, desconhecida ou reordenada e revalida o pacote completo antes de aceitar a conclusão.
+`--completed-task` permanece aceito para compatibilidade e, quando informado,
+deve listar todos os `Txx` na ordem aprovada. O CLI exige os resultados próprios
+das tarefas, vinculados a `pack_identity`, `pack_digest` e `package_digest`, e
+revalida o pacote completo antes de aceitar a conclusão do plano.
 
-8. confirmar o resultado em `.bianchini/changes/Cxxx-*/results/` e o `STATE.md` atualizado.
+9. confirmar o resultado em `.bianchini/changes/Cxxx-*/results/` e o `STATE.md` atualizado.
 
 `not_run`, flake aberto, evidência obsoleta ou dependência indispensável mantém o plano bloqueado. Uma mudança interna sem contrato/dado/invariante não invalida planos futuros.
 

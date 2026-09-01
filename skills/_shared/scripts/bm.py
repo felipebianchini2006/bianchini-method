@@ -4006,7 +4006,9 @@ def parser() -> argparse.ArgumentParser:
     plan_result.add_argument("--repo", type=Path, default=Path.cwd())
     plan_result.add_argument("--change", required=True)
     plan_result.add_argument("--plan", required=True)
-    plan_result.add_argument("--actual-delta", type=Path, required=True)
+    plan_result.add_argument("--task")
+    plan_result.add_argument("--context-pack", type=Path)
+    plan_result.add_argument("--actual-delta", type=Path)
     plan_result.add_argument("--result", required=True)
     plan_result.add_argument("--verification", action="append", default=[])
     plan_result.add_argument("--completed-task", action="append", default=[])
@@ -4393,17 +4395,40 @@ def main() -> int:
                 )
             )
         elif args.command == "plan":
-            emit(
-                v04_planning.plan_complete(
-                    args.repo,
-                    args.change,
-                    args.plan,
-                    actual_delta=args.actual_delta,
-                    result=args.result,
-                    verification=args.verification,
-                    completed_tasks=args.completed_task,
+            if args.task:
+                if not args.context_pack:
+                    raise BMError("plan complete --task exige --context-pack")
+                if args.actual_delta or args.completed_task:
+                    raise BMError(
+                        "plan complete --task não aceita --actual-delta ou --completed-task"
+                    )
+                emit(
+                    v04_planning.task_complete(
+                        args.repo,
+                        args.change,
+                        args.plan,
+                        args.task,
+                        context_pack=args.context_pack,
+                        result=args.result,
+                        verification=args.verification,
+                    )
                 )
-            )
+            else:
+                if not args.actual_delta:
+                    raise BMError("plan complete exige --actual-delta")
+                if args.context_pack:
+                    raise BMError("plan complete sem --task não aceita --context-pack")
+                emit(
+                    v04_planning.plan_complete(
+                        args.repo,
+                        args.change,
+                        args.plan,
+                        actual_delta=args.actual_delta,
+                        result=args.result,
+                        verification=args.verification,
+                        completed_tasks=args.completed_task,
+                    )
+                )
         elif args.command == "context":
             if args.action == "pack":
                 if not args.unit:

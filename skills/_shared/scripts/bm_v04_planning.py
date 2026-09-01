@@ -24,6 +24,7 @@ from bm_coherence import (
 from bm_project_model import PlanContract, ProjectModel, read_frontmatter
 import bm_scope
 import bm_close
+import bm_context
 import bm_spec_package
 from bm_workspace import MethodWorkspace
 
@@ -1035,6 +1036,199 @@ def _result_payloads(directory: Path) -> dict[str, dict[str, Any]]:
     return results
 
 
+TASK_RESULT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "change",
+        "plan",
+        "task",
+        "status",
+        "expected_result",
+        "result",
+        "covers",
+        "verification",
+        "pack_identity",
+        "pack_digest",
+        "package_digest",
+        "completed_at",
+    }
+)
+
+
+def _task_result_payloads(
+    workspace: MethodWorkspace,
+    directory: Path,
+    plan: PlanContract,
+    package_digest: str,
+) -> dict[str, dict[str, Any]]:
+    task_directory = directory / "results" / "tasks" / plan.id
+    workspace.resolve(task_directory)
+    if not task_directory.exists():
+        return {}
+    if task_directory.is_symlink() or not task_directory.is_dir():
+        raise PlanningError("MODEL_MISMATCH", f"resultados de {plan.id} são inseguros")
+    known = {task.id: task for task in plan.tasks}
+    results: dict[str, dict[str, Any]] = {}
+    change_prefix = directory.name.split("-", 1)[0]
+    for path in sorted(task_directory.iterdir(), key=lambda candidate: candidate.name):
+        if path.is_symlink() or not path.is_file() or not re.fullmatch(r"T\d{2,}\.md", path.name):
+            raise PlanningError(
+                "MODEL_MISMATCH", f"resultado de tarefa inválido: {path.name}"
+            )
+        task_id = path.stem
+        task = known.get(task_id)
+        if task is None or task_id in results:
+            raise PlanningError(
+                "MODEL_MISMATCH", f"resultado pertence a tarefa desconhecida: {task_id}"
+            )
+        try:
+            value = read_frontmatter(path)
+        except ValueError as error:
+            raise PlanningError("DOCVIVA_INCOMPLETE", str(error)) from error
+        identity = f"{change_prefix}/{plan.id}/{task_id}"
+        if (
+            set(value) != TASK_RESULT_FIELDS
+            or value.get("schema_version") != 1
+            or value.get("change") != directory.name
+            or value.get("plan") != plan.id
+            or value.get("task") != task_id
+            or value.get("status") != "completed"
+            or value.get("expected_result") != task.result
+            or value.get("covers") != list(task.covers)
+            or value.get("pack_identity") != identity
+            or value.get("package_digest") != package_digest
+            or not isinstance(value.get("result"), str)
+            or not value["result"].strip()
+            or not isinstance(value.get("completed_at"), str)
+            or not value["completed_at"].strip()
+            or not isinstance(value.get("pack_digest"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", value["pack_digest"])
+            or not isinstance(value.get("verification"), list)
+            or not value["verification"]
+            or not all(
+                isinstance(item, str) and item.strip()
+                for item in value["verification"]
+            )
+        ):
+            raise PlanningError(
+                "DOCVIVA_INCOMPLETE", f"resultado inválido de {identity}"
+            )
+        results[task_id] = value
+    return results
+
+
+def task_complete(
+    repo: Path,
+    change: str,
+    plan_id: str,
+    task_id: str,
+    *,
+    context_pack: Path,
+    result: str,
+    verification: Iterable[str],
+) -> dict[str, Any]:
+    """Registra uma tarefa executada a partir do pack explícito e vigente."""
+
+    workspace, directory, _current, _expected, plans = _load_package(repo, change)
+    coherence = read_frontmatter(directory / "COHERENCE.md")
+    if coherence.get("status") not in {"approved", "approved_with_stale"}:
+        raise PlanningError("COHERENCE_ERROR", "tarefa exige pacote global aprovado")
+    _assert_approved_package_current(
+        workspace, directory, _current, _expected, plans, coherence
+    )
+    if plan_id in coherence.get("stale_plans", []):
+        raise PlanningError("IMPACT_STALE", f"{plan_id} está stale")
+    plan = _plan_by_id(plans, plan_id)
+    if plan.schema_version != 2:
+        raise PlanningError(
+            "MODEL_MISMATCH", "resultado por tarefa exige plano schema 2"
+        )
+    matches = [task for task in plan.tasks if task.id == task_id]
+    if len(matches) != 1:
+        raise PlanningError("MODEL_MISMATCH", f"tarefa desconhecida: {plan_id}/{task_id}")
+    task = matches[0]
+    package_digest = coherence.get("digest")
+    if not isinstance(package_digest, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", package_digest
+    ):
+        raise PlanningError("STALE_EVIDENCE", "pacote aprovado possui digest inválido")
+    plan_results = _result_payloads(directory)
+    missing_plans = [dependency for dependency in plan.depends_on if dependency not in plan_results]
+    if missing_plans:
+        raise PlanningError(
+            "MISSING_PROVIDER",
+            "dependências ainda não concluídas: " + ", ".join(missing_plans),
+        )
+    task_results = _task_result_payloads(workspace, directory, plan, package_digest)
+    if task_id in task_results:
+        raise PlanningError("COHERENCE_ERROR", f"{plan_id}/{task_id} já foi concluída")
+    missing_tasks = [dependency for dependency in task.depends_on if dependency not in task_results]
+    if missing_tasks:
+        raise PlanningError(
+            "MISSING_PROVIDER",
+            "tarefas ainda não concluídas: " + ", ".join(missing_tasks),
+        )
+    try:
+        pack = bm_context.verify_context_pack(workspace.root, context_pack)
+    except bm_context.ContextPackError as error:
+        raise PlanningError(error.code, str(error).split(": ", 1)[-1]) from error
+    identity = f"{directory.name.split('-', 1)[0]}/{plan.id}/{task.id}"
+    if pack.get("unit") != identity:
+        raise PlanningError(
+            "STALE_EVIDENCE", f"context pack pertence a {pack.get('unit')}, não a {identity}"
+        )
+    summary = result.strip()
+    evidence = [item.strip() for item in verification if item.strip()]
+    if not summary:
+        raise PlanningError("DOCVIVA_INCOMPLETE", "conclusão da tarefa exige resultado")
+    if not evidence:
+        raise PlanningError("STALE_EVIDENCE", "conclusão da tarefa exige verificação")
+    completed_at = _now()
+    payload = {
+        "schema_version": 1,
+        "change": directory.name,
+        "plan": plan.id,
+        "task": task.id,
+        "status": "completed",
+        "expected_result": task.result,
+        "result": summary,
+        "covers": list(task.covers),
+        "verification": evidence,
+        "pack_identity": identity,
+        "pack_digest": pack["digest"],
+        "package_digest": package_digest,
+        "completed_at": completed_at,
+    }
+    workspace.atomic_write(
+        directory / "results" / "tasks" / plan.id / f"{task.id}.md",
+        _document(payload, f"# Resultado {plan.id}/{task.id}\n\n{summary}"),
+    )
+    state = workspace.read_state()
+    state.update(
+        {
+            "current_unit": None,
+            "status": "approved",
+            "blockers": [],
+            "next_action": f"Consultar a próxima onda de {directory.name}.",
+            "digest": package_digest,
+            "updated_at": _now(),
+        }
+    )
+    active = state.get("active_work")
+    if isinstance(active, dict):
+        active["status"] = "approved"
+    workspace.write_state(state)
+    return {
+        "change": directory.name,
+        "plan": plan.id,
+        "task": task.id,
+        "status": "completed",
+        "pack_identity": identity,
+        "pack_digest": pack["digest"],
+        "package_digest": package_digest,
+    }
+
+
 def _effective_model(
     current: ProjectModel,
     plans: Iterable[PlanContract],
@@ -1082,9 +1276,32 @@ def plan_complete(
     completed_task_ids = list(
         dict.fromkeys(value.strip() for value in completed_tasks if value.strip())
     )
+    managed_task_results = (
+        plan.schema_version == 2
+        and coherence.get("schema_version") == 2
+        and coherence.get("spec_contract") == SPEC_CONTRACT_VERSION
+    )
     if plan.schema_version == 2:
         expected_tasks = [task.id for task in plan.tasks]
-        if completed_task_ids != expected_tasks:
+        if managed_task_results:
+            task_results = _task_result_payloads(
+                workspace, directory, plan, str(coherence.get("digest"))
+            )
+            recorded_tasks = [
+                task_id for task_id in expected_tasks if task_id in task_results
+            ]
+            if recorded_tasks != expected_tasks:
+                missing = [task for task in expected_tasks if task not in recorded_tasks]
+                raise PlanningError(
+                    "DOCVIVA_INCOMPLETE",
+                    "conclusão exige resultados próprios para todas as tarefas (ausentes: "
+                    + ", ".join(missing)
+                    + ")",
+                )
+        if (
+            (managed_task_results and completed_task_ids)
+            or not managed_task_results
+        ) and completed_task_ids != expected_tasks:
             missing = [task for task in expected_tasks if task not in completed_task_ids]
             unknown = [task for task in completed_task_ids if task not in expected_tasks]
             details = []
@@ -1100,6 +1317,7 @@ def plan_complete(
                 + "; ".join(details)
                 + ")",
             )
+        completed_task_ids = expected_tasks
     results = _result_payloads(directory)
     if plan_id in results:
         raise PlanningError("COHERENCE_ERROR", f"{plan_id} já possui resultado")
@@ -1160,7 +1378,7 @@ def plan_complete(
         },
         "completed_at": completed_at,
     }
-    if plan.schema_version == 2:
+    if plan.schema_version == 2 and not managed_task_results:
         for task in plan.tasks:
             task_payload = {
                 "schema_version": 1,

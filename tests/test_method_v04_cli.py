@@ -800,6 +800,34 @@ class MethodV04Scenarios(unittest.TestCase):
             )
             self.assertNotEqual(incomplete.returncode, 0)
             self.assertIn("DOCVIVA_INCOMPLETE", incomplete.stderr)
+            for task_id in ("T01", "T02"):
+                packed = cli_json(
+                    "context",
+                    "pack",
+                    "--repo",
+                    str(repo),
+                    "--unit",
+                    f"C001/P01/{task_id}",
+                )
+                task_completed = cli_json(
+                    "plan",
+                    "complete",
+                    "--repo",
+                    str(repo),
+                    "--change",
+                    change_id,
+                    "--plan",
+                    "P01",
+                    "--task",
+                    task_id,
+                    "--context-pack",
+                    str(repo / str(packed["path"])),
+                    "--result",
+                    f"{task_id} entregue",
+                    "--verification",
+                    f"test_{task_id.lower()} passou",
+                )
+                self.assertEqual(task_completed["pack_identity"], f"C001/P01/{task_id}")
             completed = cli_json(
                 "plan",
                 "complete",
@@ -1744,6 +1772,32 @@ class MethodV04Scenarios(unittest.TestCase):
             )
             actual_delta = base / "actual-delta.json"
             actual_delta.write_text(json.dumps(delta), encoding="utf-8")
+            packed = cli_json(
+                "context",
+                "pack",
+                "--repo",
+                str(repo),
+                "--unit",
+                "C001/P01/T01",
+            )
+            cli_json(
+                "plan",
+                "complete",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--plan",
+                "P01",
+                "--task",
+                "T01",
+                "--context-pack",
+                str(repo / str(packed["path"])),
+                "--result",
+                "Fatura entregue conforme contrato",
+                "--verification",
+                "test_invoice passou",
+            )
             completed = cli_json(
                 "plan",
                 "complete",

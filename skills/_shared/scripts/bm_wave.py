@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Any
 
 import bm_spec_package
@@ -49,6 +50,9 @@ TASK_RESULT_FIELDS = frozenset(
         "result",
         "covers",
         "verification",
+        "pack_identity",
+        "pack_digest",
+        "package_digest",
         "completed_at",
     }
 )
@@ -435,6 +439,7 @@ def _completed_results(
     root: Path,
     change: Path,
     plans: list[PlanContract],
+    package_digest: str,
 ) -> tuple[set[str], dict[str, set[str]]]:
     known_plans = {plan.id: plan for plan in plans}
     completed_plans: set[str] = set()
@@ -479,6 +484,7 @@ def _completed_results(
                     change.name,
                     plan_dir.name,
                     known_tasks[child.stem],
+                    package_digest,
                 )
                 task_results[(plan_dir.name, child.stem)] = value
                 completed_tasks[plan_dir.name].add(child.stem)
@@ -497,14 +503,6 @@ def _completed_results(
                 "WAVE_INCOMPLETE",
                 f"resultado de {plan_id} não possui evidência das tarefas: {', '.join(missing)}",
             )
-        for task in contract.tasks:
-            task_result = task_results[(plan_id, task.id)]
-            for field in ("result", "verification", "completed_at"):
-                if task_result.get(field) != plan_result.get(field):
-                    _fail(
-                        "WAVE_INCOMPLETE",
-                        f"resultado de {plan_id}/{task.id} diverge do plano em {field}",
-                    )
     return completed_plans, completed_tasks
 
 
@@ -557,9 +555,14 @@ def _validate_plan_result(
 
 
 def _validate_task_result(
-    value: dict[str, Any], change_name: str, plan_id: str, task: Any
+    value: dict[str, Any],
+    change_name: str,
+    plan_id: str,
+    task: Any,
+    package_digest: str,
 ) -> None:
     identity = f"{plan_id}/{task.id}"
+    pack_identity = f"{change_name.split('-', 1)[0]}/{identity}"
     if set(value) != TASK_RESULT_FIELDS:
         _fail("WAVE_INCOMPLETE", f"resultado de {identity} possui shape não canônico")
     if (
@@ -571,12 +574,31 @@ def _validate_task_result(
         or value.get("status") != "completed"
         or value.get("expected_result") != task.result
         or value.get("covers") != list(task.covers)
+        or value.get("pack_identity") != pack_identity
+        or value.get("package_digest") != package_digest
+        or not isinstance(value.get("pack_digest"), str)
+        or not re.fullmatch(r"[0-9a-f]{64}", value["pack_digest"])
         or not _nonempty_text(value.get("result"))
         or not _nonempty_text(value.get("completed_at"))
     ):
         _fail("WAVE_INCOMPLETE", f"resultado inválido de {identity}")
     if not _evidence(value.get("verification")):
         _fail("WAVE_INCOMPLETE", f"resultado de {identity} não possui verificação")
+
+
+def _resource_conflicts(
+    selected: list[tuple[str, PurePosixPath]], files: tuple[str, ...]
+) -> list[str]:
+    conflicts: list[str] = []
+    for raw in files:
+        candidate = PurePosixPath(raw)
+        for identity, existing in selected:
+            left = candidate.parts
+            right = existing.parts
+            shared = min(len(left), len(right))
+            if left[:shared] == right[:shared] and identity not in conflicts:
+                conflicts.append(identity)
+    return conflicts
 
 
 def _blocking_findings(
@@ -656,7 +678,7 @@ def next_wave(repo: str | Path, change: str) -> dict[str, Any]:
         global_blockers = ["STATE_BLOCKED"]
 
     completed_plans, completed_tasks = _completed_results(
-        root, directory, plans
+        root, directory, plans, package_digest
     )
     if stale_plans & completed_plans:
         _fail("WAVE_INCOMPLETE", "plano concluído não pode permanecer stale")
@@ -668,6 +690,7 @@ def next_wave(repo: str | Path, change: str) -> dict[str, Any]:
     blocked_units: list[dict[str, Any]] = []
     waiting_units: list[dict[str, Any]] = []
     completed_units: list[str] = []
+    selected_resources: list[tuple[str, PurePosixPath]] = []
 
     for plan in plans:
         identities = _identities(change_prefix, plan)
@@ -773,6 +796,16 @@ def next_wave(repo: str | Path, change: str) -> dict[str, Any]:
                     }
                 )
                 continue
+            conflicts = _resource_conflicts(selected_resources, task.files)
+            if conflicts:
+                waiting_units.append(
+                    {
+                        "identity": identity,
+                        "reason": "resource_overlap",
+                        "pending": conflicts,
+                    }
+                )
+                continue
             parallel_units.append(
                 {
                     "identity": identity,
@@ -781,6 +814,9 @@ def next_wave(repo: str | Path, change: str) -> dict[str, Any]:
                     "pack_identity": identity,
                     "dependencies_satisfied": satisfied_plans + satisfied_tasks,
                 }
+            )
+            selected_resources.extend(
+                (identity, PurePosixPath(path)) for path in task.files
             )
 
     return {

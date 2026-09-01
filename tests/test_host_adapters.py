@@ -53,7 +53,9 @@ class HostAdapterScenarios(unittest.TestCase):
         codex = common_contract(render_adapter("codex"))
         self.assertEqual(generic, codex)
         self.assertIn("pack_identity", generic)
-        self.assertIn("contract_digest", generic)
+        self.assertIn("pack_digest", generic)
+        self.assertIn("package_digest", generic)
+        self.assertNotIn("contract_digest", generic)
 
     def test_codex_adds_smallest_diff_without_changing_common_contract(self) -> None:
         codex = render_adapter("codex")
