@@ -114,7 +114,7 @@
   "schema_version": 1,
   "source": {
     "contract": "contracts/cli-surfaces.json",
-    "contract_sha256": "436424b71608ecf87e75cf6d58e5f319717af7f46369ff4ee1846fce05540735",
+    "contract_sha256": "43d29ddac93fce939ba1c06d76c310dee8ea83ae7464abd7842c9f28f6fd093d",
     "oracle": "scripts/bm_python_oracle.py",
     "oracle_sha256": "315b24b3fe6b84e64b9ea7d37de28047006aae66580dbe469cdb6bac1dce8996"
   },
