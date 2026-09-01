@@ -60,6 +60,111 @@ EXIT_BLOCKED = 3
 EXIT_UNSAFE_WORKSPACE = 4
 
 
+class StableHelpFormatter(argparse.HelpFormatter):
+    """Mantém o wrapping público usado pelo Python 3.9."""
+
+    def _format_usage(
+        self,
+        usage: str | None,
+        actions: list[argparse.Action],
+        groups: list[Any],
+        prefix: str | None,
+    ) -> str:
+        if prefix is None:
+            prefix = "usage: "
+        if usage is not None:
+            rendered_usage = usage % {"prog": self._prog}
+        elif not actions:
+            rendered_usage = self._prog
+        else:
+            prog = self._prog
+            optionals = [action for action in actions if action.option_strings]
+            positionals = [action for action in actions if not action.option_strings]
+            format_actions = self._format_actions_usage
+            action_usage = format_actions(optionals + positionals, groups)
+            rendered_usage = " ".join(
+                item for item in (prog, action_usage) if item
+            )
+            text_width = self._width - self._current_indent
+            if len(prefix) + len(rendered_usage) > text_width:
+                part_pattern = r"\(.*?\)+(?=\s|$)|\[.*?\]+(?=\s|$)|\S+"
+                optional_usage = format_actions(optionals, groups)
+                positional_usage = format_actions(positionals, groups)
+                optional_parts = re.findall(part_pattern, optional_usage)
+                positional_parts = re.findall(part_pattern, positional_usage)
+                if " ".join(optional_parts) != optional_usage:
+                    raise AssertionError("uso opcional não pôde ser estabilizado")
+                if " ".join(positional_parts) != positional_usage:
+                    raise AssertionError("uso posicional não pôde ser estabilizado")
+
+                def wrapped_lines(
+                    parts: list[str], indent: str, first_prefix: str | None = None
+                ) -> list[str]:
+                    lines: list[str] = []
+                    line: list[str] = []
+                    line_length = (
+                        len(first_prefix) - 1
+                        if first_prefix is not None
+                        else len(indent) - 1
+                    )
+                    for part in parts:
+                        if line_length + 1 + len(part) > text_width and line:
+                            lines.append(indent + " ".join(line))
+                            line = []
+                            line_length = len(indent) - 1
+                        line.append(part)
+                        line_length += len(part) + 1
+                    if line:
+                        lines.append(indent + " ".join(line))
+                    if first_prefix is not None:
+                        lines[0] = lines[0][len(indent) :]
+                    return lines
+
+                if len(prefix) + len(prog) <= 0.75 * text_width:
+                    indent = " " * (len(prefix) + len(prog) + 1)
+                    if optional_parts:
+                        lines = wrapped_lines(
+                            [prog, *optional_parts], indent, prefix
+                        )
+                        lines.extend(wrapped_lines(positional_parts, indent))
+                    elif positional_parts:
+                        lines = wrapped_lines(
+                            [prog, *positional_parts], indent, prefix
+                        )
+                    else:
+                        lines = [prog]
+                else:
+                    indent = " " * len(prefix)
+                    lines = wrapped_lines(
+                        [*optional_parts, *positional_parts], indent
+                    )
+                    if len(lines) > 1:
+                        lines = wrapped_lines(optional_parts, indent)
+                        lines.extend(wrapped_lines(positional_parts, indent))
+                    lines = [prog, *lines]
+                rendered_usage = "\n".join(lines)
+        return f"{prefix}{rendered_usage}\n\n"
+
+
+class StableArgumentParser(argparse.ArgumentParser):
+    """Preserva mensagens públicas do argparse entre versões do Python."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("formatter_class", StableHelpFormatter)
+        super().__init__(*args, **kwargs)
+        self._positionals.title = "positional arguments"
+        self._optionals.title = "optional arguments"
+
+    def _check_value(self, action: argparse.Action, value: Any) -> None:
+        choices = action.choices
+        if choices is not None and value not in choices:
+            rendered = ", ".join(repr(choice) for choice in choices)
+            raise argparse.ArgumentError(
+                action,
+                f"invalid choice: {value!r} (choose from {rendered})",
+            )
+
+
 class BMError(Exception):
     def __init__(self, message: str, exit_code: int = EXIT_INVALID):
         super().__init__(message)
@@ -3950,7 +4055,7 @@ def direct_risk_from_args(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(prog="bm", description=__doc__)
+    result = StableArgumentParser(prog="bm", description=__doc__)
     commands = result.add_subparsers(dest="command", required=True)
 
     validate = commands.add_parser("validate-state")
@@ -4313,6 +4418,11 @@ def parser() -> argparse.ArgumentParser:
     summary.add_argument("state", type=Path)
     summary.add_argument("--root", type=Path)
     summary.add_argument("--format", choices=["json", "text"], default="json")
+    result.usage = (
+        "bm [-h]\n          {"
+        + ",".join(commands.choices)
+        + "}\n          ..."
+    )
     return result
 
 
