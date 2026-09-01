@@ -310,6 +310,12 @@ def _entry_signals(
         signals.append((3, f"model:webhook:{section}:{identifier}", "webhook"))
     if kinds & {"concurrency", "concurrent", "queue"}:
         signals.append((3, f"model:concurrency:{section}:{identifier}", "concurrency"))
+    if kinds & {"migration", "database_migration", "schema_migration", "destructive_migration"}:
+        signals.append((3, f"model:migration:{section}:{identifier}", "migration"))
+    if "destructive_migration" in kinds:
+        signals.append(
+            (5, f"model:destructive_migration:{identifier}", "irreversible")
+        )
     irreversible = (
         entry.get("irreversible") is True
         or entry.get("destructive") is True

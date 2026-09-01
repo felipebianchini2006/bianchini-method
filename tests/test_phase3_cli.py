@@ -200,6 +200,102 @@ class Phase3CliScenarios(unittest.TestCase):
                 checkpoint["risk"]["reasons"],
             )
 
+    def test_finish_reclassifies_structured_model_migration_without_route_redirect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            self.init_repo(repo)
+            self.json_bm("model", "init", "--repo", str(repo))
+            started = self.json_bm(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Ajustar modelo operacional",
+                "--scope",
+                "Mudança coesa no modelo atual",
+                "--acceptance",
+                "Migração estrutural fica explícita",
+                "--verification",
+                "python3 -m unittest",
+            )
+            quick = str(started["id"])
+            model_path = repo / ".bianchini/current/SYSTEM_MODEL.md"
+            model = json.loads(model_path.read_text(encoding="utf-8").split("---", 2)[1])
+            model["effects"] = [
+                {
+                    "id": "M001-drop-legacy",
+                    "kind": "destructive_migration",
+                    "destructive": True,
+                    "reversible": False,
+                }
+            ]
+            model_path.write_text(
+                "---\n"
+                + json.dumps(model, ensure_ascii=False, indent=2, sort_keys=True)
+                + "\n---\n# Modelo atual com migração\n",
+                encoding="utf-8",
+            )
+            guards = (
+                "official_docs",
+                "timeout_recovery",
+                "rollback",
+                "sandbox",
+                "backup_restore",
+                "migration_verify",
+                "human_checkpoint",
+            )
+            checkpoint = self.json_bm(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                quick,
+                "--checkpoint",
+                "Modelo e recuperação verificados",
+                "--next-action",
+                "Finalizar",
+                "--evidence",
+                "teste estrutural passou",
+                *(argument for guard in guards for argument in ("--guard", guard)),
+            )
+            self.assertEqual(checkpoint["risk"]["route"], "protected")
+            self.assertEqual(checkpoint["risk"]["workflow"], "quick")
+            self.assertIn(
+                "model:migration:effects:M001-drop-legacy",
+                checkpoint["risk"]["reasons"],
+            )
+            self.assertIn(
+                "model:destructive_migration:M001-drop-legacy",
+                checkpoint["risk"]["reasons"],
+            )
+
+            finished = self.json_bm(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                quick,
+                "--status",
+                "completed",
+                "--next-action",
+                "Concluído",
+                "--verification",
+                "teste estrutural passou",
+                "--docviva-kind",
+                "rule",
+                "--docviva-outcome",
+                "updated",
+                "--docviva-artifact",
+                ".bianchini/current/SYSTEM_MODEL.md",
+                "--docviva-justification",
+                "O modelo atual registra a migração e sua reversibilidade.",
+            )
+            self.assertEqual(finished["risk"]["route"], "protected")
+            self.assertTrue(finished["risk"]["reclassified"])
+
     def test_next_wave_is_public_read_only_projection(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo, _change = NextWaveScenarios().make_repo(Path(temp))

@@ -19,7 +19,7 @@ from typing import Any, Iterable
 
 import bm_docviva
 import bm_risk
-from bm_project_model import read_frontmatter
+from bm_project_model import ProjectModel, read_frontmatter
 from bm_workspace import MethodWorkspace
 
 
@@ -331,6 +331,12 @@ def quick_start(
         check=False,
     )
     base_head = head.stdout.strip() if head.returncode == 0 else "UNBORN"
+    try:
+        model_before = ProjectModel.from_system_model(
+            root / ".bianchini/current/SYSTEM_MODEL.md"
+        ).to_mapping()
+    except (OSError, UnicodeError, ValueError) as error:
+        raise WorkflowError("MODEL_MISMATCH", f"SYSTEM_MODEL atual: {error}") from error
     quick_id = MethodWorkspace(root).allocate_id("quick")
     slug = _slug(objective)
     work_id = f"{quick_id}-{slug}"
@@ -378,6 +384,7 @@ def quick_start(
         "docviva_before": bm_docviva.snapshot_docviva(root),
         "id": work_id,
         "base_head": base_head,
+        "model_before": model_before,
         "status": "active",
         "objective": objective,
         "scope": scope_text,
@@ -586,15 +593,25 @@ def _quick_final_risk(
         declared_paths.update(event.get("changed_files", []))
         available_guards.update(event.get("guards", []))
     try:
+        model_before = brief.get("model_before")
+        model_after = None
+        if model_before is not None:
+            model_after = ProjectModel.from_system_model(
+                root / ".bianchini/current/SYSTEM_MODEL.md"
+            ).to_mapping()
         risk = bm_risk.assess_quick_risk(
             int(initial.get("declared_score", initial.get("score", 0))),
             flags=inputs.get("flags", {}),
             declared_paths=declared_paths,
             diff_paths=_quick_diff_paths(root, brief.get("base_head")),
+            current_model=model_before,
+            expected_model=model_after,
             phase="finish",
         )
-    except bm_risk.RiskInputError as error:
-        raise WorkflowError(error.code, str(error).split(": ", 1)[-1]) from error
+    except (OSError, UnicodeError, ValueError, bm_risk.RiskInputError) as error:
+        if isinstance(error, bm_risk.RiskInputError):
+            raise WorkflowError(error.code, str(error).split(": ", 1)[-1]) from error
+        raise WorkflowError("MODEL_MISMATCH", f"SYSTEM_MODEL atual: {error}") from error
     initial_floor = int(initial.get("derived_floor", 0))
     initial_guards = set(initial.get("additional_guards", []))
     risk["start_floor"] = initial_floor
