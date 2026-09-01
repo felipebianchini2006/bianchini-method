@@ -86,6 +86,29 @@ func TestReleaseTargetsAreClosedAndDeduplicated(t *testing.T) {
 	}
 }
 
+func TestReleaseVersionMustMatchCompiledKernel(t *testing.T) {
+	if err := validateReleaseVersionContract("0.5.0", "0.5.0", "0.5.0"); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name       string
+		packaged   string
+		requested  string
+		kernel     string
+		wantDetail string
+	}{
+		{"package diverges", "0.4.9", "0.4.9", "0.5.0", "kernel version 0.5.0"},
+		{"requested diverges", "0.5.0", "0.4.9", "0.5.0", "release 0.4.9"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateReleaseVersionContract(test.packaged, test.requested, test.kernel)
+			if err == nil || !strings.Contains(err.Error(), test.wantDetail) {
+				t.Fatalf("err=%v", err)
+			}
+		})
+	}
+}
+
 func TestReleaseCommitMustResolveToCurrentHead(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {

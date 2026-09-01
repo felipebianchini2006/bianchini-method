@@ -277,7 +277,7 @@ Atualização é sempre explícita:
 ~/.codex/skills/_shared/bin/bm update-bm
 ```
 
-A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal. O updater `0.5.0` autentica manifesto, `SHA256SUMS`, tamanho e digest do archive antes da troca transacional com lock, journal e backup.
+A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal. O updater `0.5.0` valida identidade, manifesto, `SHA256SUMS`, tamanho e digest do archive antes da troca transacional com lock, journal e backup.
 
 Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem parte da interface `0.4`. Artefatos anteriores reconhecidos entram somente por `/migrar-bianchini` ou `bm migrate`.
 

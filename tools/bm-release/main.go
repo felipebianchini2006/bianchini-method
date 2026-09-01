@@ -19,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/felipebianchini2006/bianchini-method/internal/gokernel"
 )
 
 var releaseTargets = []string{
@@ -83,8 +85,8 @@ func run() error {
 	if !semanticReleaseVersion(resolvedVersion) {
 		return fmt.Errorf("invalid release version: %s", resolvedVersion)
 	}
-	if packagedVersion != resolvedVersion {
-		return fmt.Errorf("skills version %s differs from release %s", packagedVersion, resolvedVersion)
+	if err := validateReleaseVersionContract(packagedVersion, resolvedVersion, gokernel.Version); err != nil {
+		return err
 	}
 	epoch, err := releaseEpoch(root, resolvedCommit)
 	if err != nil {
@@ -156,6 +158,16 @@ func run() error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(manifest)
+}
+
+func validateReleaseVersionContract(packagedVersion, releaseVersion, kernelVersion string) error {
+	if packagedVersion != releaseVersion {
+		return fmt.Errorf("skills version %s differs from release %s", packagedVersion, releaseVersion)
+	}
+	if kernelVersion != releaseVersion {
+		return fmt.Errorf("kernel version %s differs from release %s", kernelVersion, releaseVersion)
+	}
+	return nil
 }
 
 func parseReleaseTargets(value string) ([]string, error) {
@@ -384,7 +396,7 @@ func addTrackedReleaseTree(writer *tar.Writer, root, packageRoot string, epoch t
 }
 
 func writeTarDirectory(writer *tar.Writer, name string, epoch time.Time) error {
-	header := &tar.Header{Name: strings.TrimSuffix(name, "/") + "/", Typeflag: tar.TypeDir, Mode: 0o755, ModTime: epoch, AccessTime: epoch, ChangeTime: epoch, Uid: 0, Gid: 0}
+	header := &tar.Header{Name: strings.TrimSuffix(name, "/"), Typeflag: tar.TypeDir, Mode: 0o755, ModTime: epoch, AccessTime: epoch, ChangeTime: epoch, Uid: 0, Gid: 0}
 	return writer.WriteHeader(header)
 }
 
