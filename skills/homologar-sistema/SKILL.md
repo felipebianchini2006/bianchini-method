@@ -7,7 +7,7 @@ description: Use para homologar explicitamente o release candidate ligado a uma 
 
 **Anuncie:** "Homologando RC <id> no sistema real."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py).
+Resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py). O CLI e o pack do RC fornecem o contrato operacional necessário.
 
 ## Princípio obrigatório
 
@@ -24,8 +24,9 @@ Automação reduz repetição, mas não elimina o passe real. Um E2E pode servir
 
 1. Ler `.bianchini/STATE.md` e executar `bm.py model validate --repo <repo>`.
 2. Confirmar mudança, planos e resultados concluídos, além do fingerprint completo do RC: `id`, `revision`, `build`, `checksum`.
-3. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
-4. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
+3. Compilar `bm.py context pack --repo <repo> --unit RC:<fingerprint>` e usar somente suas referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a homologação; não montar contexto manual.
+4. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
+5. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
 
 Não homologar árvore fonte quando a entrega é outro artefato. Se uma plataforma com interface não puder ser iniciada e operada, registrar `not_run` e declarar `BLOQUEADO`; nunca inferir aprovação pelo código.
 

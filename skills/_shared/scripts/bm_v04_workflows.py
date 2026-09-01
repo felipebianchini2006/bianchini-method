@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+import bm_docviva
 from bm_project_model import read_frontmatter
 from bm_workspace import MethodWorkspace
 
@@ -363,6 +364,8 @@ def quick_start(
     missing = sorted(required - set(guards))
     brief = {
         "schema_version": 1,
+        "docviva_contract": 1,
+        "docviva_before": bm_docviva.snapshot_docviva(root),
         "id": work_id,
         "status": "active",
         "objective": objective,
@@ -494,6 +497,10 @@ def quick_finish(
     next_action: str,
     blockers: list[str],
     production_authorized: bool,
+    docviva_kind: str | None = None,
+    docviva_outcome: str | None = None,
+    docviva_artifacts: Iterable[str] = (),
+    docviva_justification: str | None = None,
 ) -> dict[str, Any]:
     root = _repo_root(repo)
     directory = _quick_directory(root, work_id)
@@ -502,6 +509,7 @@ def quick_finish(
     if (directory / "RESULT.md").is_file():
         raise WorkflowError("ORDER_VIOLATION", "quick terminal é imutável")
     brief = _read_frontmatter(directory / "BRIEF.md", "brief do quick")
+    docviva: dict[str, Any] | None = None
     if status == "completed":
         stored_digest = brief.get("digest")
         unsigned = {key: value for key, value in brief.items() if key != "digest"}
@@ -533,6 +541,23 @@ def quick_finish(
             raise WorkflowError(
                 "STALE_EVIDENCE", "código mudou após o último checkpoint"
             )
+        if brief.get("docviva_contract") == 1:
+            if not docviva_kind or not docviva_outcome:
+                raise WorkflowError(
+                    "DOCVIVA_INCOMPLETE",
+                    "quick concluído exige classificação DocViva explícita",
+                )
+            try:
+                docviva = bm_docviva.verify_docviva_impact(
+                    root,
+                    brief.get("docviva_before", {}),
+                    {"kind": docviva_kind, "outcome": docviva_outcome},
+                    docviva_artifacts,
+                    docviva_justification or "",
+                    required=docviva_kind in bm_docviva.REQUIRED_KINDS,
+                )
+            except bm_docviva.DocVivaError as error:
+                raise WorkflowError(error.code, str(error).split(": ", 1)[-1]) from error
     elif not blockers:
         raise WorkflowError("MODEL_MISMATCH", "quick bloqueado exige motivo")
     result = {
@@ -544,6 +569,7 @@ def quick_finish(
         "limitations": limitations,
         "blockers": blockers,
         "production_authorized": production_authorized,
+        "docviva": docviva,
         "fingerprint": _tree_fingerprint(root),
         "finished_at": _now(),
     }
@@ -560,7 +586,12 @@ def quick_finish(
         last_completed={"kind": "quick", "id": work_id, "status": status},
         next_action=next_action,
     )
-    return {"id": work_id, "status": status, "path": str(directory / "RESULT.md")}
+    return {
+        "id": work_id,
+        "status": status,
+        "path": str(directory / "RESULT.md"),
+        "docviva": docviva,
+    }
 
 
 DEBUG_TRANSITIONS = {
@@ -676,6 +707,8 @@ def debug_start(
     debug_id = f"{base_id}-{_slug(objective)}"
     value = {
         "schema_version": 1,
+        "docviva_contract": 1,
+        "docviva_before": bm_docviva.snapshot_docviva(root),
         "id": debug_id,
         "status": "active",
         "stage": "intake",
@@ -848,7 +881,14 @@ def debug_status(repo: Path, debug_id: str | None = None) -> dict[str, Any]:
 
 
 def debug_finish(
-    repo: Path, debug_id: str, status: str = "resolved", reason: str | None = None
+    repo: Path,
+    debug_id: str,
+    status: str = "resolved",
+    reason: str | None = None,
+    docviva_kind: str | None = None,
+    docviva_outcome: str | None = None,
+    docviva_artifacts: Iterable[str] = (),
+    docviva_justification: str | None = None,
 ) -> dict[str, Any]:
     root = _repo_root(repo)
     if status not in TERMINAL_DEBUG:
@@ -857,6 +897,7 @@ def debug_finish(
     value = _read_frontmatter(source, "debug ativo")
     if status == "resolved" and value.get("stage") != "documented":
         raise WorkflowError("ORDER_VIOLATION", "debug resolvido exige RED, GREEN, regressão e documentação")
+    docviva: dict[str, Any] | None = None
     if status == "resolved":
         events = value.get("events", [])
         last = events[-1] if isinstance(events, list) and events else None
@@ -870,10 +911,28 @@ def debug_finish(
             raise WorkflowError(
                 "DOCVIVA_INCOMPLETE", "debug não documenta: " + ", ".join(missing)
             )
+        if value.get("docviva_contract") == 1:
+            if not docviva_kind or not docviva_outcome:
+                raise WorkflowError(
+                    "DOCVIVA_INCOMPLETE",
+                    "debug resolvido exige classificação DocViva explícita",
+                )
+            try:
+                docviva = bm_docviva.verify_docviva_impact(
+                    root,
+                    value.get("docviva_before", {}),
+                    {"kind": docviva_kind, "outcome": docviva_outcome},
+                    docviva_artifacts,
+                    docviva_justification or "",
+                    required=docviva_kind in bm_docviva.REQUIRED_KINDS,
+                )
+            except bm_docviva.DocVivaError as error:
+                raise WorkflowError(error.code, str(error).split(": ", 1)[-1]) from error
     if status != "resolved" and not (reason or "").strip():
         raise WorkflowError("MODEL_MISMATCH", "debug bloqueado ou escalado exige motivo")
     value["status"] = status
     value["reason"] = reason
+    value["docviva"] = docviva
     value["finished_at"] = _now()
     target = _debug_path(root, debug_id, resolved=True)
     _atomic_write(source, _frontmatter(value, f"# Debug {debug_id}\n\n{value['objective']}"))
@@ -886,7 +945,13 @@ def debug_finish(
         last_completed={"kind": "debug", "id": debug_id, "status": status},
         next_action="Revisar o resultado do debug e seguir o trabalho registrado.",
     )
-    return {"id": debug_id, "status": status, "stage": value["stage"], "path": str(target)}
+    return {
+        "id": debug_id,
+        "status": status,
+        "stage": value["stage"],
+        "path": str(target),
+        "docviva": docviva,
+    }
 
 
 def _legacy_idle(root: Path) -> bool:

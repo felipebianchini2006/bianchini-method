@@ -7,7 +7,7 @@ description: Use para executar uma entrega coesa como quick normal ou protegido,
 
 **Anuncie:** "Classificando e executando este quick com Bianchini Method 0.4."
 
-Use somente por invocação explícita de `/executar-direto`. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Não acione outra metodologia. A escolha explícita deste fluxo é a decisão de roteamento: o quick nunca aciona `/sdd-planning`, independentemente do score, dos hazards ou da complexidade encontrada.
+Use somente por invocação explícita de `/executar-direto` e resolva `bm.py`. Não acione outra metodologia. A escolha explícita deste fluxo é a decisão de roteamento: o quick nunca aciona `/sdd-planning`, independentemente do score, dos hazards ou da complexidade encontrada.
 
 Planos, specs e decisões já existentes em `.bianchini/` são documentação e rastreio. Use-os como contexto confiável, sem exigir novo planejamento para executar a tarefa solicitada.
 
@@ -78,6 +78,14 @@ Execute `bm.py direct start` com objetivo, escopo, estado atual, aceite, verific
 ```
 
 O brief contém score, justificativas, modo, não objetivos, arquivos/interfaces prováveis, guards, comandos e digest. Retomada exige o mesmo digest; mudança de brief invalida evidências anteriores.
+
+Depois de iniciar ou localizar o quick, compile seu contexto operacional:
+
+```bash
+bm.py context pack --repo <repo> --unit Q012
+```
+
+Use o pack como fonte primária. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a execução; regenere o pack sem reler o contrato completo ou montar contexto manual.
 
 `STATE.md` aponta para o quick ativo sem copiar seu histórico. Branch principal suja, detached HEAD ou mudanças não reconhecidas bloqueiam. Use a branch segura criada/validada pelo CLI.
 

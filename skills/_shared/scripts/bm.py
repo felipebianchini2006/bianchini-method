@@ -22,10 +22,14 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 from bm_context import (
+    DEFAULT_MAX_BYTES,
+    ContextPackError,
     QUALITY_V2_UNIT_FIELDS,
+    compile_context_pack,
     hydrate_task_context,
     mutation_mode_for_change,
     validate_quality_v2_plan,
+    verify_context_pack,
 )
 from bm_feature_support import FIX_ROUNDS_BY_PROFILE
 from bm_mutation import mutation_evidence_verify
@@ -3971,6 +3975,14 @@ def parser() -> argparse.ArgumentParser:
     plan_result.add_argument("--verification", action="append", default=[])
     plan_result.add_argument("--completed-task", action="append", default=[])
 
+    context = commands.add_parser("context")
+    context.add_argument("action", choices=["pack", "verify"])
+    context.add_argument("--repo", type=Path, default=Path.cwd())
+    context.add_argument("--unit")
+    context.add_argument("--output", type=Path)
+    context.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
+    context.add_argument("--path", type=Path)
+
     debug = commands.add_parser("debug")
     debug.add_argument(
         "action", choices=["start", "list", "status", "resume", "checkpoint", "finish"]
@@ -4007,6 +4019,15 @@ def parser() -> argparse.ArgumentParser:
     debug.add_argument("--residual-risk")
     debug.add_argument("--status", choices=["resolved", "blocked", "escalated"])
     debug.add_argument("--reason")
+    debug.add_argument(
+        "--docviva-kind",
+        choices=["internal", "behavioral", "contract", "architecture", "rule"],
+    )
+    debug.add_argument(
+        "--docviva-outcome", choices=["updated", "not_applicable", "no_op"]
+    )
+    debug.add_argument("--docviva-artifact", action="append", default=[])
+    debug.add_argument("--docviva-justification")
 
     migrate = commands.add_parser("migrate")
     migrate.add_argument("action", choices=["check", "apply"])
@@ -4194,6 +4215,15 @@ def parser() -> argparse.ArgumentParser:
     direct.add_argument("--undefined-ownership", action="store_true")
     direct.add_argument("--ambiguous-financial-rule", action="store_true")
     direct.add_argument("--new-material-architecture", action="store_true")
+    direct.add_argument(
+        "--docviva-kind",
+        choices=["internal", "behavioral", "contract", "architecture", "rule"],
+    )
+    direct.add_argument(
+        "--docviva-outcome", choices=["updated", "not_applicable", "no_op"]
+    )
+    direct.add_argument("--docviva-artifact", action="append", default=[])
+    direct.add_argument("--docviva-justification")
 
     updater = commands.add_parser("update-bm")
     updater.add_argument("--check", action="store_true")
@@ -4301,6 +4331,22 @@ def main() -> int:
                     completed_tasks=args.completed_task,
                 )
             )
+        elif args.command == "context":
+            if args.action == "pack":
+                if not args.unit:
+                    raise BMError("context pack exige --unit")
+                emit(
+                    compile_context_pack(
+                        args.repo,
+                        args.unit,
+                        output=args.output,
+                        max_bytes=args.max_bytes,
+                    )
+                )
+            else:
+                if not args.path:
+                    raise BMError("context verify exige --path")
+                emit(verify_context_pack(args.repo, args.path))
         elif args.command == "migrate":
             if args.action == "check":
                 emit(v04.migration_check(args.repo))
@@ -4358,6 +4404,10 @@ def main() -> int:
                         args.id,
                         args.status or "resolved",
                         args.reason,
+                        args.docviva_kind,
+                        args.docviva_outcome,
+                        args.docviva_artifact,
+                        args.docviva_justification,
                     )
                 )
         elif args.command == "snapshot":
@@ -4575,6 +4625,10 @@ def main() -> int:
                         args.next_action,
                         args.blocker,
                         args.production_authorized,
+                        args.docviva_kind,
+                        args.docviva_outcome,
+                        args.docviva_artifact,
+                        args.docviva_justification,
                     )
                 )
             else:
@@ -4609,6 +4663,9 @@ def main() -> int:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
     except bm_scope.ScopeError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_BLOCKED
+    except ContextPackError as error:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
     except (OSError, UnicodeError, subprocess.SubprocessError, KeyError, TypeError, ValueError) as error:

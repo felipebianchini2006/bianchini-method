@@ -7,7 +7,7 @@ description: Use para ler `.bianchini/STATE.md` e resumir trabalho atual, coerê
 
 **Anuncie:** "Lendo o estado verificável do projeto."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Esta skill é somente leitura: não corrige estado, não executa trabalho e não cria artefato.
+Resolva `bm.py`. Esta skill não corrige estado nem executa trabalho; o único write permitido é o cache efêmero do pack em `.bianchini/.runtime/context/`.
 
 ## Fluxo
 
@@ -18,6 +18,7 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva 
 5. Se `active_work.kind` for `quick`, usar `bm.py direct status --repo <repo>` e abrir apenas `PROGRESS.md` quando necessário.
 6. Se for `debug`, usar `bm.py debug status --repo <repo> --id <Dxxx-do-estado>` e não abrir o caso completo sem pedido de detalhe.
 7. Se for `change`, consultar `COHERENCE.md` e o resultado do plano ativo somente para contar findings, impacto e gates.
+8. Quando houver unidade ativa, compilar `bm.py context pack --repo <repo> --unit <identidade>` e resumir somente o pack. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` é reportado sem fallback para leitura integral.
 
 ## Resposta compacta
 

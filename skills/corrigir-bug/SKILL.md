@@ -7,7 +7,7 @@ description: Use para diagnosticar e corrigir bugs com sessão persistente, hip�
 
 **Anuncie:** "Abrindo ou retomando um debug persistente no Bianchini Method 0.4."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`.
+Resolva `bm.py`. O CLI e o pack do caso fornecem o contrato operacional necessário.
 
 Princípio: nenhum fix antes de uma causa sustentada por evidência. Sintoma, correlação e componente onde a falha aparece não são automaticamente causa raiz.
 
@@ -26,6 +26,14 @@ bm.py debug resume --repo <repo> ...
 ```
 
 O CLI aloca `Dxxx` em `.bianchini/debug/active/` e atualiza `STATE.md` sem copiar o histórico do caso.
+
+Compile o contexto do caso antes da investigação:
+
+```bash
+bm.py context pack --repo <repo> --unit D004
+```
+
+Use o pack como fonte primária. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia o caso; regenere o pack sem reler o contrato completo ou criar fallback manual.
 
 Registre:
 

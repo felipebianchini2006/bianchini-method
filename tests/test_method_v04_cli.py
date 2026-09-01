@@ -1652,6 +1652,13 @@ class MethodV04Scenarios(unittest.TestCase):
             )
             self.assertEqual(completed["status"], "completed")
             self.assertTrue((change_root / "results/P01.md").is_file())
+            task_result = change_root / "results/tasks/P01/T01.md"
+            self.assertTrue(task_result.is_file())
+            task_payload = json.loads(
+                task_result.read_text(encoding="utf-8").split("---", 2)[1]
+            )
+            self.assertEqual(task_payload["task"], "T01")
+            self.assertEqual(task_payload["verification"], ["test_invoice passou"])
             git(repo, "add", ".")
             git(repo, "commit", "-m", "complete billing plan")
 
@@ -2004,6 +2011,11 @@ class MethodV04Scenarios(unittest.TestCase):
             quick_id = str(started["id"])
             self.assertEqual(started["risk"]["route"], "protected")
             self.assertTrue((repo / f".bianchini/quick/{quick_id}/BRIEF.md").is_file())
+            docviva_spec = repo / ".bianchini/current/specs/payment.md"
+            docviva_spec.write_text(
+                "# Pagamento\n\n## PAY-001: Confirmação idempotente\n",
+                encoding="utf-8",
+            )
 
             checkpoint = cli_json(
                 "direct",
@@ -2043,6 +2055,14 @@ class MethodV04Scenarios(unittest.TestCase):
                 "--verification",
                 "sandbox passou",
                 "--production-authorized",
+                "--docviva-kind",
+                "behavioral",
+                "--docviva-outcome",
+                "updated",
+                "--docviva-artifact",
+                ".bianchini/current/specs/payment.md",
+                "--docviva-justification",
+                "O contrato observável de pagamento foi atualizado.",
             )
             self.assertNotEqual(stale.returncode, 0)
             self.assertIn("STALE_EVIDENCE", stale.stderr)
@@ -2083,9 +2103,78 @@ class MethodV04Scenarios(unittest.TestCase):
                 "--verification",
                 "sandbox passou",
                 "--production-authorized",
+                "--docviva-kind",
+                "behavioral",
+                "--docviva-outcome",
+                "updated",
+                "--docviva-artifact",
+                ".bianchini/current/specs/payment.md",
+                "--docviva-justification",
+                "O contrato observável de pagamento foi atualizado.",
             )
             self.assertEqual(finished["status"], "completed")
+            self.assertEqual(finished["docviva"]["outcome"], "updated")
             self.assertTrue((repo / f".bianchini/quick/{quick_id}/RESULT.md").is_file())
+
+    def test_internal_quick_accepts_proven_docviva_not_applicable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            started = cli_json(
+                "direct",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Renomear variável interna",
+                "--scope",
+                "Refactor sem efeito observável",
+                "--acceptance",
+                "Testes existentes continuam verdes",
+                "--verification",
+                "python3 -m unittest",
+            )
+            quick_id = str(started["id"])
+            cli_json(
+                "direct",
+                "checkpoint",
+                "--repo",
+                str(repo),
+                "--slug",
+                quick_id,
+                "--checkpoint",
+                "Refactor verificado",
+                "--next-action",
+                "Finalizar",
+                "--command",
+                "python3 -m unittest",
+                "--evidence",
+                "suíte verde",
+            )
+
+            finished = cli_json(
+                "direct",
+                "finish",
+                "--repo",
+                str(repo),
+                "--slug",
+                quick_id,
+                "--status",
+                "completed",
+                "--next-action",
+                "Concluído",
+                "--verification",
+                "suíte verde",
+                "--docviva-kind",
+                "internal",
+                "--docviva-outcome",
+                "not_applicable",
+                "--docviva-justification",
+                "Somente nomes internos mudaram; comportamento e contratos ficaram iguais.",
+            )
+
+            self.assertEqual(finished["docviva"]["outcome"], "not_applicable")
 
     def test_webhook_quick_cannot_finish_without_authenticity_guard(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2286,11 +2375,30 @@ class MethodV04Scenarios(unittest.TestCase):
                 "nenhum risco conhecido no escopo testado",
             )
             self.assertEqual(documented["stage"], "documented")
+            debug_spec = repo / ".bianchini/current/specs/webhook.md"
+            debug_spec.write_text(
+                "# Webhook\n\n## WHK-001: Deduplicação por provider_event_id\n",
+                encoding="utf-8",
+            )
 
             finished = cli_json(
-                "debug", "finish", "--repo", str(repo), "--id", debug_id
+                "debug",
+                "finish",
+                "--repo",
+                str(repo),
+                "--id",
+                debug_id,
+                "--docviva-kind",
+                "behavioral",
+                "--docviva-outcome",
+                "updated",
+                "--docviva-artifact",
+                ".bianchini/current/specs/webhook.md",
+                "--docviva-justification",
+                "O contrato de deduplicação corrigido foi registrado.",
             )
             self.assertEqual(finished["status"], "resolved")
+            self.assertEqual(finished["docviva"]["outcome"], "updated")
             self.assertFalse((repo / f".bianchini/debug/active/{debug_id}.md").exists())
             self.assertTrue((repo / f".bianchini/debug/resolved/{debug_id}.md").is_file())
 

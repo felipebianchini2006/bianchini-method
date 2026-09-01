@@ -9,7 +9,7 @@ description: Use para executar planos aprovados do Bianchini Method 0.4 com work
 
 Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `/status-projeto`; executar todos somente quando o pedido atual for explícito.
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md) e resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py).
+Resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py) e use [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md) somente no gate aplicável. O CLI e o pack carregam o contrato operacional da unidade.
 
 ## 1. Preflight
 
@@ -42,7 +42,15 @@ Respeite `mise` e configuração equivalente. Instale/aquela dependência soment
 
 ## 3. Contexto mínimo e retomada
 
-Carregue somente:
+Compile o contexto da tarefa antes de editar:
+
+```bash
+bm.py context pack --repo <workspace> --unit C001/P01/T03
+```
+
+Valide o pack retornado e carregue somente suas fontes e referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a unidade; regenere o pack sem reler o contrato completo ou criar fallback manual.
+
+O pack seleciona:
 
 - índice atual;
 - plano ativo;

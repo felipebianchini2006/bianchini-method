@@ -45,6 +45,13 @@ PHASE1_SHARDS = (
     ("test_close_recovery", "CloseRecoveryScenarios"),
 )
 
+PHASE2_SHARDS = (
+    ("test_context_pack", "ContextPackScenarios"),
+    ("test_context_cli", "ContextCliScenarios"),
+    ("test_context_skill_adoption", "ContextSkillAdoptionScenarios"),
+    ("test_docviva", "DocVivaScenarios"),
+)
+
 SELF_UPDATE_SHARDS = (
     "SelfUpdateScenarios",
 )
@@ -94,6 +101,9 @@ def main() -> int:
     for module, shard in PHASE1_SHARDS:
         if run_shard(module, shard, environment) != 0:
             return 1
+    for module, shard in PHASE2_SHARDS:
+        if run_shard(module, shard, environment) != 0:
+            return 1
     for shard in SELF_UPDATE_SHARDS:
         if run_shard("test_self_update", shard, environment) != 0:
             return 1
@@ -109,6 +119,7 @@ def main() -> int:
         + len(CORE_04_SHARDS)
         + len(CONTRACT_SHARDS)
         + len(PHASE1_SHARDS)
+        + len(PHASE2_SHARDS)
         + len(SELF_UPDATE_SHARDS)
         + len(LINEAGE_SHARDS)
         + len(CODEX_SHARDS)

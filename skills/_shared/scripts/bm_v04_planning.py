@@ -1080,6 +1080,7 @@ def plan_complete(
         effective_after = effective_before.apply_delta(delta)
     except ValueError as error:
         raise PlanningError("MODEL_MISMATCH", str(error)) from error
+    completed_at = _now()
     payload = {
         "schema_version": 1,
         "change": directory.name,
@@ -1098,8 +1099,29 @@ def plan_complete(
             "stale_plans": [],
             "reason": "entrega equivalente ao delta aprovado",
         },
-        "completed_at": _now(),
+        "completed_at": completed_at,
     }
+    if plan.schema_version == 2:
+        for task in plan.tasks:
+            task_payload = {
+                "schema_version": 1,
+                "change": directory.name,
+                "plan": plan.id,
+                "task": task.id,
+                "status": "completed",
+                "expected_result": task.result,
+                "result": summary,
+                "covers": list(task.covers),
+                "verification": evidence,
+                "completed_at": completed_at,
+            }
+            workspace.atomic_write(
+                directory / "results" / "tasks" / plan.id / f"{task.id}.md",
+                _document(
+                    task_payload,
+                    f"# Resultado {plan.id}/{task.id}\n\n{summary}",
+                ),
+            )
     workspace.atomic_write(
         directory / "results" / f"{plan.id}.md",
         _document(payload, f"# Resultado {plan.id}\n\n{summary}"),
