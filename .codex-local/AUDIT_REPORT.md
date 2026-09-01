@@ -1,222 +1,22 @@
-# Auditoria independente — evolução sustentável 0.4.7 → 0.5
+# Relatório final — evolução sustentável 0.4.7 → 0.5
 
 Data: 2026-09-01
 
-Branch auditada: `dev/evolucao-sustentavel-0.4.7-0.5`
+Branch: `dev/evolucao-sustentavel-0.4.7-0.5`
 
-Base aprovada e `origin/main`: `7c9fa23f524623f3360ebae579048e1765095220`
+Base e `origin/main`: `7c9fa23f524623f3360ebae579048e1765095220`
 
-Head de código auditado: `b9b0b7cbb42d41ac3132c1c76df5e790b0a53379`
+Head funcional auditado: `ed2841c478dcbda3da2563d62d12110a38558b84`
 
-Plano lido integralmente: SHA-256 `aa170b8054c48a07f2787f7434575731f0302b9328cbae7e83998bd10ea2eacc`
-Veredito: **NEEDS_WORK**
+Head publicado: o commit administrativo deste relatório sucede o head funcional. Obtenha o valor exato com `git rev-parse origin/dev/evolucao-sustentavel-0.4.7-0.5`.
 
-> O commit deste relatório é administrativo e sucede o head de código auditado. O head publicado exato deve ser obtido com `git rev-parse HEAD` após o checkout da branch remota.
+Veredito: **BLOCKED** para a aceitação final. Os gates executáveis da implementação passaram e a auditoria não manteve finding conhecido `CRITICAL` ou `IMPORTANT`, mas o plano normativo obrigatório não está disponível para provar os gates das seções 14 e 17.
 
-## 1. Resultado executivo
+Não há alegação de “zero regressão”. O veredito cobre somente os contratos, testes, builds e medições descritos aqui.
 
-A implementação preserva o Python como backend oficial, mantém o Go como preview explícito e não realiza cutover inseguro. A suíte completa da branch terminou com `35 shards aprovados`. A baseline destacada em `origin/main` repetiu os `22 shards aprovados`. Os testes Go, race detector, vet, matriz de compilação e as 12 fixtures congeladas passam nas duas engines.
+## 1. Resultado
 
-O plano completo ainda não está concluído. Há três findings IMPORTANT abertos:
-
-1. a cobertura golden da interface pública não abrange todas as 58 superfícies registradas;
-2. o Go implementa somente 6 fatias declaradas de preview e não possui paridade integral;
-3. a jornada integrada obrigatória da seção 15 não está demonstrada de ponta a ponta em uma única execução controlada.
-
-Não foi encontrado finding CRITICAL. Os findings IMPORTANT locais que admitiam correção compatível e delimitada foram corrigidos com RED/GREEN e commits próprios. Os três restantes exigem completar trabalho material previsto no plano; eles impedem `PASS`, cutover e release.
-
-Não há alegação de “zero regressão”. A evidência se limita aos testes e medições registrados neste relatório.
-
-## 2. Preflight e isolamento
-
-- `origin/main`, base e merge-base coincidiam em `7c9fa23f524623f3360ebae579048e1765095220`.
-- A implementação ocorreu em worktree e branch dedicadas.
-- `main` não recebeu merge nem commit desta auditoria.
-- A branch não contém diff em `.planning/` contra `origin/main`.
-- Changes antigas não foram migradas.
-- Não houve release, publicação de binário ou cutover.
-- A comparação de baseline foi feita em worktree temporária destacada de `origin/main`.
-
-Comandos de confirmação:
-
-```bash
-git fetch origin --prune
-git rev-parse origin/main
-git merge-base origin/main HEAD
-git status --short --branch
-git diff --name-only origin/main...HEAD -- .planning
-```
-
-## 3. Matriz fase → commits → testes
-
-| Fase | Commits de implementação | Correções desta auditoria | Evidência de teste |
-|---|---|---|---|
-| 0 — contrato e baseline | `c5a85f9` | — | baseline destacada: `22 shards aprovados`; verificador do contrato válido; 12 fixtures Python verdes |
-| 1 — specs gerenciadas e close | `1b1bc17` | `50f0226` | `test_spec_package`, `test_close_recovery`, `test_method_v04_cli`; suíte final verde |
-| 2 — packs e DocViva | `c32cc4d` | `50f0226` também protege promoção seletiva | `test_context_pack`, `test_context_cli`, `test_context_skill_adoption`, `test_context_efficiency`, `test_docviva`; suíte final verde |
-| 3 — risco, ondas e adapters | `3c33650` | `2ea080a`, `2ad3299` | `test_risk_floor`, `test_next_wave`, `test_host_adapters`, `test_phase3_cli`; suíte final verde |
-| 4 — aprendizado governado | `98ae3e0` | `04e32d7` | `test_learning` e seleção de lições em `test_context_pack`; suíte final verde |
-| 5 — Go preview | `92898b6`, `d2e7394`, `e4fe380` | `b9b0b7c` | `go test ./...`, `go test -race ./...`, `go vet ./...`, `go mod verify`, 12 fixtures Go e matriz de build verdes |
-| Evidência de execução | `8de1295` | este relatório | revalidação independente completa descrita nas seções 7 a 11 |
-
-O agrupamento acima preserva a separação entre mudança funcional e linguagem. Não houve commit de cutover.
-
-## 4. Correções feitas durante a auditoria
-
-### `04e32d7` — aprendizado governado utilizável
-
-RED observado:
-
-- uma sessão debug real não conseguia indicar aprendizado ao terminar;
-- uma fonte Markdown comum causava `LEARNING_SOURCE_INVALID` em vez de ser ignorada como não candidata;
-- symlink sob a área controlada podia ser percorrido antes da rejeição da fonte.
-
-GREEN:
-
-- `debug finish` aceita indicação explícita e opcional de proposta;
-- a evidência nasce dos eventos debug persistidos;
-- somente fonte com frontmatter estruturado é candidata;
-- travessia segura rejeita symlink e variantes case-insensitive de `.planning`;
-- aprovação continua separada, humana, opt-in e ligada ao digest atual;
-- kernel, schemas, `METHOD_CONTRACT` e skills não são editados automaticamente.
-
-### `2ea080a` — ondas consumíveis e seguras
-
-RED observado:
-
-- tarefas com paths sobrepostos podiam aparecer na mesma onda;
-- o adapter orientava o host a fornecer um `contract_digest` que a interface pública não produzia;
-- faltava uma transição pública operacional que ligasse resultado, pack e conclusão da tarefa.
-
-GREEN:
-
-- conflito por path exato ou ancestral agora separa tarefas deterministicamente;
-- a saída informa `resource_overlap`;
-- adapters usam os digests realmente emitidos;
-- a transição usa a ação pública existente `plan complete --task ... --context-pack ...`;
-- resultado liga `pack_identity`, `pack_digest` e `package_digest`;
-- schema 1 mantém o comportamento legado;
-- decisões de host não foram incorporadas ao kernel.
-
-### `50f0226` — DocViva inalterada não é reescrita
-
-RED observado:
-
-- close com conteúdo idêntico alterava `mtime` de arquitetura/spec;
-- variantes case-insensitive de `.planning` nos paths de recuperação não falhavam como `PATH_UNSAFE`.
-
-GREEN:
-
-- escrita atômica vira no-op quando os bytes são iguais;
-- promoção da árvore de specs preserva bytes e `mtime` dos arquivos inalterados;
-- adição, alteração, remoção e modo de arquivos continuam promovidos;
-- os pontos de close/recovery aplicam a mesma regra case-insensitive de path safety.
-
-### `2ad3299` — piso de risco ligado ao drift atual
-
-RED observado:
-
-- uma quick iniciada como normal continuava normal mesmo após a DocViva atual ganhar migração destrutiva estruturada.
-
-GREEN:
-
-- a sessão guarda snapshot do modelo no início;
-- `finish` compara o modelo atual real;
-- sinais estruturados de `migration` e `destructive_migration` elevam o piso;
-- a rota pública continua `quick`; o resultado protegido não introduz redirecionamento obrigatório para SDD.
-
-### `b9b0b7c` — licença da dependência Go
-
-RED observado:
-
-- `golang.org/x/text v0.23.0` estava pinado, porém sem o texto de licença exigido pelo plano.
-
-GREEN:
-
-- `THIRD_PARTY_NOTICES.md` contém o aviso BSD 3-Clause da dependência;
-- teste reconcilia módulos externos declarados com os notices.
-
-## 5. Findings abertos
-
-### IMPORTANT-001 — cobertura golden incompleta da superfície pública
-
-Evidência:
-
-- `contracts/cli-surfaces.json` registra 58 superfícies;
-- as 58 possuem referências a behavior tests;
-- apenas 5 superfícies do registro ligam fixtures golden, totalizando 8 referências;
-- o diretório congelado possui 12 cenários e o harness executa esses 12;
-- behavior tests focados não substituem a comparação golden completa exigida na Fase 0: argv, exit code, stdout, stderr e árvore/bytes do workspace para toda superfície pública.
-
-Impacto:
-
-- o Python não está completamente congelado como oráculo para todas as superfícies;
-- divergências futuras podem não ser detectadas pelo harness de paridade.
-
-Critério para fechar:
-
-- criar fixtures determinísticas para todas as superfícies públicas congeladas, incluindo falhas, symlink/path traversal, concorrência, permissões e recuperação quando aplicável;
-- executar cada fixture em Python e Go sem alterar golden para esconder divergências.
-
-### IMPORTANT-002 — paridade Go e gates de cutover incompletos
-
-Evidência:
-
-- `bm-preview version --json` declara 6 fatias implementadas: `change-policy`, `direct:classify`, `direct:reopen`, `spec-diff:file`, `status:legacy` e `workspace:create-parser`;
-- o registro público contém 58 superfícies;
-- model, scope, planning, coherence, impact, context pack, DocViva, learning, update e companions restantes não foram portados integralmente;
-- schema 1/schema 2 completos, crash recovery, concorrência, instalação limpa, update e rollback não possuem paridade Go demonstrada;
-- `workspace:create-parser` é parser-only e retorna `NOT_IMPLEMENTED` para a operação.
-
-Impacto:
-
-- o gate central da seção 14 falha;
-- o Go não pode virar backend oficial.
-
-Estado seguro atual:
-
-- Python segue oficial;
-- Go segue `0.4.7-preview`, experimental e explícito;
-- não há fallback silencioso Python/Go;
-- não foi feito cutover.
-
-Critério para fechar:
-
-- portar verticalmente todas as superfícies congeladas;
-- provar paridade completa nas fixtures ampliadas;
-- validar instalação limpa, update, rollback, concorrência e recovery;
-- obter nova auditoria independente sem finding CRITICAL ou IMPORTANT aberto.
-
-### IMPORTANT-003 — jornada integrada obrigatória não demonstrada
-
-Evidência:
-
-- há testes focados e integrações parciais por módulo;
-- não foi encontrada uma execução única, controlada e reproduzível que percorra os 13 passos da seção 15: projeto vazio, scope rastreável, design opcional, change, specs/modelo/planos/roadmap, coerência, aprovação, workspace, ondas/packs, conclusão, close recuperável, homologação real e estado pronto para deploy explícito.
-
-Impacto:
-
-- a composição entre subsistemas não está provada no fluxo público completo;
-- a definição de pronto da seção 17 permanece aberta mesmo com shards unitários/integrados verdes.
-
-Critério para fechar:
-
-- adicionar uma fixture de jornada completa, com variante sem design e variante com design quando aplicável;
-- validar schema 1 e schema 2, `.planning/` presente e intocado, erro/recuperação e deploy apenas como estado explícito, sem publicação real.
-
-## 6. Interface pública e compatibilidade
-
-O verificador retornou:
-
-```text
-command_count: 31
-surface_count: 58
-negative_surface_count: 4
-errors: []
-valid: true
-```
-
-O fluxo humano documentado permanece:
+O fluxo público foi preservado pelos contratos e testes disponíveis:
 
 ```text
 /preparar-escopo
@@ -231,233 +31,265 @@ O fluxo humano documentado permanece:
 /status-projeto para leitura de estado
 ```
 
-As mudanças auditadas não criam uma etapa humana obrigatória nova. O aprendizado é opt-in. O piso de risco protege a quick sem trocar sua rota pública.
+O backend oficial é Go `0.5.0`. O binário declara `engine=go`, `official=true`, `preview=false`, `contract_version=0.4` e 58 superfícies implementadas. As skills ativas apontam somente para `_shared/bin/bm`; não existe fallback Python silencioso. O Python permanece no repositório como oráculo de compatibilidade.
 
-## 7. Fixtures de compatibilidade
+O aprendizado continua opt-in, exige identidade humana para aprovação/desativação e não edita automaticamente kernel, schemas, `METHOD_CONTRACT` ou skills.
 
-Os 12 cenários congelados passam em Python e no Go preview:
+Não houve merge na main, release ou publicação de artifacts. Somente a branch de implementação deve ser publicada para restauração da prova normativa e nova auditoria. A branch não está liberada para merge enquanto o plano não for relido integralmente.
 
-1. `change-policy-material.json`
-2. `change-policy-read-only.json`
-3. `direct-classify-default.json`
-4. `direct-classify-protected.json`
-5. `direct-reopen-terminal.json`
-6. `retired-legacy-transition.json`
-7. `retired-repo-hygiene.json`
-8. `retired-route.json`
-9. `spec-diff-created-output.json`
-10. `status-legacy-json.json`
-11. `status-legacy-text.json`
-12. `workspace-old-companion-flags.json`
+## 2. Preflight e isolamento
 
-Resultado independente:
+- `origin/main`, `main` local e merge-base permaneceram em `7c9fa23f524623f3360ebae579048e1765095220`.
+- A suite da baseline foi reexecutada em worktree destacado de `origin/main`: `python3 scripts/run_test_shards.py` terminou com `22 shards aprovados`.
+- A implementação ocorreu em worktree e branch dedicadas.
+- O remoto não avançou durante a execução final.
+- Changes antigas não foram migradas.
+- O namespace proibido não foi usado como fonte, destino ou alvo de comandos de auditoria.
+- Arquivos e mudanças de terceiros foram preservados.
 
-```text
-Python: 12 passed, 0 failed
-Go:     12 passed, 0 failed
-Golden intencionalmente alterado: 0
-```
+O plano normativo não está presente no checkout final nem no attachment acessível à auditoria independente. O SHA-256 anteriormente registrado para o plano é `aa170b8054c48a07f2787f7434575731f0302b9328cbae7e83998bd10ea2eacc`. A auditoria final revalidou os contratos congelados, o registro público, os testes e as evidências versionadas, mas não pôde montar a matriz requisito → código → teste → evidência das seções 14 e 17. Essa ausência bloqueia a aceitação final.
 
-Este resultado prova paridade somente para esses 12 cenários. Não prova paridade das 58 superfícies.
+A reexecução dos 22 shards confirma a suite existente no commit-base atual. Ela não substitui a leitura do plano nem prova, por si só, a completude do escopo evolutivo.
 
-## 8. Testes finais independentes
+## 3. Commits por fase
 
-| Comando | Resultado |
-|---|---|
-| `PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_test_shards.py` em `origin/main` destacado | `22 shards aprovados` |
-| `PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_test_shards.py` na branch | `35 shards aprovados` |
-| `python3 scripts/verify_cli_contract.py` | válido; 31 comandos, 58 superfícies, 4 negativas, 0 erros |
-| `python3 scripts/run_cli_contract_fixtures.py --engine python` | 12/12 |
-| `python3 scripts/run_cli_contract_fixtures.py --engine go --binary <temporário>` | 12/12 |
-| `go test ./...` | verde |
-| `go test -race ./...` | verde |
-| `go vet ./...` | verde |
-| `go mod verify` | `all modules verified` |
-| matriz `CGO_ENABLED=0` para 5 targets | 5/5 compilados |
-
-Os binários usados na auditoria foram temporários e removidos ao final. Alvos não nativos foram cross-compiled, não executados.
-
-## 9. Métricas atuais de contexto
-
-Definição: bytes de `SKILL.md` mais pack compilado em fixture versionada. A baseline mede bytes do contexto estático prescrito. Não houve medição de tokens nem alegação de economia de tokens.
-
-| Skill/unidade | Antes | Depois | Fontes no pack | Redução medida |
-|---|---:|---:|---:|---:|
-| `executar-plano` — `C001/P01/T01` | 35.309 B / 3 arquivos | 16.019 B / 2 arquivos | 15 | 19.290 B (54,63%) |
-| `executar-direto` — `Q012` | 28.559 B / 2 arquivos | 10.487 B / 2 arquivos | 4 | 18.072 B (63,28%) |
-| `corrigir-bug` — `D004` | 27.042 B / 2 arquivos | 8.598 B / 2 arquivos | 2 | 18.444 B (68,21%) |
-| `homologar-sistema` — `RC:build-a` | 30.528 B / 2 arquivos | 12.712 B / 2 arquivos | 3 | 17.816 B (58,36%) |
-| `status-projeto` — `C001/P01` | 22.686 B / 2 arquivos | 8.497 B / 2 arquivos | 14 | 14.189 B (62,55%) |
-
-Essas medições foram refeitas no head auditado. Elas substituem, para este head, os números históricos menores de `reports/evolution-0.4.7/phase2-context-docviva.json`, sem reescrever o relatório histórico.
-
-Limite da evidência: bytes prescritos e compilados não equivalem a tokens nem provam o conteúdo efetivamente lido por um agente.
-
-## 10. Métricas atuais de DocViva
-
-Fixture independente em repositório temporário:
-
-- antes: 3 arquivos, 72 bytes;
-- escrita idêntica retornou `false` e preservou `mtime`;
-- fluxo interno `not_applicable`: 0 arquivos alterados;
-- fluxo comportamental: somente `.bianchini/current/specs/payment.md` mudou;
-- artefato comportamental: 29 bytes;
-- depois: 4 arquivos, 101 bytes.
-
-Testes de close também demonstram preservação de `mtime` para arquitetura e specs inalteradas durante promoção. Recovery cobre specs, journal truncado e variantes de path inseguro.
-
-Limite da evidência: a medição é estrutural. A qualidade semântica continua sujeita à revisão humana.
-
-## 11. Python/Go, builds e checksums
-
-Estado declarado pelo preview:
-
-```text
-version: 0.4.7-preview
-engine: go-preview
-official: false
-preview: true
-contract_version: 0.4
-implemented_surfaces: 6 fatias declaradas
-```
-
-Builds determinísticos temporários do head de código `b9b0b7cbb42d41ac3132c1c76df5e790b0a53379`:
-
-| Target | SHA-256 |
-|---|---|
-| darwin-amd64 | `26757c55be4f8c81abe9a06def06d424c04388a0fed8fcf7f90f583e44fc2c35` |
-| darwin-arm64 | `ace26a3f2dcd4cf8f16becd647bca7bf5aca0034255504cba727ffbb95ba1733` |
-| linux-amd64 | `049ac49171c41fa978e2c63b34c346e629bda5e95ffab04bcd08730761868229` |
-| linux-arm64 | `b0fc158ad16c7489527fe82ca46c6e041bf8b455a5e6013eecfe6d04f0716fb7` |
-| windows-amd64 | `60eae67f380495250199ccd2449d9fc1c409fadb7b98eb43547aedf051c91bba` |
-
-Comando de build:
-
-```bash
-CGO_ENABLED=0 GOOS=<os> GOARCH=<arch> go build \
-  -mod=readonly -trimpath \
-  -ldflags "-s -w -buildid= -X github.com/felipebianchini2006/bianchini-method/internal/gokernel.BuildCommit=b9b0b7cbb42d41ac3132c1c76df5e790b0a53379" \
-  -o <arquivo-temporário> ./cmd/bm-preview
-```
-
-Esses checksums são evidência de cross-build da auditoria. Não são artefatos de release e não foram publicados.
-
-## 12. Gate de cutover
-
-| Gate da seção 14 | Estado | Evidência |
+| Fase | Commits principais | Resultado |
 |---|---|---|
-| todas as superfícies públicas possuem paridade | **FALHA** | 6 fatias Go declaradas versus 58 superfícies registradas |
-| schema 1 e schema 2 possuem fixtures | **FALHA** | cobertura Python focada existe; paridade Go integral não |
-| suíte Python antiga continua verde | PASSA | baseline 22/22 e branch 35/35 |
-| `go test ./...` verde | PASSA | comando independente verde |
-| builds da matriz verdes | PASSA PARCIALMENTE | 5/5 cross-build; somente darwin-arm64 executado nativamente |
-| instalação limpa validada | **FALHA** | não demonstrada para distribuição Go |
-| update e rollback validados | **FALHA** | não demonstrados para backend Go oficial |
-| nenhuma skill chama Python específico salvo launcher | **FALHA** | Python ainda é oficialmente consumido, como esperado no preview |
-| nenhum backend silencioso | PASSA | preview e oficial são explícitos; inspeção/testes não acharam fallback |
-| auditoria independente aprovada | **FALHA** | este relatório é `NEEDS_WORK` |
+| 0 — contrato público | `c5a85f9`, `52cdb9e` | Interface congelada; todas as superfícies possuem fixture de comportamento. |
+| 1 — specs e close | `1b1bc17`, `50f0226`, `38dabd2`, `bded063` | Schema 2 gerenciado, schema 1 preservado, close recuperável e jornadas integradas. |
+| 2 — contexto e DocViva | `c32cc4d`, `1a50b6d`, `0694271` | Packs adotados após completude; métricas reproduzíveis; escrita idêntica preservada. |
+| 3 — risco, ondas e adapters | `3c33650`, `2ea080a`, `2ad3299` | Piso derivado, ondas consumíveis e adapters sem decisão de host no kernel. |
+| 4 — aprendizado governado | `98ae3e0`, `04e32d7`, `32000a5`, `3a6665d`, `257d22d` | Proposta opt-in, lock compartilhado, aprovação humana e retries duráveis. |
+| 5 — Go vertical e cutover | `92898b6` até `1b851d7`; cutover isolado `15737ec`; hardening `685f139`, `9686fdd`, `82a209a`, `b56f906`, `7f3d29b`, `ed2841c` | 58 superfícies, paridade completa, updater/release nativos e publish durável. |
 
-Resultado: cutover corretamente não realizado.
+O cutover de linguagem ficou isolado em `15737ec`. As correções funcionais anteriores e posteriores possuem commits próprios.
 
-## 13. Definição de pronto da seção 17
-
-| Critério | Estado |
-|---|---|
-| fluxo público preservado | demonstrado pelo contrato e skills auditadas |
-| 22 shards originais passam | demonstrado |
-| testes novos passam | demonstrado: 35 shards totais |
-| specs em digest/approve/stale/close para changes novas | demonstrado nos testes Python |
-| changes antigas fecham sem reescrita | demonstrado nos testes Python |
-| packs são default e medidamente menores | demonstrado em bytes no Python |
-| DocViva seletiva e sem reescrita inalterada | demonstrado estruturalmente |
-| quick mantém rota e piso de risco | demonstrado |
-| ondas consumíveis por qualquer host | demonstrado na interface host-neutral e fixtures dos adapters |
-| adapters têm fonte canônica | demonstrado |
-| aprendizado é opt-in, evidenciado e aprovado | demonstrado no backend Python |
-| Go possui paridade de toda superfície | **não satisfeito** |
-| backend visível | demonstrado |
-| instalação, update e rollback funcionam | **não satisfeito para o cutover Go** |
-| auditoria sem finding CRITICAL/IMPORTANT | **não satisfeito** |
-| branch publicada | deve ser confirmado após o push do commit deste relatório |
-| `main` intacta antes da auditoria | demonstrado |
-
-## 14. Riscos e limitações restantes
-
-- As 12 fixtures verdes cobrem somente uma fração da interface congelada.
-- O Go preview não executa o fluxo público principal completo.
-- Recovery e concorrência ainda não possuem prova de paridade Go.
-- Instalação limpa offline, update e rollback de uma distribuição Go não foram validados.
-- Alvos Linux e Windows foram compilados, mas não executados nativamente.
-- A jornada completa da seção 15 precisa de fixture integrada.
-- As métricas de contexto são bytes, não tokens.
-- A medição de DocViva é estrutural, não uma homologação semântica humana.
-
-## 15. Comandos exatos para auditoria independente
-
-Checkout limpo:
+Histórico completo e ordenado:
 
 ```bash
-git clone https://github.com/felipebianchini2006/bianchini-method.git
-cd bianchini-method
-git fetch origin --prune
-git switch --track origin/dev/evolucao-sustentavel-0.4.7-0.5
+git log --reverse --format='%H %s' 7c9fa23f524623f3360ebae579048e1765095220..HEAD
+```
+
+## 4. Testes por fase
+
+| Fase | Testes e gates |
+|---|---|
+| 0 | Registro canônico válido; help estático em 77 paths; 78/78 fixtures no Python. |
+| 1 | `test_spec_package`, `test_close_recovery`, schema 1 e schema 2 nas jornadas completas. |
+| 2 | `test_context_pack`, `test_context_cli`, `test_context_skill_adoption`, `test_docviva`, `test_phase2_metrics`. |
+| 3 | `test_risk_floor`, `test_next_wave`, `test_host_adapters`, `test_phase3_cli`. |
+| 4 | `tests.test_learning`: 17/17; fixtures de propose/list/approve/reject/deactivate e retries. |
+| 5 | `go test ./...`, `go test -race ./...`, `go vet ./...`, `go mod verify`, 78/78 fixtures Go, jornadas Go schema 1 e 2. |
+
+Gate agregado final:
+
+```text
+python3 scripts/run_test_shards.py
+38 shards aprovados.
+```
+
+Baseline isolada:
+
+```text
+origin/main 7c9fa23f524623f3360ebae579048e1765095220
+python3 scripts/run_test_shards.py
+22 shards aprovados.
+```
+
+Resultados finais adicionais:
+
+```text
+go test ./...          PASS
+go test -race ./...    PASS
+go vet ./...           PASS
+go mod verify          all modules verified
+CLI help               77 paths reproduzíveis
+Python fixtures        78 passed, 0 failed
+Go fixtures            78 passed, 0 failed
+Python full journeys   2 passed
+Go full journeys       2 passed
+```
+
+## 5. Fixtures de compatibilidade
+
+O diretório `tests/fixtures/cli_contract` contém 78 fixtures. O harness compara por backend:
+
+- argv;
+- exit code;
+- stdout completo;
+- stderr completo, inclusive `usage` do argparse;
+- arquivos criados, alterados, removidos e preservados;
+- bytes esperados quando aplicável.
+
+As fixtures cobrem as 58 superfícies públicas e os negativos congelados. Incluem schema 1, schema 2, caminhos inseguros, symlinks, recuperação, update, aprendizado governado e a jornada completa.
+
+## 6. Métricas de contexto e DocViva
+
+Fonte versionada: `reports/evolution-0.4.7/phase2-context-docviva.json`.
+
+| Skill | Antes | Depois | Redução em bytes |
+|---|---:|---:|---:|
+| `executar-plano` | 35.309 | 16.074 | 54,48% |
+| `executar-direto` | 28.559 | 10.598 | 62,89% |
+| `corrigir-bug` | 27.042 | 8.700 | 67,83% |
+| `homologar-sistema` | 30.528 | 12.776 | 58,15% |
+| `status-projeto` | 22.686 | 8.611 | 62,04% |
+
+O “antes” é recalculado por `git show` em sete paths explícitos do commit-base, com bytes e SHA-256. O “depois” é medido pelo oráculo Python após o cutover, pois a compilação de contexto continua sendo um contrato de compatibilidade. Não há alegação de economia de tokens.
+
+DocViva:
+
+- runtime histórico reexecutado com três fluxos estruturais;
+- 12/12 fixtures históricas da Fase 0 aprovadas contra o runtime-base;
+- zero mutações em `.bianchini/current` nessas 12 fixtures;
+- escrita com bytes idênticos preserva conteúdo e `mtime`;
+- mudanças internas justificadas registram zero arquivos atuais alterados;
+- mudança comportamental exige declaração correspondente.
+
+Limite: as 12 fixtures não existiam no commit-base. A evidência usa o runtime-base com o contrato congelado na Fase 0; não recria o instante histórico nem mede qualidade semântica.
+
+## 7. Paridade Python/Go
+
+```text
+Superfícies registradas: 58
+Fixtures Python:        78/78
+Fixtures Go:            78/78
+Jornada schema 1 Go:    PASS
+Jornada schema 2 Go:    PASS
+Backend oficial:        Go 0.5.0
+Fallback runtime:       ausente
+```
+
+O Python segue como oráculo versionado. A execução oficial das skills usa o binário Go. Não existe seleção automática de backend.
+
+## 8. Artifacts reproduzíveis e checksums
+
+O builder foi executado duas vezes a partir de `ed2841c478dcbda3da2563d62d12110a38558b84`. Os cinco archives, `SHA256SUMS` e `release-manifest.json` foram comparados byte a byte. Nenhum artifact foi publicado.
+
+```text
+d2d03d08d2010d82984420793df60f7e78aa5f963383b5591e2ef8a32400c481  bianchini-method_0.5.0_darwin-amd64.tar.gz
+87bdd0504919215f576fd93656c32fecb0bc959c7cb3822f163f8bca140e105b  bianchini-method_0.5.0_darwin-arm64.tar.gz
+35af778d7f148ddb56a4f9a0767ca7c41c891134b02fbc8c6dfe60af866e3c0a  bianchini-method_0.5.0_linux-amd64.tar.gz
+a6f200a191095b643c7a45e26dfc122a03bafebd0ca06844f8b4cfce13dee985  bianchini-method_0.5.0_linux-arm64.tar.gz
+ac8a843fe6e1d25dd0792d91d5730d775effb50400e6f7b217dd1d25d41b2fea  bianchini-method_0.5.0_windows-amd64.tar.gz
+```
+
+O updater valida identidade, manifesto, tamanho, digest, paths e troca transacional. O teste de integração constrói um package real, instala, executa o binário instalado e prova rollback.
+
+## 9. Hardening final
+
+As correções da auditoria final incluem:
+
+- rejeição de conteúdo extra e números fracionários nos journals tipados, além de chaves duplicadas no `MANIFEST.json` gerenciado;
+- persistência com file sync, publish atômico e barreira de diretório no Unix;
+- `MoveFileExW` com `MOVEFILE_WRITE_THROUGH` no Windows;
+- tombstone imprevisível para remoção Windows, sem apagar colisões de terceiros;
+- abertura gravável para `File.Sync` no Windows;
+- help CLI completo e byte a byte compatível com argparse;
+- parsing de `--flag=value`, abreviações únicas, intermixing e `--`;
+- lock e retries duráveis no aprendizado para approve, reject e deactivate;
+- validação de ID antes de qualquer path derivado;
+- verificação do target já instalado na recuperação committed do updater;
+- binding entre versão pedida, versão das skills e versão compilada.
+
+## 10. Riscos e limitações restantes
+
+1. **Bloqueador de aceitação:** o plano normativo não pôde ser relido pela auditoria independente. O contrato congelado e as evidências versionadas sustentam os testes executados, mas não substituem a prova de completude das seções 14 e 17.
+2. O Windows teve cross-build de `gokernel.test.exe` e `bm.exe`, além de testes build-tag compilados. Não houve runner Windows real nem ensaio de power-loss; portanto o comportamento Win32 em runtime não é declarado como observado neste host.
+3. As métricas são bytes, não tokens.
+4. As jornadas automatizadas provam os fluxos estruturais e públicos. Homologação humana de um produto real continua sendo responsabilidade do projeto consumidor.
+5. Os artifacts foram produzidos somente em diretórios temporários e não foram publicados.
+
+Nenhuma dessas limitações autoriza enfraquecer schema, digest, path safety, evidência ou gates.
+
+## 11. Comandos exatos para auditoria independente
+
+```bash
+git fetch origin
+git switch --detach origin/dev/evolucao-sustentavel-0.4.7-0.5
+git rev-parse HEAD
 git rev-parse origin/main
 git merge-base origin/main HEAD
-git rev-parse HEAD
 git status --short --branch
-git diff --name-only origin/main...HEAD -- .planning
-```
+git diff --check origin/main...HEAD
 
-Contrato e suíte Python:
+python3 scripts/generate_cli_help.py --check
+python3 scripts/measure_phase2_context_docviva.py --check
+python3 scripts/run_cli_contract_fixtures.py --engine python
 
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/verify_cli_contract.py
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_cli_contract_fixtures.py --engine python
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_test_shards.py
-```
-
-Go:
-
-```bash
-go version
-go mod verify
 go test ./...
 go test -race ./...
 go vet ./...
-go run ./cmd/bm-preview version --json
+go mod verify
+
+python3 scripts/run_test_shards.py
 ```
 
-Paridade das 12 fixtures atuais com binário temporário:
+Reprodução isolada da baseline:
 
 ```bash
-audit_tmp_dir=$(mktemp -d /tmp/bm-audit-parity.XXXXXX)
-go build -mod=readonly -trimpath -o "$audit_tmp_dir/bm-preview" ./cmd/bm-preview
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_cli_contract_fixtures.py \
-  --engine go --binary "$audit_tmp_dir/bm-preview"
-find "$audit_tmp_dir" -depth -delete
+audit_baseline_root=$(mktemp -d)
+git worktree add --detach "$audit_baseline_root/checkout" origin/main
+(
+  cd "$audit_baseline_root/checkout"
+  python3 scripts/run_test_shards.py
+)
+git worktree remove "$audit_baseline_root/checkout"
+rmdir "$audit_baseline_root"
 ```
 
-Matriz de build:
+Paridade Go e jornadas com backend explícito:
 
 ```bash
-audit_tmp_dir=$(mktemp -d /tmp/bm-audit-build.XXXXXX)
-build_commit=$(git rev-parse HEAD)
-for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
-  go_os=${target%/*}
-  go_arch=${target#*/}
-  suffix=""
-  if [ "$go_os" = windows ]; then suffix=".exe"; fi
-  CGO_ENABLED=0 GOOS="$go_os" GOARCH="$go_arch" go build \
-    -mod=readonly -trimpath \
-    -ldflags "-s -w -buildid= -X github.com/felipebianchini2006/bianchini-method/internal/gokernel.BuildCommit=$build_commit" \
-    -o "$audit_tmp_dir/bm-preview-${go_os}-${go_arch}${suffix}" ./cmd/bm-preview
-  shasum -a 256 "$audit_tmp_dir/bm-preview-${go_os}-${go_arch}${suffix}"
-done
-find "$audit_tmp_dir" -depth -delete
+audit_tmp_dir=$(mktemp -d)
+go build -trimpath -o "$audit_tmp_dir/bm" ./cmd/bm
+python3 scripts/run_cli_contract_fixtures.py --engine go --binary "$audit_tmp_dir/bm"
+PYTHONPATH=tests BM_FULL_JOURNEY_BACKEND=go BM_FULL_JOURNEY_GO_BINARY="$audit_tmp_dir/bm" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest test_full_journey.FullJourneyScenarios -v
+"$audit_tmp_dir/bm" version --json
+unlink "$audit_tmp_dir/bm"
+rmdir "$audit_tmp_dir"
 ```
 
-## 16. Veredito
+Cross-build Windows, sem alegar execução Windows:
 
-**NEEDS_WORK**
+```bash
+audit_windows_dir=$(mktemp -d)
+GOOS=windows GOARCH=amd64 go test -c -o "$audit_windows_dir/gokernel.test.exe" ./internal/gokernel
+GOOS=windows GOARCH=amd64 go build -o "$audit_windows_dir/bm.exe" ./cmd/bm
+unlink "$audit_windows_dir/gokernel.test.exe"
+unlink "$audit_windows_dir/bm.exe"
+rmdir "$audit_windows_dir"
+```
 
-Motivo: os gates de paridade total Go, cobertura golden integral, instalação/update/rollback e jornada completa continuam abertos. A posição segura é manter Python oficial e Go preview explícito até que esses itens sejam implementados e uma nova auditoria independente os aprove.
+Reprodução dos artifacts a partir do head funcional, sem publicar release:
+
+```bash
+audit_release_root=$(mktemp -d)
+mkdir "$audit_release_root/output"
+git worktree add --detach "$audit_release_root/checkout" ed2841c478dcbda3da2563d62d12110a38558b84
+(
+  cd "$audit_release_root/checkout"
+  go run ./tools/bm-release --repo . --output "$audit_release_root/output" --commit HEAD
+)
+shasum -a 256 "$audit_release_root/output"/*.tar.gz
+git worktree remove "$audit_release_root/checkout"
+unlink \
+  "$audit_release_root/output/bianchini-method_0.5.0_darwin-amd64.tar.gz" \
+  "$audit_release_root/output/bianchini-method_0.5.0_darwin-arm64.tar.gz" \
+  "$audit_release_root/output/bianchini-method_0.5.0_linux-amd64.tar.gz" \
+  "$audit_release_root/output/bianchini-method_0.5.0_linux-arm64.tar.gz" \
+  "$audit_release_root/output/bianchini-method_0.5.0_windows-amd64.tar.gz" \
+  "$audit_release_root/output/SHA256SUMS" \
+  "$audit_release_root/output/release-manifest.json"
+rmdir "$audit_release_root/output"
+rmdir "$audit_release_root"
+```
+
+## 12. Estado de entrega
+
+- Main intacta.
+- Branch dedicada publicada para continuação da auditoria, mas ainda não apta para merge.
+- Cutover Go explícito e observável.
+- Release não publicada.
+- Deploy continua exigindo ação explícita no projeto consumidor.
+- Aceitação final bloqueada até restaurar o plano exato, confirmar seu SHA-256, relê-lo integralmente e refazer a matriz das seções 14 e 17.
