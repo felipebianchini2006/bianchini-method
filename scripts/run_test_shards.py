@@ -52,6 +52,13 @@ PHASE2_SHARDS = (
     ("test_docviva", "DocVivaScenarios"),
 )
 
+PHASE3_SHARDS = (
+    ("test_risk_floor", "RiskFloorScenarios"),
+    ("test_next_wave", "NextWaveScenarios"),
+    ("test_host_adapters", "HostAdapterScenarios"),
+    ("test_phase3_cli", "Phase3CliScenarios"),
+)
+
 SELF_UPDATE_SHARDS = (
     "SelfUpdateScenarios",
 )
@@ -104,6 +111,9 @@ def main() -> int:
     for module, shard in PHASE2_SHARDS:
         if run_shard(module, shard, environment) != 0:
             return 1
+    for module, shard in PHASE3_SHARDS:
+        if run_shard(module, shard, environment) != 0:
+            return 1
     for shard in SELF_UPDATE_SHARDS:
         if run_shard("test_self_update", shard, environment) != 0:
             return 1
@@ -120,6 +130,7 @@ def main() -> int:
         + len(CONTRACT_SHARDS)
         + len(PHASE1_SHARDS)
         + len(PHASE2_SHARDS)
+        + len(PHASE3_SHARDS)
         + len(SELF_UPDATE_SHARDS)
         + len(LINEAGE_SHARDS)
         + len(CODEX_SHARDS)

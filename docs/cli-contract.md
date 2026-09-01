@@ -5,8 +5,8 @@
 - Schema do registry: `1`
 - Contrato: `0.4`
 - Base congelada: `7c9fa23f524623f3360ebae579048e1765095220`
-- Comandos do parser: `29`
-- Superfícies do parser: `50`
+- Comandos do parser: `30`
+- Superfícies do parser: `53`
 
 ## Convenções
 
@@ -32,7 +32,7 @@
 ### `bm roadmap`
 
 - Geração: `core_0_4`
-- Parser: `action;choices=sync;required | --repo;type=Path;default="$CWD" | --change;required`
+- Parser: `action;choices=sync,next-wave;required | --repo;type=Path;default="$CWD" | --change;required | --format;choices=json;default="json"`
 
 ### `bm coherence`
 
@@ -53,6 +53,11 @@
 
 - Geração: `core_0_4`
 - Parser: `action;choices=pack,verify;required | --repo;type=Path;default="$CWD" | --unit;default=null | --output;type=Path;default=null | --max-bytes;type=int;default=16384 | --path;type=Path;default=null`
+
+### `bm adapter`
+
+- Geração: `operational`
+- Parser: `action;choices=render,install;required | --host;choices=generic,codex,claude-compatible;required | --repo;type=Path;default="$CWD" | --overwrite;action=store_true;default=false`
 
 ### `bm debug`
 
@@ -169,12 +174,15 @@
 | `scope.seal` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/SCOPE.md<br>.bianchini/changes/<change>/COHERENCE.md<br>.bianchini/STATE.md | bm_scope.seal_scope | skills/_shared/scripts/bm_scope.py | skills/preparar-escopo/SKILL.md | tests/test_method_v04_cli.py::test_scope_seal_creates_verified_scope_and_preserves_foreign_planning |
 | `scope.verify` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | bm_scope.verify_scope | skills/_shared/scripts/bm_scope.py | skills/preparar-escopo/SKILL.md<br>skills/sdd-planning/SKILL.md | tests/test_method_v04_cli.py::test_scope_verify_detects_tampering_and_different_pdf |
 | `roadmap.sync` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/ROADMAP.md<br>.bianchini/STATE.md | v04_planning.sync_roadmap | skills/_shared/scripts/bm_v04_planning.py | skills/sdd-planning/SKILL.md | tests/test_method_v04_cli.py::test_typed_planning_binds_scope_roadmap_tasks_semantic_review_and_package |
+| `roadmap.next-wave` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | next_wave | skills/_shared/scripts/bm_wave.py | skills/executar-plano/SKILL.md | tests/test_phase3_cli.py::test_next_wave_is_public_read_only_projection |
 | `coherence.check` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/COHERENCE.md | v04_planning.coherence_check | skills/_shared/scripts/bm_v04_planning.py | skills/sdd-planning/SKILL.md | tests/test_method_v04_cli.py::test_change_model_coherence_and_impact_are_integrated |
 | `coherence.approve` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/COHERENCE.md<br>.bianchini/STATE.md | v04_planning.coherence_approve | skills/_shared/scripts/bm_v04_planning.py | skills/sdd-planning/SKILL.md | tests/test_method_v04_cli.py::test_typed_planning_binds_scope_roadmap_tasks_semantic_review_and_package |
 | `impact.analyze` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/COHERENCE.md<br>.bianchini/STATE.md | v04_planning.impact_analyze | skills/_shared/scripts/bm_v04_planning.py | skills/executar-plano/SKILL.md<br>skills/sdd-planning/SKILL.md | tests/test_method_v04_cli.py::test_change_model_coherence_and_impact_are_integrated |
 | `plan.complete` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/<plan>.md<br>.bianchini/changes/<change>/results/tasks/<plan>/<task>.md<br>.bianchini/STATE.md | v04_planning.plan_complete | skills/_shared/scripts/bm_v04_planning.py | skills/executar-plano/SKILL.md | tests/test_method_v04_cli.py::test_typed_plan_completion_requires_every_task |
 | `context.pack` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/.runtime/context/<unit>.json ou --output confinado ao repo | compile_context_pack | skills/_shared/scripts/bm_context.py | skills/corrigir-bug/SKILL.md<br>skills/executar-direto/SKILL.md<br>skills/executar-plano/SKILL.md<br>skills/homologar-sistema/SKILL.md<br>skills/status-projeto/SKILL.md | tests/test_context_cli.py::test_context_pack_and_verify_are_public_and_json_observable |
 | `context.verify` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | verify_context_pack | skills/_shared/scripts/bm_context.py | — | tests/test_context_cli.py::test_context_pack_and_verify_are_public_and_json_observable |
+| `adapter.render` | operational | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | render_adapter | skills/_shared/scripts/bm_host_adapters.py | — | tests/test_phase3_cli.py::test_adapter_render_and_explicit_install_are_public |
+| `adapter.install` | operational | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | bloco gerenciado em AGENTS.md ou CLAUDE.md no --repo explícito | install_adapter | skills/_shared/scripts/bm_host_adapters.py | — | tests/test_phase3_cli.py::test_adapter_render_and_explicit_install_are_public |
 | `debug.start` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/debug/active/<id>/**<br>.bianchini/STATE.md | v04.debug_start | skills/_shared/scripts/bm_v04_workflows.py | skills/corrigir-bug/SKILL.md | tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order |
 | `debug.list` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04.debug_status | skills/_shared/scripts/bm_v04_workflows.py | skills/corrigir-bug/SKILL.md | tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order |
 | `debug.status` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04.debug_status | skills/_shared/scripts/bm_v04_workflows.py | skills/corrigir-bug/SKILL.md<br>skills/status-projeto/SKILL.md | tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order |

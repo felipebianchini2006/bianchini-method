@@ -33,7 +33,10 @@ from bm_context import (
 )
 from bm_feature_support import FIX_ROUNDS_BY_PROFILE
 from bm_mutation import mutation_evidence_verify
+from bm_risk import RiskInputError, assess_quick_risk
 from bm_spec_diff import spec_diff
+from bm_wave import WaveError, next_wave
+from bm_host_adapters import HostAdapterError, install_adapter, render_adapter
 from bm_update import (
     UpdateError as BMUpdateError,
     render_update_result,
@@ -3904,7 +3907,7 @@ def direct_risk_from_args(args: argparse.Namespace) -> dict[str, Any]:
         )
         if enabled
     ]
-    return v04.classify_quick_risk(
+    legacy = v04.classify_quick_risk(
         args.scope_score,
         args.external_effect_score,
         args.migration_score,
@@ -3912,6 +3915,30 @@ def direct_risk_from_args(args: argparse.Namespace) -> dict[str, Any]:
         args.money_score,
         overrides,
     )
+    flags = {
+        **legacy["dimensions"],
+        "payment": bool(args.payment_flow),
+        "webhook": bool(args.webhook_flow),
+        **{name: True for name in overrides},
+    }
+    assessed = assess_quick_risk(
+        legacy["score"],
+        flags=flags,
+        declared_paths=args.changed_file,
+        phase="start",
+    )
+    return {
+        **legacy,
+        **assessed,
+        "score": assessed["effective_score"],
+        "dimensions": legacy["dimensions"],
+        "overrides": legacy["overrides"],
+        "reasons": sorted(set(legacy["reasons"]) | set(assessed["reasons"])),
+        "risk_inputs": {
+            "flags": flags,
+            "declared_paths": sorted(set(args.changed_file)),
+        },
+    }
 
 
 def parser() -> argparse.ArgumentParser:
@@ -3937,9 +3964,10 @@ def parser() -> argparse.ArgumentParser:
     scope.add_argument("--extraction", choices=["native", "ocr", "mixed"])
 
     roadmap = commands.add_parser("roadmap")
-    roadmap.add_argument("action", choices=["sync"])
+    roadmap.add_argument("action", choices=["sync", "next-wave"])
     roadmap.add_argument("--repo", type=Path, default=Path.cwd())
     roadmap.add_argument("--change", required=True)
+    roadmap.add_argument("--format", choices=["json"], default="json")
 
     coherence = commands.add_parser("coherence")
     coherence.add_argument("action", choices=["check", "approve"])
@@ -3982,6 +4010,14 @@ def parser() -> argparse.ArgumentParser:
     context.add_argument("--output", type=Path)
     context.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
     context.add_argument("--path", type=Path)
+
+    adapter = commands.add_parser("adapter")
+    adapter.add_argument("action", choices=["render", "install"])
+    adapter.add_argument(
+        "--host", choices=["generic", "codex", "claude-compatible"], required=True
+    )
+    adapter.add_argument("--repo", type=Path, default=Path.cwd())
+    adapter.add_argument("--overwrite", action="store_true")
 
     debug = commands.add_parser("debug")
     debug.add_argument(
@@ -4280,7 +4316,10 @@ def main() -> int:
             else:
                 emit(bm_scope.verify_scope(args.repo, args.change, args.source))
         elif args.command == "roadmap":
-            emit(v04_planning.sync_roadmap(args.repo, args.change))
+            if args.action == "sync":
+                emit(v04_planning.sync_roadmap(args.repo, args.change))
+            else:
+                emit(next_wave(args.repo, args.change))
         elif args.command == "coherence":
             if args.action == "check":
                 emit(
@@ -4347,6 +4386,24 @@ def main() -> int:
                 if not args.path:
                     raise BMError("context verify exige --path")
                 emit(verify_context_pack(args.repo, args.path))
+        elif args.command == "adapter":
+            if args.action == "render":
+                content = render_adapter(args.host)
+                emit(
+                    {
+                        "host": args.host,
+                        "content": content,
+                        "digest": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                    }
+                )
+            else:
+                emit(
+                    install_adapter(
+                        args.repo,
+                        args.host,
+                        overwrite=args.overwrite,
+                    )
+                )
         elif args.command == "migrate":
             if args.action == "check":
                 emit(v04.migration_check(args.repo))
@@ -4608,6 +4665,7 @@ def main() -> int:
                         args.evidence,
                         args.blocker,
                         args.next_action,
+                        args.guard,
                     )
                 )
             elif args.action == "finish":
@@ -4666,6 +4724,9 @@ def main() -> int:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
     except ContextPackError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_BLOCKED
+    except (RiskInputError, WaveError, HostAdapterError) as error:
         print(str(error), file=sys.stderr)
         return EXIT_BLOCKED
     except (OSError, UnicodeError, subprocess.SubprocessError, KeyError, TypeError, ValueError) as error:

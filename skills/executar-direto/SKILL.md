@@ -64,6 +64,8 @@ Sinais críticos como `scope=2`, migração destrutiva, concorrência não contr
 
 Pagamento e webhook não escalam pela palavra. Eles podem ser quick protegido quando formam um fluxo único, usam arquitetura conhecida e possuem guards completos.
 
+O JSON separa `declared_score`, `derived_floor`, `effective_score`, `reasons` e `additional_guards`. O score informado pode elevar o risco, nunca reduzir o piso estrutural. Use `--changed-file` na classificação quando os paths já forem conhecidos. O workflow permanece `quick`, mesmo quando o piso muda a rota interna para `protected`.
+
 Em `direct start`, sinalize `--payment-flow` e/ou `--webhook-flow`. O CLI deriva os guards obrigatórios das dimensões e do tipo de fluxo. Guards são nomes estáveis como `official_docs`, `source_of_truth`, `local_contract`, `authenticity`, `deduplication`, `replay_order`, `idempotency`, `timeout_recovery`, `persistence`, `reconciliation`, `rollback` e `sandbox`.
 
 ## 3. Iniciar ou retomar
@@ -123,6 +125,8 @@ Trabalhe continuamente, com o menor diff correto:
 Quando houver trabalho independente, despache em paralelo pesquisa localizada, implementação com ownership separado ou revisão especializada. Não terceirize a decisão de aceite, a integração do diff, os checkpoints nem a conclusão do quick.
 
 Use `bm.py direct checkpoint` para registrar arquivo alterado, comando, resultado e evidência estruturada. Evidência de comando `passed` exige `exit_code: 0`; browser, screenshot ou manual exige referência reproduzível. Toda evidência fica vinculada ao digest do brief e ao fingerprint da árvore.
+
+O checkpoint reavalia os paths declarados. Registre guards adicionais com `--guard`. No `finish`, o CLI compara também o diff real; piso maior exige os guards novos e nunca redireciona para `/sdd-planning`.
 
 Não instalar framework de qualidade, criar abstração futura ou abrir tarefa por camada de teste. Em retomada, use `bm.py direct status` e leia apenas `PROGRESS.md`.
 

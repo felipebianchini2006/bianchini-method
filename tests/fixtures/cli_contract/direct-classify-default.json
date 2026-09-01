@@ -1,11 +1,12 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "evolution_note": "Fase 3 adiciona piso derivado observável; campos legados permanecem presentes.",
   "surface": "direct.classify",
   "argv": ["direct", "classify", "--repo", "{repo}"],
   "initial_tree": {"keep.txt": {"text": "preservar\n"}},
   "expected": {
     "exit_code": 0,
-    "stdout": {"kind": "json", "value": {"dimensions": {"concurrency": 0, "external_effect": 0, "migration": 0, "money": 0, "scope": 0}, "overrides": [], "reasons": [], "route": "normal", "score": 0}},
+    "stdout": {"kind": "json", "value": {"additional_guards": [], "declared_score": 0, "derived_floor": 0, "diff_floor": 0, "dimensions": {"concurrency": 0, "external_effect": 0, "migration": 0, "money": 0, "scope": 0}, "effective_score": 0, "initial_floor": 0, "overrides": [], "phase": "start", "reasons": [], "reclassified": false, "risk_contract": "quick-risk-floor-v1", "risk_inputs": {"declared_paths": [], "flags": {"concurrency": 0, "external_effect": 0, "migration": 0, "money": 0, "payment": false, "scope": 0, "webhook": false}}, "route": "normal", "schema_version": 1, "score": 0, "workflow": "quick"}},
     "stderr": "",
     "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
   }

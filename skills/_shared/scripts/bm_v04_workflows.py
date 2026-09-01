@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import bm_docviva
+import bm_risk
 from bm_project_model import read_frontmatter
 from bm_workspace import MethodWorkspace
 
@@ -361,6 +362,7 @@ def quick_start(
                 "reconciliation",
             }
         )
+    required.update(risk.get("additional_guards", []))
     missing = sorted(required - set(guards))
     brief = {
         "schema_version": 1,
@@ -374,6 +376,7 @@ def quick_start(
         "verification": verification,
         "risk": risk,
         "guards": sorted(set(guards)),
+        "required_guards": sorted(required),
         "missing_guards": missing,
         "flow": {"webhook": webhook_flow, "payment": payment_flow},
         "production_checkpoint_required": bool(
@@ -454,6 +457,7 @@ def quick_checkpoint(
     evidence: list[str],
     blockers: list[str],
     next_action: str,
+    guards: list[str] | None = None,
 ) -> dict[str, Any]:
     root = _repo_root(repo)
     directory = _quick_directory(root, work_id)
@@ -467,6 +471,7 @@ def quick_checkpoint(
         "commands": commands,
         "evidence": evidence,
         "blockers": blockers,
+        "guards": sorted(set(guards or [])),
         "fingerprint": _tree_fingerprint(root),
         "at": _now(),
     }
@@ -474,6 +479,9 @@ def quick_checkpoint(
     progress["updated_at"] = _now()
     brief = _read_frontmatter(directory / "BRIEF.md", "brief do quick")
     event["brief_digest"] = brief.get("digest")
+    risk, missing_guards = _quick_final_risk(root, brief, progress.get("events", []))
+    event["risk"] = risk
+    event["missing_guards"] = missing_guards
     _atomic_write(
         progress_path,
         _frontmatter(progress, f"# Progresso de {work_id}\n\n{summary.strip()}"),
@@ -484,7 +492,80 @@ def quick_checkpoint(
         blockers=blockers,
         active_work={"kind": "quick", "id": work_id, "status": "active"},
     )
-    return {"id": work_id, "status": "active", "checkpoint": len(progress["events"])}
+    return {
+        "id": work_id,
+        "status": "active",
+        "checkpoint": len(progress["events"]),
+        "risk": risk,
+        "missing_guards": missing_guards,
+    }
+
+
+def _quick_diff_paths(root: Path) -> list[str]:
+    head = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    tracked_args = ["diff", "--name-only"]
+    if head.returncode == 0:
+        tracked_args.append("HEAD")
+    tracked_args.extend(
+        ["--", ".", ":(exclude).bianchini", ":(exclude).planning"]
+    )
+    tracked = set(_git(root, *tracked_args).splitlines())
+    untracked = set(
+        _git(
+            root,
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "--",
+            ".",
+            ":(exclude).bianchini",
+            ":(exclude).planning",
+        ).splitlines()
+    )
+    return sorted(path for path in tracked | untracked if path)
+
+
+def _quick_final_risk(
+    root: Path, brief: dict[str, Any], events: Iterable[dict[str, Any]]
+) -> tuple[dict[str, Any], list[str]]:
+    initial = brief.get("risk", {})
+    if initial.get("risk_contract") != bm_risk.RISK_CONTRACT:
+        return initial, list(brief.get("missing_guards", []))
+    inputs = initial.get("risk_inputs", {})
+    declared_paths = set(inputs.get("declared_paths", []))
+    available_guards = set(brief.get("guards", []))
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        declared_paths.update(event.get("changed_files", []))
+        available_guards.update(event.get("guards", []))
+    try:
+        risk = bm_risk.assess_quick_risk(
+            int(initial.get("declared_score", initial.get("score", 0))),
+            flags=inputs.get("flags", {}),
+            declared_paths=declared_paths,
+            diff_paths=_quick_diff_paths(root),
+            phase="finish",
+        )
+    except bm_risk.RiskInputError as error:
+        raise WorkflowError(error.code, str(error).split(": ", 1)[-1]) from error
+    initial_floor = int(initial.get("derived_floor", 0))
+    initial_guards = set(initial.get("additional_guards", []))
+    risk["start_floor"] = initial_floor
+    risk["reclassified"] = bool(
+        risk.get("derived_floor", 0) > initial_floor
+        or set(risk.get("additional_guards", [])) - initial_guards
+    )
+    required = set(brief.get("required_guards", [])) | set(
+        risk.get("additional_guards", [])
+    )
+    return risk, sorted(required - available_guards)
 
 
 def quick_finish(
@@ -520,10 +601,6 @@ def quick_finish(
         )
         if stored_digest != current_digest:
             raise WorkflowError("STALE_EVIDENCE", "BRIEF.md mudou após a classificação")
-        if brief.get("missing_guards"):
-            raise WorkflowError(
-                "MISSING_GUARD", "guards ausentes: " + ", ".join(brief["missing_guards"])
-            )
         if brief.get("production_checkpoint_required") and not production_authorized:
             raise WorkflowError(
                 "EXTERNAL_AUTHORITY_REQUIRED", "efeito real exige checkpoint explícito"
@@ -540,6 +617,11 @@ def quick_finish(
         if last.get("fingerprint") != _tree_fingerprint(root):
             raise WorkflowError(
                 "STALE_EVIDENCE", "código mudou após o último checkpoint"
+            )
+        final_risk, missing_guards = _quick_final_risk(root, brief, events)
+        if missing_guards:
+            raise WorkflowError(
+                "MISSING_GUARD", "guards ausentes: " + ", ".join(missing_guards)
             )
         if brief.get("docviva_contract") == 1:
             if not docviva_kind or not docviva_outcome:
@@ -560,6 +642,8 @@ def quick_finish(
                 raise WorkflowError(error.code, str(error).split(": ", 1)[-1]) from error
     elif not blockers:
         raise WorkflowError("MODEL_MISMATCH", "quick bloqueado exige motivo")
+    else:
+        final_risk = brief.get("risk")
     result = {
         "schema_version": 1,
         "id": work_id,
@@ -570,6 +654,7 @@ def quick_finish(
         "blockers": blockers,
         "production_authorized": production_authorized,
         "docviva": docviva,
+        "risk": final_risk,
         "fingerprint": _tree_fingerprint(root),
         "finished_at": _now(),
     }
@@ -591,6 +676,7 @@ def quick_finish(
         "status": status,
         "path": str(directory / "RESULT.md"),
         "docviva": docviva,
+        "risk": final_risk,
     }
 
 

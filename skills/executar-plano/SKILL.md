@@ -15,14 +15,15 @@ Resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py) e use [`../_share
 
 1. Ler `.bianchini/STATE.md`; sem ele, bloquear e orientar `/migrar-bianchini` ou `/sdd-planning` conforme o projeto.
 2. Confirmar `status: approved|executing`, digest vigente, `COHERENCE.md` em `approved` e planos solicitados aprovados. Ler `schedule.plan_waves` e `schedule.task_waves` do checkpoint.
-3. Validar o modelo sem reabrir a auditoria aprovada:
+3. Projetar a onda executável com `bm.py roadmap next-wave --repo <repo> --change C001 --format json`. O host pode paralelizar somente `parallel_units`; o CLI não cria agentes nem escolhe modelo.
+4. Validar o modelo sem reabrir a auditoria aprovada:
 
 ```bash
 bm.py model validate --repo <repo> --change C001
 ```
 
-4. Bloquear `ERROR`, `WARNING` aberto, plano `stale`, dependência incompleta, consumidor sem provider e divergência do modelo.
-5. Exigir `git status --porcelain` vazio antes de criar ou retomar workspace.
+5. Bloquear `ERROR`, `WARNING` aberto, plano `stale`, dependência incompleta, consumidor sem provider e divergência do modelo.
+6. Exigir `git status --porcelain` vazio antes de criar ou retomar workspace.
 
 Não executar `coherence check` nem `impact analyze` como consulta de preflight: ambos atualizam `COHERENCE.md`. O gate de workspace valida o checkpoint aprovado. Digest alterado exige nova revisão completa e nova aprovação explícita.
 

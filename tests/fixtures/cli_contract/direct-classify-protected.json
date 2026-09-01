@@ -1,11 +1,12 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "evolution_note": "Fase 3 adiciona piso derivado observável; campos legados permanecem presentes.",
   "surface": "direct.classify",
   "argv": ["direct", "classify", "--repo", "{repo}", "--scope-score", "2", "--payment-flow", "--production-authorized"],
   "initial_tree": {"keep.txt": {"text": "preservar\n"}},
   "expected": {
     "exit_code": 0,
-    "stdout": {"kind": "json", "value": {"dimensions": {"concurrency": 0, "external_effect": 0, "migration": 0, "money": 0, "scope": 2}, "overrides": ["multiple_objectives"], "reasons": ["scope=2", "override:multiple_objectives"], "route": "protected", "score": 2}},
+    "stdout": {"kind": "json", "value": {"additional_guards": ["idempotency", "persistence", "reconciliation", "source_of_truth", "timeout_recovery"], "declared_score": 2, "derived_floor": 3, "diff_floor": 0, "dimensions": {"concurrency": 0, "external_effect": 0, "migration": 0, "money": 0, "scope": 2}, "effective_score": 3, "initial_floor": 3, "overrides": ["multiple_objectives"], "phase": "start", "reasons": ["declared_below_floor:2<3", "flag:payment=true", "flag:scope=2", "flags:dimension_total=2", "override:multiple_objectives", "scope=2"], "reclassified": false, "risk_contract": "quick-risk-floor-v1", "risk_inputs": {"declared_paths": [], "flags": {"concurrency": 0, "external_effect": 0, "migration": 0, "money": 0, "payment": true, "scope": 2, "webhook": false}}, "route": "protected", "schema_version": 1, "score": 3, "workflow": "quick"}},
     "stderr": "",
     "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
   }
