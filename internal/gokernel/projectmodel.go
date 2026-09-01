@@ -264,6 +264,10 @@ func loadPlanContract(path string) (planContract, error) {
 	if err != nil {
 		return planContract{}, err
 	}
+	return parsePlanContract(value)
+}
+
+func parsePlanContract(value map[string]any) (planContract, error) {
 	identifier := strings.TrimSpace(stateString(value["id"]))
 	if identifier == "" {
 		return planContract{}, fmt.Errorf("plano exige id")

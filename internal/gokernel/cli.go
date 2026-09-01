@@ -34,6 +34,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runModel(args[1:])
 	case "scope":
 		result, err = runScope(args[1:])
+	case "roadmap":
+		result, err = runRoadmap(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
 	case "policy":
@@ -50,6 +52,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runPlanningCheck(args[1:])
 	case "direct":
 		result, err = runDirect(args[1:])
+	case "debug":
+		result, err = runDebug(args[1:])
+	case "learn":
+		result, err = runLearning(args[1:])
+	case "migrate":
+		result, err = runMigrate(args[1:])
 	case "spec-diff":
 		result, err = runSpecDiff(args[1:])
 	case "status":

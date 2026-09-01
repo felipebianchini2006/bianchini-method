@@ -429,6 +429,32 @@ model_delta:
                 self.assertEqual(verified.returncode, 0, verified.stderr)
                 self.assertTrue(json.loads(verified.stdout)["verified"])
 
+    def test_go_next_wave_matches_python_oracle_without_mutation(self) -> None:
+        from tests.test_next_wave import NextWaveScenarios, tree_digest
+
+        with tempfile.TemporaryDirectory(prefix="bm-go-wave-parity-") as temp:
+            base = Path(temp)
+            binary = base / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            scenario = NextWaveScenarios(
+                "test_next_wave_is_deterministic_parallel_and_excludes_stale_blocked"
+            )
+            repo, _change = scenario.make_repo(base)
+            before = tree_digest(repo)
+            python = run(
+                "python3", str(ROOT / "scripts" / "bm.py"), "roadmap", "next-wave",
+                "--repo", str(repo), "--change", "C001", "--format", "json",
+            )
+            go = run(
+                str(binary), "roadmap", "next-wave", "--repo", str(repo),
+                "--change", "C001", "--format", "json",
+            )
+            self.assertEqual(go.returncode, python.returncode)
+            self.assertEqual(go.stderr, python.stderr)
+            self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
+            self.assertEqual(tree_digest(repo), before)
+
     def test_preview_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),

@@ -40,12 +40,10 @@ func runDirect(args []string) (any, error) {
 		}
 		return nil, domainError("ORDER_VIOLATION", "quick 0.4 terminal é imutável")
 	}
+	if oneOf(action, "start", "status", "checkpoint", "finish") {
+		return runDirectLifecycle(action, args[1:])
+	}
 	if action != "classify" {
-		for _, allowed := range []string{"start", "status", "checkpoint", "finish"} {
-			if action == allowed {
-				return nil, domainError("NOT_IMPLEMENTED", "direct "+action+" não está disponível no backend go-preview")
-			}
-		}
 		return nil, argparseError(fmt.Sprintf("argument action: invalid choice: '%s'", action))
 	}
 	flags, err := parseFlags(args[1:], directValueFlags, directBooleanFlags)
