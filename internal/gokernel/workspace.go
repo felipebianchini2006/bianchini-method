@@ -310,7 +310,7 @@ func (workspace methodWorkspace) atomicWrite(path string, content []byte) error 
 	if err := temporary.Close(); err != nil {
 		return workflowError("MODEL_MISMATCH", err.Error())
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
+	if err := durableRename(temporaryPath, path); err != nil {
 		return workflowError("MODEL_MISMATCH", err.Error())
 	}
 	return nil

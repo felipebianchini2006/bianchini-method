@@ -113,7 +113,7 @@ func writeUpdateJournalWithSync(transaction updateTransaction, syncDir directory
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
+	if err := replacePath(temporaryPath, path); err != nil {
 		return err
 	}
 	return syncDir(filepath.Dir(path))

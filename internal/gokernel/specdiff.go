@@ -311,5 +311,5 @@ func atomicWrite(path string, data []byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, path)
+	return durableRename(temporaryPath, path)
 }

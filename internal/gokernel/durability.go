@@ -24,28 +24,18 @@ func syncRenameDirectories(source, target string, syncDir directorySync) error {
 }
 
 func durableRename(source, target string) error {
-	if err := os.Rename(source, target); err != nil {
+	if err := replacePath(source, target); err != nil {
 		return err
 	}
 	return syncRenameDirectories(source, target, syncDirectory)
 }
 
 func durableRemoveAll(path string) error {
-	if err := os.RemoveAll(path); err != nil {
-		return err
-	}
-	return syncDirectory(filepath.Dir(path))
+	return removeAllDurably(path)
 }
 
 func durableRemoveFile(path string) error {
-	err := os.Remove(path)
-	if os.IsNotExist(err) {
-		return syncDirectory(filepath.Dir(path))
-	}
-	if err != nil {
-		return err
-	}
-	return syncDirectory(filepath.Dir(path))
+	return removeFileDurably(path)
 }
 
 func syncTreeDurably(root string) error {

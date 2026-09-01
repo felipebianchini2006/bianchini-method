@@ -196,7 +196,7 @@ func closeAtomicWriteWithSync(path string, content []byte, syncDir directorySync
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
+	if err := replacePath(temporaryPath, path); err != nil {
 		return err
 	}
 	return syncDir(filepath.Dir(path))
@@ -302,7 +302,7 @@ func closeRenameWithSync(source, target string, syncDir directorySync) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
-	if err := os.Rename(source, target); err != nil {
+	if err := replacePath(source, target); err != nil {
 		return err
 	}
 	return syncRenameDirectories(source, target, syncDir)

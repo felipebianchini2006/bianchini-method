@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"syscall"
 	"testing"
 )
 
@@ -244,18 +243,20 @@ func TestSpecDiffFixtureAndPathSafety(t *testing.T) {
 		t.Fatalf("output mode=%o want=755", info.Mode().Perm())
 	}
 	restrictedOutput := filepath.Join(repo, "restricted.md")
-	oldUmask := syscall.Umask(0o077)
-	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", base, "--target", target, "--output", restrictedOutput)
-	syscall.Umask(oldUmask)
-	if code != 0 || stderr != "" {
-		t.Fatalf("restricted umask code=%d stderr=%q", code, stderr)
-	}
-	restrictedInfo, err := os.Stat(restrictedOutput)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if restrictedInfo.Mode().Perm() != 0o600 {
-		t.Fatalf("restricted output mode=%o want=600", restrictedInfo.Mode().Perm())
+	restoreUmask, umaskSupported := setTestUmask(0o077)
+	if umaskSupported {
+		code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", base, "--target", target, "--output", restrictedOutput)
+		restoreUmask()
+		if code != 0 || stderr != "" {
+			t.Fatalf("restricted umask code=%d stderr=%q", code, stderr)
+		}
+		restrictedInfo, err := os.Stat(restrictedOutput)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if restrictedInfo.Mode().Perm() != 0o600 {
+			t.Fatalf("restricted output mode=%o want=600", restrictedInfo.Mode().Perm())
+		}
 	}
 
 	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", filepath.Join(repo, ".planning", "base.md"), "--target", target, "--output", filepath.Join(repo, "unsafe.md"))

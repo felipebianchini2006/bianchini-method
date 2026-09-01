@@ -439,7 +439,7 @@ func contextAtomicWrite(path string, content []byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, path)
+	return durableRename(temporaryPath, path)
 }
 
 func contextSortedKeys(values map[string]bool) []string {

@@ -227,7 +227,7 @@ func closeLegacyChange(pack coherencePackage, archive string, summary []byte) (m
 	if err := os.MkdirAll(filepath.Dir(archive), 0o755); err != nil {
 		return nil, err
 	}
-	if err := os.Rename(pack.directory, archive); err != nil {
+	if err := durableRename(pack.directory, archive); err != nil {
 		_ = pack.workspace.atomicWrite(filepath.Join(pack.workspace.current, "ARCHITECTURE.md"), previousArchitecture)
 		_ = pack.workspace.atomicWrite(pack.workspace.currentMod, previousModel)
 		return nil, err
@@ -247,7 +247,7 @@ func closeLegacyChange(pack coherencePackage, archive string, summary []byte) (m
 	}
 	if err != nil {
 		if moved {
-			_ = os.Rename(archive, pack.directory)
+			_ = durableRename(archive, pack.directory)
 		}
 		_ = pack.workspace.atomicWrite(filepath.Join(pack.workspace.current, "ARCHITECTURE.md"), previousArchitecture)
 		_ = pack.workspace.atomicWrite(pack.workspace.currentMod, previousModel)

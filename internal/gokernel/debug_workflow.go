@@ -372,7 +372,7 @@ func debugFinish(repo string, flags parsedFlags) (map[string]any, error) {
 	if err := workspace.atomicWrite(source, document); err != nil {
 		return nil, err
 	}
-	if err := os.Rename(source, target); err != nil {
+	if err := durableRename(source, target); err != nil {
 		return nil, workflowError("MODEL_MISMATCH", err.Error())
 	}
 	stateStatus := "idle"

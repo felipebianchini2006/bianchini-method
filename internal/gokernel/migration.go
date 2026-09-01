@@ -226,7 +226,7 @@ func migrationApply(repo string) (map[string]any, error) {
 			_ = os.Remove(part)
 			return nil, rollback("checksum do destino divergiu: " + entry.Target)
 		}
-		if err := os.Rename(part, target); err != nil {
+		if err := durableRename(part, target); err != nil {
 			return nil, rollback(err.Error())
 		}
 		copied = append(copied, migrationCopyPair{source: source, target: target})
