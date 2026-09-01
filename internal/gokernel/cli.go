@@ -40,6 +40,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runPolicy(args[1:])
 	case "adapter":
 		result, err = runAdapter(args[1:])
+	case "snapshot":
+		result, err = runSnapshot(args[1:])
+	case "planning-audit":
+		result, err = runPlanningAudit(args[1:])
+	case "design-audit":
+		result, err = runDesignAudit(args[1:])
+	case "planning-check":
+		result, err = runPlanningCheck(args[1:])
 	case "direct":
 		result, err = runDirect(args[1:])
 	case "spec-diff":
