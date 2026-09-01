@@ -21,6 +21,7 @@ var ImplementedSurfaces = []string{
 	"coherence:approve",
 	"impact:analyze",
 	"plan:complete",
+	"cycle-close",
 	"change-policy",
 	"policy",
 	"adapter:render",

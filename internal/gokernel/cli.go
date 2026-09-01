@@ -88,6 +88,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runContext(args[1:])
 	case "update-bm":
 		result, err = runUpdate(args[1:])
+	case "cycle-close":
+		result, err = runCycleClose(args[1:])
 	default:
 		return writeArgparseError(stderr, fmt.Sprintf("argument command: invalid choice: '%s'", args[0]))
 	}
