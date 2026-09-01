@@ -424,6 +424,9 @@ func legacyWriteReviewPackage(cwdValue, base, head, briefValue, reportValue, out
 	if err != nil {
 		return nil, err
 	}
+	if _, err := legacyGitOutput(cwd, "rev-parse", "--show-toplevel"); err != nil {
+		return nil, fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "git rev-parse --show-toplevel: "))
+	}
 	brief, err := safeStandaloneFile(briefValue, "brief")
 	if err != nil {
 		return nil, err

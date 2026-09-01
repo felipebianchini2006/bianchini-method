@@ -61,6 +61,14 @@ func runMutationEvidence(args []string) (any, error) {
 }
 
 func legacyMutationEvidenceVerify(rootValue, stateValue, planID, riskSeam, tool, commandValue, reportValue, outputValue, revision, classificationsValue string) (map[string]any, error) {
+	statePath, err := safeStandaloneFile(stateValue, "state")
+	if err != nil {
+		return nil, err
+	}
+	state, err := validateStateFile(statePath, "")
+	if err != nil {
+		return nil, err
+	}
 	root, err := safeRoot(rootValue)
 	if err != nil {
 		return nil, err
@@ -73,14 +81,6 @@ func legacyMutationEvidenceVerify(rootValue, stateValue, planID, riskSeam, tool,
 	actualRoot, actualErr := filepath.EvalSymlinks(gitRoot)
 	if evalErr != nil || actualErr != nil || filepath.Clean(expectedRoot) != filepath.Clean(actualRoot) {
 		return nil, fmt.Errorf("--root deve apontar para a raiz Git")
-	}
-	statePath, err := confinedPath(root, stateValue, "state", true)
-	if err != nil {
-		return nil, err
-	}
-	state, err := validateStateFile(statePath, "")
-	if err != nil {
-		return nil, err
 	}
 	reportPath, err := confinedPath(root, reportValue, "mutation report", true)
 	if err != nil {

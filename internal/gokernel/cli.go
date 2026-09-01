@@ -38,6 +38,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runRoadmap(args[1:])
 	case "coherence":
 		result, err = runCoherence(args[1:])
+	case "impact":
+		result, err = runImpact(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
 	case "policy":
@@ -60,6 +62,20 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runLearning(args[1:])
 	case "migrate":
 		result, err = runMigrate(args[1:])
+	case "task-brief":
+		result, err = runTaskBrief(args[1:])
+	case "report":
+		result, err = runReport(args[1:])
+	case "review-package":
+		result, err = runReviewPackage(args[1:])
+	case "checkpoint":
+		result, err = runCheckpoint(args[1:])
+	case "proof-map":
+		result, err = runProofMap(args[1:])
+	case "mutation-evidence":
+		result, err = runMutationEvidence(args[1:])
+	case "telemetry":
+		result, err = runTelemetry(args[1:])
 	case "spec-diff":
 		result, err = runSpecDiff(args[1:])
 	case "status":

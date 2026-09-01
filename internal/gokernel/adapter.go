@@ -117,7 +117,13 @@ func renderAdapter(host string) string {
 func installAdapter(repo, host string, overwrite bool) (map[string]any, error) {
 	root, err := safeRoot(repo)
 	if err != nil {
-		return nil, adapterError("HOST_ADAPTER_PATH_INVALID", strings.TrimPrefix(err.Error(), "PATH_SAFETY: "))
+		message := strings.TrimPrefix(err.Error(), "PATH_SAFETY: ")
+		if message == "root ausente" {
+			message = "raiz do repositório ausente"
+		} else if message == "root deve ser diretório real" {
+			message = "raiz do repositório não pode ser symlink"
+		}
+		return nil, adapterError("HOST_ADAPTER_PATH_INVALID", message)
 	}
 	definition := adapterDefinitions[host]
 	target := filepath.Join(root, definition.target)

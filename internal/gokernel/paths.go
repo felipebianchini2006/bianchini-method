@@ -137,11 +137,20 @@ func safeStandaloneFile(path, label string) (string, error) {
 		return "", domainError("PATH_SAFETY", label+" inválido")
 	}
 	info, err := os.Lstat(absolute)
-	if err != nil || !info.Mode().IsRegular() {
-		return "", domainError("PATH_SAFETY", label+" deve ser arquivo regular")
+	if os.IsNotExist(err) {
+		if label == "state" {
+			return "", stateError("estado não encontrado: "+path, 2)
+		}
+		return "", fmt.Errorf("erro de entrada/IO: [Errno 2] No such file or directory: '%s'", path)
+	}
+	if err != nil {
+		return "", domainError("PATH_SAFETY", label+" inválido")
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
 		return "", domainError("PATH_SAFETY", label+" não aceita symlink")
+	}
+	if !info.Mode().IsRegular() {
+		return "", domainError("PATH_SAFETY", label+" deve ser arquivo regular")
 	}
 	return absolute, nil
 }
