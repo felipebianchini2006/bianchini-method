@@ -276,6 +276,135 @@ class GovernedLearningScenarios(unittest.TestCase):
             lessons = repo / ".bianchini/current/lessons"
             self.assertFalse(lessons.exists())
 
+            proposed = self.run_bm("learn", "propose", "--repo", str(repo))
+            self.assertEqual(proposed.returncode, 0, proposed.stderr)
+            self.assertEqual(json.loads(proposed.stdout)["candidates"], [])
+
+    def test_source_discovery_rejects_symlinked_bianchini_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            repo = base / "repo"
+            repo.mkdir()
+            subprocess.run(
+                ["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True
+            )
+            outside = base / "outside"
+            (outside / "debug/resolved").mkdir(parents=True)
+            (outside / "debug/resolved/D001-external.md").write_text(
+                "conteúdo externo não governado\n", encoding="utf-8"
+            )
+            (repo / ".bianchini").symlink_to(outside, target_is_directory=True)
+
+            proposed = self.run_bm("learn", "propose", "--repo", str(repo))
+            self.assertNotEqual(proposed.returncode, 0)
+            self.assertIn("LEARNING_PATH_INVALID", proposed.stderr)
+
+    def test_resolved_debug_can_explicitly_nominate_pending_learning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            repo.mkdir()
+            subprocess.run(
+                ["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True
+            )
+            subprocess.run(["git", "config", "user.name", "BM Test"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=repo,
+                check=True,
+            )
+            (repo / "README.md").write_text("fixture\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "fixture"], cwd=repo, check=True, capture_output=True
+            )
+            initialized = self.run_bm("model", "init", "--repo", str(repo))
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            started = self.run_bm(
+                "debug",
+                "start",
+                "--repo",
+                str(repo),
+                "--objective",
+                "Estabilizar retry",
+                "--expected",
+                "Retry idempotente",
+                "--actual",
+                "Retry duplica efeito",
+                "--environment",
+                "pytest local",
+            )
+            self.assertEqual(started.returncode, 0, started.stderr)
+            debug_id = json.loads(started.stdout)["id"]
+            for event in ("reproduced", "diagnosed", "red", "fixing"):
+                extra: list[str] = []
+                if event == "diagnosed":
+                    extra = ["--root-cause", "retry sem chave estável"]
+                checkpoint = self.run_bm(
+                    "debug",
+                    "checkpoint",
+                    "--repo",
+                    str(repo),
+                    "--id",
+                    debug_id,
+                    "--event",
+                    event,
+                    "--evidence",
+                    f"evidência {event}",
+                    *extra,
+                )
+                self.assertEqual(checkpoint.returncode, 0, checkpoint.stderr)
+            (repo / "fix.py").write_text("IDEMPOTENT = True\n", encoding="utf-8")
+            for event in ("green", "regression_checked", "documented"):
+                extra = []
+                if event == "regression_checked":
+                    extra = ["--neighbor-regression", "retry saudável permanece válido"]
+                if event == "documented":
+                    extra = ["--residual-risk", "limitado ao contrato testado"]
+                checkpoint = self.run_bm(
+                    "debug",
+                    "checkpoint",
+                    "--repo",
+                    str(repo),
+                    "--id",
+                    debug_id,
+                    "--event",
+                    event,
+                    "--evidence",
+                    f"evidência {event}",
+                    *extra,
+                )
+                self.assertEqual(checkpoint.returncode, 0, checkpoint.stderr)
+
+            finished = self.run_bm(
+                "debug",
+                "finish",
+                "--repo",
+                str(repo),
+                "--id",
+                debug_id,
+                "--docviva-kind",
+                "internal",
+                "--docviva-outcome",
+                "not_applicable",
+                "--docviva-justification",
+                "A correção não alterou contrato vivo.",
+                "--learning-classification",
+                "repeatable_procedure",
+                "--learning-statement",
+                "Usar chave de idempotência estável em retries.",
+                "--learning-tag",
+                "retry",
+                "--learning-validity",
+                "enquanto o contrato de retry estiver ativo",
+            )
+            self.assertEqual(finished.returncode, 0, finished.stderr)
+            proposed = self.run_bm("learn", "propose", "--repo", str(repo))
+            self.assertEqual(proposed.returncode, 0, proposed.stderr)
+            payload = json.loads(proposed.stdout)
+            self.assertEqual(payload["created"], 1)
+            self.assertEqual(payload["candidates"][0]["classification"], "repeatable_procedure")
+            self.assertFalse((repo / ".bianchini/current/lessons").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

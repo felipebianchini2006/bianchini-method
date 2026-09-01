@@ -106,14 +106,7 @@ def _atomic_write(path: Path, content: bytes) -> None:
 
 
 def _source_paths(root: Path, since: str | None) -> list[Path]:
-    patterns = (
-        ".bianchini/debug/resolved/*.md",
-        ".bianchini/debug/KNOWLEDGE.md",
-        ".bianchini/changes/*/results/**/*.md",
-        ".bianchini/archive/*/results/**/*.md",
-        ".bianchini/changes/*/COHERENCE.md",
-        ".bianchini/archive/*/COHERENCE.md",
-    )
+    bianchini = _fixed_dir(root, ".bianchini", create=False)
     allowed_by_since: set[str] | None = None
     if since:
         checked = subprocess.run(
@@ -135,18 +128,71 @@ def _source_paths(root: Path, since: str | None) -> list[Path]:
         if changed.returncode != 0:
             _fail("LEARNING_SINCE_INVALID", changed.stderr.strip() or "diff falhou")
         allowed_by_since = set(changed.stdout.splitlines())
+    if not bianchini.is_dir():
+        return []
+
+    def add_file(result: set[Path], path: Path) -> None:
+        relative = path.relative_to(root).as_posix()
+        if any(part.casefold() == ".planning" for part in Path(relative).parts):
+            return
+        if path.is_symlink():
+            _fail("LEARNING_PATH_INVALID", f"fonte symlink: {relative}")
+        if path.is_file() and (allowed_by_since is None or relative in allowed_by_since):
+            result.add(path)
+
+    def add_markdown_tree(result: set[Path], directory: Path) -> None:
+        if directory.is_symlink():
+            _fail(
+                "LEARNING_PATH_INVALID",
+                f"diretório symlink: {directory.relative_to(root).as_posix()}",
+            )
+        if not directory.is_dir():
+            return
+        for current, directories, files in os.walk(directory, followlinks=False):
+            current_path = Path(current)
+            safe_directories: list[str] = []
+            for name in sorted(directories):
+                if name.casefold() == ".planning":
+                    continue
+                child = current_path / name
+                if child.is_symlink():
+                    _fail(
+                        "LEARNING_PATH_INVALID",
+                        f"diretório symlink: {child.relative_to(root).as_posix()}",
+                    )
+                safe_directories.append(name)
+            directories[:] = safe_directories
+            for name in sorted(files):
+                if name.casefold() == ".planning":
+                    continue
+                path = current_path / name
+                if path.suffix == ".md":
+                    add_file(result, path)
+
     result: set[Path] = set()
-    for pattern in patterns:
-        for path in root.glob(pattern):
-            relative = path.relative_to(root).as_posix()
-            if ".planning" in Path(relative).parts:
+    debug = _fixed_dir(root, ".bianchini/debug", create=False)
+    resolved = _fixed_dir(root, ".bianchini/debug/resolved", create=False)
+    if resolved.is_dir():
+        for path in sorted(resolved.iterdir()):
+            if path.suffix == ".md":
+                add_file(result, path)
+    add_file(result, debug / "KNOWLEDGE.md")
+    for area in ("changes", "archive"):
+        directory = _fixed_dir(root, f".bianchini/{area}", create=False)
+        if not directory.is_dir():
+            continue
+        for work in sorted(directory.iterdir()):
+            if work.name.casefold() == ".planning":
                 continue
-            if path.is_symlink():
-                _fail("LEARNING_PATH_INVALID", f"fonte symlink: {relative}")
-            if path.is_file() and (
-                allowed_by_since is None or relative in allowed_by_since
-            ):
-                result.add(path)
+            if work.is_symlink():
+                _fail(
+                    "LEARNING_PATH_INVALID",
+                    f"diretório symlink: {work.relative_to(root).as_posix()}",
+                )
+            if not work.is_dir():
+                continue
+            add_file(result, work / "COHERENCE.md")
+            add_markdown_tree(result, work / "results")
     return sorted(result)
 
 
@@ -166,6 +212,12 @@ def _text_list(value: Any, label: str, *, required: bool = False) -> list[str]:
 def _extract_candidate(
     root: Path, source: Path, *, source_identity: str | None = None
 ) -> dict[str, Any] | None:
+    try:
+        text = source.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        _fail("LEARNING_SOURCE_INVALID", f"{source.name}: {error}")
+    if not text.startswith("---\n"):
+        return None
     try:
         payload = read_frontmatter(source)
     except (OSError, UnicodeError, ValueError) as error:
@@ -190,7 +242,18 @@ def _extract_candidate(
             "LEARNING_EVIDENCE_REQUIRED",
             "somente fonte terminal com sucesso comprovado pode propor aprendizado",
         )
-    evidence = _text_list(payload.get("evidence"), "evidence", required=True)
+    evidence_value = payload.get("evidence")
+    if evidence_value is None:
+        evidence_value = payload.get("verification")
+    if evidence_value is None and isinstance(payload.get("events"), list):
+        evidence_value = [
+            item["evidence"]
+            for item in payload["events"]
+            if isinstance(item, dict)
+            and isinstance(item.get("evidence"), str)
+            and item["evidence"].strip()
+        ]
+    evidence = _text_list(evidence_value, "evidence", required=True)
     statement = raw.get("statement")
     validity = raw.get("validity")
     if not isinstance(statement, str) or not statement.strip():

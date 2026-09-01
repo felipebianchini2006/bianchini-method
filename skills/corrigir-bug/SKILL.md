@@ -149,6 +149,12 @@ Bug que restaura spec aceita não altera a spec. Se a investigação provar que 
 bm.py debug finish --repo <repo> ...
 ```
 
+Quando a resolução demonstrar um padrão causal reutilizável, a finalização pode
+nomear explicitamente uma proposta com `--learning-classification`,
+`--learning-statement`, `--learning-tag` e `--learning-validity`. Isso cria apenas
+uma fonte elegível para `bm.py learn propose`; aprovação humana continua separada
+e obrigatória.
+
 `resolved` exige causa, RED, GREEN, reprodução original, regressão vizinha e documentação vigentes. `blocked` exige condição externa específica. `escalated` preserva toda a investigação.
 
 O CLI move casos resolvidos para `.bianchini/debug/resolved/` e atualiza `STATE.md`. Somente padrões causais realmente reutilizáveis entram em `KNOWLEDGE.md`; não copie o caso inteiro.

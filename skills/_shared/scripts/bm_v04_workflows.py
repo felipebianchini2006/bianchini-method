@@ -1015,6 +1015,7 @@ def debug_finish(
     docviva_outcome: str | None = None,
     docviva_artifacts: Iterable[str] = (),
     docviva_justification: str | None = None,
+    learning_candidate: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = _repo_root(repo)
     if status not in TERMINAL_DEBUG:
@@ -1056,6 +1057,18 @@ def debug_finish(
                 raise WorkflowError(error.code, str(error).split(": ", 1)[-1]) from error
     if status != "resolved" and not (reason or "").strip():
         raise WorkflowError("MODEL_MISMATCH", "debug bloqueado ou escalado exige motivo")
+    if learning_candidate is not None:
+        if status != "resolved":
+            raise WorkflowError(
+                "LEARNING_CANDIDATE_INVALID",
+                "somente debug resolvido pode nomear aprendizado",
+            )
+        expected_fields = {"classification", "statement", "tags", "validity", "conflicts"}
+        if set(learning_candidate) != expected_fields:
+            raise WorkflowError(
+                "LEARNING_CANDIDATE_INVALID", "nomeação de aprendizado incompleta"
+            )
+        value["learning_candidate"] = learning_candidate
     value["status"] = status
     value["reason"] = reason
     value["docviva"] = docviva

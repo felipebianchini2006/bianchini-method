@@ -4083,6 +4083,21 @@ def parser() -> argparse.ArgumentParser:
     )
     debug.add_argument("--docviva-artifact", action="append", default=[])
     debug.add_argument("--docviva-justification")
+    debug.add_argument(
+        "--learning-classification",
+        choices=[
+            "environment_fact",
+            "human_preference",
+            "repeatable_procedure",
+            "deterministic_invariant",
+            "architecture_decision",
+            "isolated_error",
+        ],
+    )
+    debug.add_argument("--learning-statement")
+    debug.add_argument("--learning-tag", action="append", default=[])
+    debug.add_argument("--learning-validity")
+    debug.add_argument("--learning-conflict", action="append", default=[])
 
     migrate = commands.add_parser("migrate")
     migrate.add_argument("action", choices=["check", "apply"])
@@ -4503,6 +4518,33 @@ def main() -> int:
                 v04.require_workspace(args.repo)
                 if not args.id:
                     raise BMError("debug finish exige --id")
+                learning_values = (
+                    args.learning_classification,
+                    args.learning_statement,
+                    args.learning_tag,
+                    args.learning_validity,
+                    args.learning_conflict,
+                )
+                learning_candidate = None
+                if any(learning_values):
+                    if not all(
+                        (
+                            args.learning_classification,
+                            args.learning_statement,
+                            args.learning_tag,
+                            args.learning_validity,
+                        )
+                    ):
+                        raise BMError(
+                            "nomeação de aprendizado exige classification, statement, tag e validity"
+                        )
+                    learning_candidate = {
+                        "classification": args.learning_classification,
+                        "statement": args.learning_statement,
+                        "tags": args.learning_tag,
+                        "validity": args.learning_validity,
+                        "conflicts": args.learning_conflict,
+                    }
                 emit(
                     v04.debug_finish(
                         args.repo,
@@ -4513,6 +4555,7 @@ def main() -> int:
                         args.docviva_outcome,
                         args.docviva_artifact,
                         args.docviva_justification,
+                        learning_candidate,
                     )
                 )
         elif args.command == "snapshot":
