@@ -21,6 +21,7 @@ var (
 	}
 	learningApprovable = map[string]bool{"repeatable_procedure": true, "deterministic_invariant": true}
 	learningSuccess    = map[string]bool{"resolved": true, "completed": true, "passed": true, "accepted": true}
+	learningRemoveFile = durableRemoveFile
 	learningValueFlags = map[string]bool{
 		"--repo": true, "--since": true, "--candidate": true, "--digest": true,
 		"--approved-by": true, "--reason": true,
@@ -59,17 +60,48 @@ func runLearning(args []string) (any, error) {
 	}
 	switch action {
 	case "propose":
-		return learningPropose(repo, lastValue(flags, "--since"))
+		return withLearningLock(repo, func() (map[string]any, error) {
+			return learningPropose(repo, lastValue(flags, "--since"))
+		})
 	case "list":
 		return learningList(repo)
 	case "approve":
-		return learningApprove(repo, lastValue(flags, "--candidate"), lastValue(flags, "--digest"), lastValue(flags, "--approved-by"))
+		return withLearningLock(repo, func() (map[string]any, error) {
+			return learningApprove(repo, lastValue(flags, "--candidate"), lastValue(flags, "--digest"), lastValue(flags, "--approved-by"))
+		})
 	case "reject":
-		return learningReject(repo, lastValue(flags, "--candidate"), lastValue(flags, "--reason"))
+		return withLearningLock(repo, func() (map[string]any, error) {
+			return learningReject(repo, lastValue(flags, "--candidate"), lastValue(flags, "--reason"))
+		})
 	case "deactivate":
-		return learningDeactivate(repo, lastValue(flags, "--candidate"), lastValue(flags, "--reason"), lastValue(flags, "--approved-by"))
+		return withLearningLock(repo, func() (map[string]any, error) {
+			return learningDeactivate(repo, lastValue(flags, "--candidate"), lastValue(flags, "--reason"), lastValue(flags, "--approved-by"))
+		})
 	}
 	return nil, argparseError(fmt.Sprintf("argument action: invalid choice: '%s'", action))
+}
+
+func withLearningLock(repo string, action func() (map[string]any, error)) (map[string]any, error) {
+	directory, err := learningFixedDir(repo, ".bianchini/.runtime/learning", true)
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(directory, "transition.lock")
+	if info, statErr := os.Lstat(path); statErr == nil && info.Mode()&os.ModeSymlink != 0 {
+		return nil, learningError("LEARNING_PATH_INVALID", "lock de aprendizado não pode ser symlink")
+	} else if statErr != nil && !os.IsNotExist(statErr) {
+		return nil, learningError("LEARNING_PATH_INVALID", statErr.Error())
+	}
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return nil, learningError("LEARNING_PATH_INVALID", "não foi possível abrir lock de aprendizado")
+	}
+	defer file.Close()
+	if err := lockCloseFile(file); err != nil {
+		return nil, learningError("LEARNING_BUSY", "outra transição de aprendizado está em execução")
+	}
+	defer unlockCloseFile(file)
+	return action()
 }
 
 func learningRepo(value string) (string, error) {
@@ -188,7 +220,7 @@ func learningCandidate(repo, source string) (map[string]any, error) {
 	if classification == "isolated_error" {
 		return nil, nil
 	}
-	if !learningSuccess[stateString(payload["status"])] || strings.TrimSpace(stateString(payload["green"])) == "" {
+	if !learningSuccess[stateString(payload["status"])] || !contextTruthy(payload["green"]) {
 		return nil, learningError("LEARNING_EVIDENCE_REQUIRED", "somente fonte terminal com sucesso comprovado pode propor aprendizado")
 	}
 	evidenceValue := payload["evidence"]
@@ -293,13 +325,24 @@ func learningApprove(repo, id, digest, approvedBy string) (map[string]any, error
 	}
 	target := filepath.Join(lessons, id+".json")
 	if _, err := os.Lstat(target); err == nil {
-		return nil, learningError("STALE_EVIDENCE", "lição já existe: "+id)
+		existing, raw, loadErr := learningJSONObject(target, "lição")
+		canonical, _ := learningCanonical(existing)
+		if loadErr != nil || !bytes.Equal(canonical, raw) || !learningApprovedTransitionMatches(existing, candidate, digest, approvedBy) {
+			return nil, learningError("STALE_EVIDENCE", "lição já existe: "+id)
+		}
+		if err := learningRemoveFile(source); err != nil {
+			return nil, learningError("LEARNING_PATH_INVALID", err.Error())
+		}
+		relative, _ := filepath.Rel(repo, target)
+		return map[string]any{"id": id, "status": "approved", "path": filepath.ToSlash(relative), "digest": digest}, nil
+	} else if !os.IsNotExist(err) {
+		return nil, learningError("LEARNING_PATH_INVALID", err.Error())
 	}
 	encoded, _ := learningCanonical(approved)
 	if err := learningAtomicWrite(repo, target, encoded); err != nil {
 		return nil, err
 	}
-	if err := os.Remove(source); err != nil {
+	if err := learningRemoveFile(source); err != nil {
 		return nil, learningError("LEARNING_PATH_INVALID", err.Error())
 	}
 	relative, _ := filepath.Rel(repo, target)
@@ -352,22 +395,34 @@ func learningReject(repo, id, reason string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	candidate["status"] = "rejected"
-	candidate["rejection_reason"] = strings.TrimSpace(reason)
-	candidate["rejected_at"] = utcNow()
+	rejected := cloneMap(candidate)
+	rejected["status"] = "rejected"
+	rejected["rejection_reason"] = strings.TrimSpace(reason)
+	rejected["rejected_at"] = utcNow()
 	directory, err := learningFixedDir(repo, ".bianchini/.runtime/learning/rejected", true)
 	if err != nil {
 		return nil, err
 	}
 	target := filepath.Join(directory, id+".json")
 	if _, err := os.Lstat(target); err == nil {
-		return nil, learningError("STALE_EVIDENCE", "rejeição já existe: "+id)
+		existing, raw, loadErr := learningJSONObject(target, "rejeição")
+		canonical, _ := learningCanonical(existing)
+		if loadErr != nil || !bytes.Equal(canonical, raw) || !learningRejectedTransitionMatches(existing, candidate, reason) {
+			return nil, learningError("STALE_EVIDENCE", "rejeição já existe: "+id)
+		}
+		if err := learningRemoveFile(source); err != nil {
+			return nil, learningError("LEARNING_PATH_INVALID", err.Error())
+		}
+		relative, _ := filepath.Rel(repo, target)
+		return map[string]any{"id": id, "status": "rejected", "path": filepath.ToSlash(relative)}, nil
+	} else if !os.IsNotExist(err) {
+		return nil, learningError("LEARNING_PATH_INVALID", err.Error())
 	}
-	encoded, _ := learningCanonical(candidate)
+	encoded, _ := learningCanonical(rejected)
 	if err := learningAtomicWrite(repo, target, encoded); err != nil {
 		return nil, err
 	}
-	if err := os.Remove(source); err != nil {
+	if err := learningRemoveFile(source); err != nil {
 		return nil, learningError("LEARNING_PATH_INVALID", err.Error())
 	}
 	relative, _ := filepath.Rel(repo, target)
@@ -614,6 +669,11 @@ func learningFixedDir(repo, relative string, create bool) (string, error) {
 			if !info.IsDir() {
 				return "", learningError("LEARNING_PATH_INVALID", "diretório inválido: "+relative)
 			}
+			if create {
+				if syncErr := syncDirectory(filepath.Dir(path)); syncErr != nil {
+					return "", learningError("LEARNING_PATH_INVALID", syncErr.Error())
+				}
+			}
 			continue
 		}
 		if !os.IsNotExist(err) {
@@ -625,6 +685,9 @@ func learningFixedDir(repo, relative string, create bool) (string, error) {
 		if err := os.Mkdir(path, 0o755); err != nil {
 			return "", learningError("LEARNING_PATH_INVALID", err.Error())
 		}
+		if err := syncDirectory(filepath.Dir(path)); err != nil {
+			return "", learningError("LEARNING_PATH_INVALID", err.Error())
+		}
 	}
 	return path, nil
 }
@@ -634,11 +697,38 @@ func learningAtomicWrite(repo, path string, content []byte) error {
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || hasForeignPart(relative) {
 		return learningError("LEARNING_PATH_INVALID", "escrita fora de .bianchini")
 	}
-	workspace := newMethodWorkspace(repo)
-	if err := workspace.atomicWrite(path, content); err != nil {
+	if err := closeAtomicWrite(path, content); err != nil {
 		return learningError("LEARNING_PATH_INVALID", strings.TrimPrefix(err.Error(), "MODEL_MISMATCH: "))
 	}
 	return nil
+}
+
+func learningApprovedTransitionMatches(existing, candidate map[string]any, digest, actor string) bool {
+	if stateString(existing["status"]) != "approved" || existing["active"] != true || stateString(existing["approved_by"]) != actor || stateString(existing["approved_digest"]) != digest || strings.TrimSpace(stateString(existing["approved_at"])) == "" {
+		return false
+	}
+	reconstructed := cloneMap(existing)
+	for _, key := range []string{"active", "approved_by", "approved_digest", "approved_at"} {
+		delete(reconstructed, key)
+	}
+	reconstructed["status"] = "pending"
+	reconstructed["digest"] = digest
+	left, _ := learningCanonical(reconstructed)
+	right, _ := learningCanonical(candidate)
+	return bytes.Equal(left, right)
+}
+
+func learningRejectedTransitionMatches(existing, candidate map[string]any, reason string) bool {
+	if stateString(existing["status"]) != "rejected" || stateString(existing["rejection_reason"]) != strings.TrimSpace(reason) || strings.TrimSpace(stateString(existing["rejected_at"])) == "" {
+		return false
+	}
+	reconstructed := cloneMap(existing)
+	delete(reconstructed, "rejection_reason")
+	delete(reconstructed, "rejected_at")
+	reconstructed["status"] = "pending"
+	left, _ := learningCanonical(reconstructed)
+	right, _ := learningCanonical(candidate)
+	return bytes.Equal(left, right)
 }
 
 func learningSafeSource(repo, relative string) (string, error) {

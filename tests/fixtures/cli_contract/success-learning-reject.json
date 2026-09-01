@@ -60,6 +60,7 @@
           ],
           "moved": [],
           "preserved": [
+            ".bianchini/.runtime/learning/transition.lock",
             ".bianchini/debug/resolved/D001-retry.md",
             "keep.txt"
           ]

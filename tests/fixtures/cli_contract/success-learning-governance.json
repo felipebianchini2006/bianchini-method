@@ -48,7 +48,8 @@
         "stderr": "",
         "mutations": {
           "created": [
-            ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json"
+            ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json",
+            ".bianchini/.runtime/learning/transition.lock"
           ],
           "altered": [],
           "deleted": [],
@@ -98,6 +99,7 @@
           "moved": [],
           "preserved": [
             ".bianchini/.runtime/learning/pending/L813BC8BD6BAB.json",
+            ".bianchini/.runtime/learning/transition.lock",
             ".bianchini/debug/resolved/D001-retry.md",
             "keep.txt"
           ]
@@ -140,6 +142,7 @@
           ],
           "moved": [],
           "preserved": [
+            ".bianchini/.runtime/learning/transition.lock",
             ".bianchini/debug/resolved/D001-retry.md",
             "keep.txt"
           ]
@@ -180,6 +183,7 @@
           "deleted": [],
           "moved": [],
           "preserved": [
+            ".bianchini/.runtime/learning/transition.lock",
             ".bianchini/debug/resolved/D001-retry.md",
             "keep.txt"
           ]

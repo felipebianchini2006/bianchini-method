@@ -1,6 +1,7 @@
 package gokernel
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,6 +80,119 @@ func TestGovernedLearningApproveAndDeactivate(t *testing.T) {
 	}
 	if deactivatedValue.(map[string]any)["active"] != false {
 		t.Fatalf("deactivated=%#v", deactivatedValue)
+	}
+}
+
+func TestGovernedLearningTransitionRequiresExclusiveLock(t *testing.T) {
+	repo := learningTestRepo(t)
+	proposed, err := runLearning([]string{"propose", "--repo", repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate := stateObject(stateArray(proposed.(map[string]any)["candidates"])[0])
+	lockDirectory := filepath.Join(repo, ".bianchini", ".runtime", "learning")
+	if err := os.MkdirAll(lockDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.OpenFile(filepath.Join(lockDirectory, "transition.lock"), os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if err := lockCloseFile(lock); err != nil {
+		t.Fatal(err)
+	}
+	defer unlockCloseFile(lock)
+	_, err = runLearning([]string{
+		"approve", "--repo", repo,
+		"--candidate", stateString(candidate["id"]),
+		"--digest", stateString(candidate["digest"]),
+		"--approved-by", "human:fixture",
+	})
+	if err == nil || !strings.Contains(err.Error(), "LEARNING_BUSY") {
+		t.Fatalf("transição concorrente não foi bloqueada: %v", err)
+	}
+}
+
+func TestGovernedLearningAcceptsTruthfulBooleanGreenOnly(t *testing.T) {
+	tests := []struct {
+		name      string
+		green     string
+		wantError bool
+	}{
+		{name: "true", green: "true"},
+		{name: "false", green: "false", wantError: true},
+		{name: "zero", green: "0", wantError: true},
+		{name: "empty", green: `""`, wantError: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := learningTestRepo(t)
+			source := filepath.Join(repo, ".bianchini", "debug", "resolved", "D001-retry.md")
+			content := strings.Replace(learningFixtureSource, `"green": "teste de contrato aprovado"`, `"green": `+test.green, 1)
+			if err := os.WriteFile(source, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			proposed, err := runLearning([]string{"propose", "--repo", repo})
+			if test.wantError {
+				if err == nil || !strings.Contains(err.Error(), "LEARNING_EVIDENCE_REQUIRED") {
+					t.Fatalf("green=%s deveria ser recusado: proposed=%#v err=%v", test.green, proposed, err)
+				}
+				return
+			}
+			if err != nil || stateInt(proposed.(map[string]any)["created"]) != 1 {
+				t.Fatalf("green=true deveria ser aceito: proposed=%#v err=%v", proposed, err)
+			}
+		})
+	}
+}
+
+func TestGovernedLearningRetriesCanonicalPartialTransitions(t *testing.T) {
+	for _, action := range []string{"approve", "reject"} {
+		t.Run(action, func(t *testing.T) {
+			repo := learningTestRepo(t)
+			proposed, err := runLearning([]string{"propose", "--repo", repo})
+			if err != nil {
+				t.Fatal(err)
+			}
+			candidate := stateObject(stateArray(proposed.(map[string]any)["candidates"])[0])
+			id, digest := stateString(candidate["id"]), stateString(candidate["digest"])
+			originalRemove := learningRemoveFile
+			calls := 0
+			learningRemoveFile = func(path string) error {
+				calls++
+				if calls == 1 {
+					return errors.New("falha simulada após target durável")
+				}
+				return originalRemove(path)
+			}
+			defer func() { learningRemoveFile = originalRemove }()
+
+			args := []string{action, "--repo", repo, "--candidate", id}
+			target := filepath.Join(repo, ".bianchini", ".runtime", "learning", "rejected", id+".json")
+			if action == "approve" {
+				args = append(args, "--digest", digest, "--approved-by", "human:fixture")
+				target = filepath.Join(repo, ".bianchini", "current", "lessons", id+".json")
+			} else {
+				args = append(args, "--reason", "caso não generalizável")
+			}
+			if _, err := runLearning(args); err == nil || !strings.Contains(err.Error(), "falha simulada") {
+				t.Fatalf("primeira transição deveria falhar após target: %v", err)
+			}
+			pending := filepath.Join(repo, ".bianchini", ".runtime", "learning", "pending", id+".json")
+			if !regularFile(target) || !regularFile(pending) {
+				t.Fatalf("estado parcial canônico não foi preservado: target=%v pending=%v", regularFile(target), regularFile(pending))
+			}
+			if _, err := runLearning(args); err != nil {
+				t.Fatalf("retry não concluiu transição parcial: %v", err)
+			}
+			if !regularFile(target) {
+				t.Fatal("histórico final ausente após retry")
+			}
+			if _, err := os.Lstat(pending); !os.IsNotExist(err) {
+				t.Fatalf("pending residual após retry: %v", err)
+			}
+		})
 	}
 }
 

@@ -9,7 +9,10 @@ import os
 import re
 import subprocess
 import tempfile
+import fcntl
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import wraps
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
@@ -85,6 +88,7 @@ def _fixed_dir(root: Path, relative: str, *, create: bool) -> Path:
             _fail("LEARNING_PATH_INVALID", f"diretório inválido: {relative}")
         if create:
             path.mkdir(exist_ok=True)
+            _sync_directory(path.parent)
     return path
 
 
@@ -100,9 +104,94 @@ def _atomic_write(path: Path, content: bytes) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        _sync_directory(path.parent)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
+
+
+def _sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _durable_unlink(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+    _sync_directory(path.parent)
+
+
+def _approved_transition_matches(
+    existing: dict[str, Any], candidate: dict[str, Any], digest: str, actor: str
+) -> bool:
+    if (
+        existing.get("status") != "approved"
+        or existing.get("active") is not True
+        or existing.get("approved_by") != actor
+        or existing.get("approved_digest") != digest
+        or not isinstance(existing.get("approved_at"), str)
+        or not existing["approved_at"].strip()
+    ):
+        return False
+    reconstructed = dict(existing)
+    for key in ("active", "approved_by", "approved_digest", "approved_at"):
+        reconstructed.pop(key, None)
+    reconstructed["status"] = "pending"
+    reconstructed["digest"] = digest
+    return _canonical(reconstructed) == _canonical(candidate)
+
+
+def _rejected_transition_matches(
+    existing: dict[str, Any], candidate: dict[str, Any], reason: str
+) -> bool:
+    if (
+        existing.get("status") != "rejected"
+        or existing.get("rejection_reason") != reason.strip()
+        or not isinstance(existing.get("rejected_at"), str)
+        or not existing["rejected_at"].strip()
+    ):
+        return False
+    reconstructed = dict(existing)
+    reconstructed.pop("rejection_reason", None)
+    reconstructed.pop("rejected_at", None)
+    reconstructed["status"] = "pending"
+    return _canonical(reconstructed) == _canonical(candidate)
+
+
+@contextmanager
+def _exclusive_transition(root: Path) -> Iterable[None]:
+    directory = _fixed_dir(root, ".bianchini/.runtime/learning", create=True)
+    lock = directory / "transition.lock"
+    if lock.is_symlink():
+        _fail("LEARNING_PATH_INVALID", "lock de aprendizado não pode ser symlink")
+    descriptor = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            _fail("LEARNING_BUSY", "outra transição de aprendizado está em execução")
+            raise AssertionError from error
+        yield
+    finally:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
+def _transition_locked(function):
+    @wraps(function)
+    def wrapped(repo: str | Path, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        root = _repo_root(repo)
+        with _exclusive_transition(root):
+            return function(root, *args, **kwargs)
+
+    return wrapped
 
 
 def _source_paths(root: Path, since: str | None) -> list[Path]:
@@ -302,6 +391,7 @@ def candidate_from_source(
     return _extract_candidate(root, path, source_identity=source_identity)
 
 
+@_transition_locked
 def propose_learning(repo: str | Path, since: str | None = None) -> dict[str, Any]:
     """Cria somente candidatos pendentes a partir de marcação explícita e evidenciada."""
 
@@ -413,6 +503,7 @@ def _safe_source(root: Path, value: str) -> Path:
     return candidate
 
 
+@_transition_locked
 def approve_learning(
     repo: str | Path, candidate: str, digest: str, approved_by: str
 ) -> dict[str, Any]:
@@ -445,10 +536,28 @@ def approve_learning(
     }
     lessons = _fixed_dir(root, ".bianchini/current/lessons", create=True)
     target = lessons / f"{candidate}.json"
+    if target.is_symlink():
+        _fail("LEARNING_PATH_INVALID", "target de lição não pode ser symlink")
     if target.exists():
-        _fail("STALE_EVIDENCE", f"lição já existe: {candidate}")
+        try:
+            existing = json.loads(target.read_bytes())
+        except (OSError, json.JSONDecodeError) as error:
+            _fail("STALE_EVIDENCE", f"lição já existe: {candidate}: {error}")
+        if (
+            not isinstance(existing, dict)
+            or _canonical(existing) != target.read_bytes()
+            or not _approved_transition_matches(existing, value, digest, approved_by)
+        ):
+            _fail("STALE_EVIDENCE", f"lição já existe: {candidate}")
+        _durable_unlink(source_path)
+        return {
+            "id": candidate,
+            "status": "approved",
+            "path": target.relative_to(root).as_posix(),
+            "digest": digest,
+        }
     _atomic_write(target, _canonical(approved))
-    source_path.unlink()
+    _durable_unlink(source_path)
     return {
         "id": candidate,
         "status": "approved",
@@ -457,6 +566,7 @@ def approve_learning(
     }
 
 
+@_transition_locked
 def deactivate_learning(
     repo: str | Path, candidate: str, reason: str, deactivated_by: str
 ) -> dict[str, Any]:
@@ -506,23 +616,42 @@ def deactivate_learning(
     }
 
 
+@_transition_locked
 def reject_learning(repo: str | Path, candidate: str, reason: str) -> dict[str, Any]:
     root = _repo_root(repo)
     if not isinstance(reason, str) or not reason.strip():
         _fail("LEARNING_REJECTION_INVALID", "rejeição exige motivo")
     source, value = _load_candidate(root, candidate)
+    clean_reason = reason.strip()
     rejected = {
         **value,
         "status": "rejected",
-        "rejection_reason": reason.strip(),
+        "rejection_reason": clean_reason,
         "rejected_at": _now(),
     }
     directory = _fixed_dir(root, ".bianchini/.runtime/learning/rejected", create=True)
     target = directory / f"{candidate}.json"
+    if target.is_symlink():
+        _fail("LEARNING_PATH_INVALID", "target de rejeição não pode ser symlink")
     if target.exists():
-        _fail("STALE_EVIDENCE", f"rejeição já existe: {candidate}")
+        try:
+            existing = json.loads(target.read_bytes())
+        except (OSError, json.JSONDecodeError) as error:
+            _fail("STALE_EVIDENCE", f"rejeição já existe: {candidate}: {error}")
+        if (
+            not isinstance(existing, dict)
+            or _canonical(existing) != target.read_bytes()
+            or not _rejected_transition_matches(existing, value, clean_reason)
+        ):
+            _fail("STALE_EVIDENCE", f"rejeição já existe: {candidate}")
+        _durable_unlink(source)
+        return {
+            "id": candidate,
+            "status": "rejected",
+            "path": target.relative_to(root).as_posix(),
+        }
     _atomic_write(target, _canonical(rejected))
-    source.unlink()
+    _durable_unlink(source)
     return {
         "id": candidate,
         "status": "rejected",

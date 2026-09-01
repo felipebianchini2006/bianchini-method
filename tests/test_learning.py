@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -15,6 +17,7 @@ BM = ROOT / "skills/_shared/scripts/bm.py"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+import bm_learning  # noqa: E402
 from bm_learning import (  # noqa: E402
     LearningError,
     approve_learning,
@@ -96,6 +99,94 @@ class GovernedLearningScenarios(unittest.TestCase):
             listed = list_learning(repo)
             self.assertEqual(len(listed["pending"]), 1)
             self.assertEqual(listed["approved"], [])
+
+    def test_python_transitions_share_the_exclusive_backend_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            self.write_source(repo)
+            lock_path = repo / ".bianchini/.runtime/learning/transition.lock"
+            lock_path.parent.mkdir(parents=True)
+            with lock_path.open("a+b") as lock:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                with self.assertRaisesRegex(LearningError, "LEARNING_BUSY"):
+                    propose_learning(repo)
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def test_partial_approve_and_reject_transitions_resume_idempotently(self) -> None:
+        for action in ("approve", "reject"):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as temp:
+                repo = self.make_repo(Path(temp))
+                self.write_source(repo)
+                candidate = propose_learning(repo)["candidates"][0]
+                pending = repo / candidate["path"]
+                if action == "approve":
+                    target = repo / ".bianchini/current/lessons" / f"{candidate['id']}.json"
+                    transition = lambda: approve_learning(
+                        repo, candidate["id"], candidate["digest"], "human:felipe"
+                    )
+                else:
+                    target = (
+                        repo
+                        / ".bianchini/.runtime/learning/rejected"
+                        / f"{candidate['id']}.json"
+                    )
+                    transition = lambda: reject_learning(
+                        repo, candidate["id"], "caso não generalizável"
+                    )
+
+                original_unlink = bm_learning._durable_unlink
+                calls = 0
+
+                def fail_once(path: Path) -> None:
+                    nonlocal calls
+                    calls += 1
+                    if calls == 1:
+                        raise OSError("falha simulada após target durável")
+                    original_unlink(path)
+
+                with mock.patch.object(
+                    bm_learning, "_durable_unlink", side_effect=fail_once
+                ):
+                    with self.assertRaisesRegex(OSError, "falha simulada"):
+                        transition()
+                    self.assertTrue(target.is_file())
+                    self.assertTrue(pending.is_file())
+                    result = transition()
+
+                self.assertEqual(result["id"], candidate["id"])
+                self.assertTrue(target.is_file())
+                self.assertFalse(pending.exists())
+
+    def test_learning_atomic_write_syncs_target_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "approved" / "lesson.json"
+            synced: list[Path] = []
+            original_sync = bm_learning._sync_directory
+
+            def tracked(path: Path) -> None:
+                synced.append(path)
+                original_sync(path)
+
+            with mock.patch.object(bm_learning, "_sync_directory", side_effect=tracked):
+                bm_learning._atomic_write(target, b"{}\n")
+
+            self.assertIn(target.parent, synced)
+
+    def test_learning_transition_target_symlink_is_rejected_before_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            self.write_source(repo)
+            candidate = propose_learning(repo)["candidates"][0]
+            target = repo / ".bianchini/current/lessons" / f"{candidate['id']}.json"
+            outside = Path(temp) / "outside.json"
+            outside.write_text("segredo externo\n", encoding="utf-8")
+            target.symlink_to(outside)
+
+            with self.assertRaisesRegex(LearningError, "LEARNING_PATH_INVALID"):
+                approve_learning(
+                    repo, candidate["id"], candidate["digest"], "human:felipe"
+                )
+            self.assertEqual(outside.read_text(encoding="utf-8"), "segredo externo\n")
 
     def test_approval_requires_human_and_current_digest(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
