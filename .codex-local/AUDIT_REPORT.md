@@ -12,6 +12,8 @@ Head publicado: o commit administrativo deste relatório sucede o head funcional
 
 Veredito: **BLOCKED** para a aceitação final. Os gates executáveis da implementação passaram e a auditoria não manteve finding conhecido `CRITICAL` ou `IMPORTANT`, mas o plano normativo obrigatório não está disponível para provar os gates das seções 14 e 17.
 
+Estado operacional local no macOS: **READY_TO_USE**. O pacote `0.5.0` foi instalado e validado no Codex; esse estado operacional não substitui o fechamento documental bloqueado acima.
+
 Não há alegação de “zero regressão”. O veredito cobre somente os contratos, testes, builds e medições descritos aqui.
 
 ## 1. Resultado
@@ -32,6 +34,8 @@ O fluxo público foi preservado pelos contratos e testes disponíveis:
 ```
 
 O backend oficial é Go `0.5.0`. O binário declara `engine=go`, `official=true`, `preview=false`, `contract_version=0.4` e 58 superfícies implementadas. As skills ativas apontam somente para `_shared/bin/bm`; não existe fallback Python silencioso. O Python permanece no repositório como oráculo de compatibilidade.
+
+A instalação local ativa está em `~/.codex/skills`. O binário instalado foi construído de `999888d86132c5754a0bbbec40dfdcb486b36376`, passou 78/78 fixtures Go e as duas jornadas completas schema 1/schema 2. O overlay Codex foi reinstalado pelo instalador gerenciado e as skills de terceiros foram comparadas com o backup sem divergência.
 
 O aprendizado continua opt-in, exige identidade humana para aprovação/desativação e não edita automaticamente kernel, schemas, `METHOD_CONTRACT` ou skills.
 
@@ -176,6 +180,14 @@ ac8a843fe6e1d25dd0792d91d5730d775effb50400e6f7b217dd1d25d41b2fea  bianchini-meth
 
 O updater valida identidade, manifesto, tamanho, digest, paths e troca transacional. O teste de integração constrói um package real, instala, executa o binário instalado e prova rollback.
 
+Para ativação local no Mac, foi gerado e verificado separadamente o package `darwin-arm64` do commit `999888d86132c5754a0bbbec40dfdcb486b36376`:
+
+```text
+c828f2049da0d757f199fc9b359fb6cda1ae2fca0e9e3fa1f3c2fac7a444da38  bianchini-method_0.5.0_darwin-arm64.tar.gz
+```
+
+O archive local foi removido após a instalação. Ele não foi publicado como release.
+
 ## 9. Hardening final
 
 As correções da auditoria final incluem:
@@ -291,6 +303,9 @@ rmdir "$audit_release_root"
 - Main intacta.
 - Branch dedicada publicada para continuação da auditoria, mas ainda não apta para merge.
 - Ambiente macOS validado nativamente.
+- Bianchini Method `0.5.0` instalado em `~/.codex/skills` e pronto para uso local.
+- Instalação anterior `0.4.5` preservada em `~/.codex/.bianchini-method-backups/20260901T211225Z-v0.4.5-skills`.
+- Binário instalado: Go oficial, 58 superfícies, 78/78 fixtures e 2/2 jornadas completas.
 - Cutover Go explícito e observável.
 - Release não publicada.
 - Deploy continua exigindo ação explícita no projeto consumidor.
