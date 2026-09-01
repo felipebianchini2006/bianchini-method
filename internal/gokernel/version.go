@@ -17,6 +17,8 @@ var ImplementedSurfaces = []string{
 	"scope:verify",
 	"roadmap:sync",
 	"roadmap:next-wave",
+	"coherence:check",
+	"coherence:approve",
 	"change-policy",
 	"policy",
 	"adapter:render",

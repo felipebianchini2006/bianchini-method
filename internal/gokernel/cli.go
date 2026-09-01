@@ -36,6 +36,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runScope(args[1:])
 	case "roadmap":
 		result, err = runRoadmap(args[1:])
+	case "coherence":
+		result, err = runCoherence(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
 	case "policy":

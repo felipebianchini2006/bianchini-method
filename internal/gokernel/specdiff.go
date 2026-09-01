@@ -43,6 +43,48 @@ func createSpecDiff(rootValue, baseValue, targetValue, outputValue string) (map[
 	if err != nil {
 		return nil, err
 	}
+	baseCandidate, err := specConfined(root, baseValue, "spec base")
+	if err != nil {
+		return nil, err
+	}
+	targetCandidate, err := specConfined(root, targetValue, "spec target")
+	if err != nil {
+		return nil, err
+	}
+	baseInfo, baseErr := os.Lstat(baseCandidate)
+	targetInfo, targetErr := os.Lstat(targetCandidate)
+	if baseErr == nil && targetErr == nil && (baseInfo.IsDir() || targetInfo.IsDir()) {
+		if !baseInfo.IsDir() || !targetInfo.IsDir() {
+			return nil, fmt.Errorf("spec diff exige base e target do mesmo tipo")
+		}
+		output, pathErr := specConfined(root, outputValue, "spec diff output")
+		if pathErr != nil {
+			return nil, pathErr
+		}
+		for _, directory := range []string{baseCandidate, targetCandidate} {
+			relative, relErr := filepath.Rel(directory, output)
+			if relErr == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative) {
+				label := "base"
+				if directory == targetCandidate {
+					label = "target"
+				}
+				return nil, fmt.Errorf("spec diff output não pode ficar dentro da %s", label)
+			}
+		}
+		manifest := filepath.Join(filepath.Dir(targetCandidate), "MANIFEST.json")
+		metadata, rendered, deriveErr := deriveManagedSpecDiff(root, baseCandidate, targetCandidate, manifest)
+		if deriveErr != nil {
+			return nil, deriveErr
+		}
+		if err := atomicWrite(output, rendered); err != nil {
+			return nil, domainError("SPEC_DIFF_ERROR", "falha ao gravar output")
+		}
+		outputRelative, _ := filepath.Rel(root, output)
+		result := cloneMap(metadata)
+		result["output"] = filepath.ToSlash(outputRelative)
+		result["output_digest"] = sha256Bytes(rendered)
+		return result, nil
+	}
 	base, err := confinedPath(root, baseValue, "spec base", true)
 	if err != nil {
 		return nil, err
