@@ -11,6 +11,8 @@ const (
 
 var ImplementedSurfaces = []string{
 	"validate-state",
+	"model:init",
+	"model:validate",
 	"change-policy",
 	"policy",
 	"adapter:render",

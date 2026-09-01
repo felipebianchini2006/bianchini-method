@@ -216,6 +216,158 @@ class GoPreviewScenarios(unittest.TestCase):
                     else:
                         self.assertEqual(go.stdout, python.stdout)
 
+    def test_go_model_init_validate_and_change_match_python_oracle(self) -> None:
+        def frontmatter(path: Path) -> dict[str, object]:
+            return json.loads(path.read_text(encoding="utf-8").split("---", 2)[1])
+
+        with tempfile.TemporaryDirectory(prefix="bm-go-model-parity-") as temp:
+            base = Path(temp)
+            binary = base / "bm-preview"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            self.assertEqual(built.returncode, 0, built.stderr)
+            python_repo = base / "python-repo"
+            go_repo = base / "go-repo"
+            for repo in (python_repo, go_repo):
+                initialized = run("git", "init", str(repo))
+                self.assertEqual(initialized.returncode, 0, initialized.stderr)
+
+            python = run(
+                "python3", str(ROOT / "scripts" / "bm.py"),
+                "model", "init", "--repo", str(python_repo),
+            )
+            go = run(str(binary), "model", "init", "--repo", str(go_repo))
+            self.assertEqual(go.returncode, python.returncode)
+            self.assertEqual(go.stderr, python.stderr)
+            python_result = json.loads(python.stdout)
+            go_result = json.loads(go.stdout)
+            for payload in (python_result, go_result):
+                payload.pop("workspace")
+            self.assertEqual(go_result, python_result)
+            for relative in (
+                ".bianchini/.gitignore", ".bianchini/PROJECT.md",
+                ".bianchini/current/ARCHITECTURE.md",
+                ".bianchini/current/SYSTEM_MODEL.md",
+                ".bianchini/current/specs/MANIFEST.json",
+                ".bianchini/debug/KNOWLEDGE.md",
+            ):
+                self.assertEqual(
+                    (go_repo / relative).read_bytes(),
+                    (python_repo / relative).read_bytes(),
+                    relative,
+                )
+            python_state = frontmatter(python_repo / ".bianchini/STATE.md")
+            go_state = frontmatter(go_repo / ".bianchini/STATE.md")
+            python_state.pop("updated_at")
+            go_state.pop("updated_at")
+            self.assertEqual(go_state, python_state)
+
+            python_validate = run(
+                "python3", str(ROOT / "scripts" / "bm.py"),
+                "model", "validate", "--repo", str(python_repo),
+            )
+            go_validate = run(
+                str(binary), "model", "validate", "--repo", str(go_repo),
+            )
+            self.assertEqual(go_validate.returncode, python_validate.returncode)
+            self.assertEqual(go_validate.stderr, python_validate.stderr)
+            python_valid = json.loads(python_validate.stdout)
+            go_valid = json.loads(go_validate.stdout)
+            for payload in (python_valid, go_valid):
+                payload.pop("state")
+                payload.pop("system_model")
+            self.assertEqual(go_valid, python_valid)
+
+            python_change = run(
+                "python3", str(ROOT / "scripts" / "bm.py"), "model", "init",
+                "--repo", str(python_repo), "--change", "Checkout seguro",
+            )
+            go_change = run(
+                str(binary), "model", "init", "--repo", str(go_repo),
+                "--change", "Checkout seguro",
+            )
+            self.assertEqual(go_change.returncode, python_change.returncode)
+            self.assertEqual(go_change.stderr, python_change.stderr)
+            python_changed = json.loads(python_change.stdout)
+            go_changed = json.loads(go_change.stdout)
+            for payload in (python_changed, go_changed):
+                payload.pop("path")
+            self.assertEqual(go_changed, python_changed)
+            change = str(go_changed["change"])
+            for relative in (
+                "SCOPE.md", "RESEARCH.md", "ARCHITECTURE.md", "SYSTEM_MODEL.md",
+                "ROADMAP.md", "SUMMARY.md", "specs/MANIFEST.json",
+            ):
+                self.assertEqual(
+                    (go_repo / ".bianchini/changes" / change / relative).read_bytes(),
+                    (python_repo / ".bianchini/changes" / change / relative).read_bytes(),
+                    relative,
+                )
+            python_coherence = frontmatter(
+                python_repo / ".bianchini/changes" / change / "COHERENCE.md"
+            )
+            go_coherence = frontmatter(
+                go_repo / ".bianchini/changes" / change / "COHERENCE.md"
+            )
+            python_coherence.pop("updated_at")
+            go_coherence.pop("updated_at")
+            self.assertEqual(go_coherence, python_coherence)
+
+            expected_model = """---
+schema_version: 1
+modules: []
+interfaces: []
+capabilities: []
+contracts:
+  - id: checkout_ready
+    owner: payments
+ownership: []
+data: []
+integrations: []
+journeys: []
+invariants: []
+effects: []
+---
+# Modelo esperado
+"""
+            plan = """---
+id: P01
+model_delta:
+  contracts:
+    add:
+      - id: checkout_ready
+        owner: payments
+---
+# Plano
+"""
+            coherence = """---
+{"schema_version":1,"planning_contract":1,"status":"pending"}
+---
+# Coerencia
+"""
+            for repo in (python_repo, go_repo):
+                directory = repo / ".bianchini" / "changes" / change
+                (directory / "SYSTEM_MODEL.md").write_text(
+                    expected_model, encoding="utf-8"
+                )
+                (directory / "plans" / "P01.md").write_text(plan, encoding="utf-8")
+                (directory / "COHERENCE.md").write_text(coherence, encoding="utf-8")
+            python_change_validate = run(
+                "python3", str(ROOT / "scripts" / "bm.py"), "model", "validate",
+                "--repo", str(python_repo), "--change", "C001",
+            )
+            go_change_validate = run(
+                str(binary), "model", "validate", "--repo", str(go_repo),
+                "--change", "C001",
+            )
+            self.assertEqual(
+                go_change_validate.returncode, python_change_validate.returncode
+            )
+            self.assertEqual(go_change_validate.stderr, python_change_validate.stderr)
+            self.assertEqual(
+                json.loads(go_change_validate.stdout),
+                json.loads(python_change_validate.stdout),
+            )
+
     def test_preview_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),

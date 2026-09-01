@@ -638,8 +638,19 @@ func stateBool(value any) bool {
 }
 
 func stateInt(value any) int {
-	number, _ := value.(float64)
-	return int(number)
+	switch number := value.(type) {
+	case int:
+		return number
+	case int64:
+		return int(number)
+	case float64:
+		return int(number)
+	case json.Number:
+		parsed, _ := number.Int64()
+		return int(parsed)
+	default:
+		return 0
+	}
 }
 
 func stateStringSlice(value any) []string {
