@@ -1,9 +1,11 @@
 package gokernel
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -90,6 +92,126 @@ func TestMigrationRejectsSymlinkBeforeMutation(t *testing.T) {
 	}
 	if _, statErr := os.Stat(filepath.Join(root, ".bianchini")); !os.IsNotExist(statErr) {
 		t.Fatalf("migração bloqueada alterou workspace: %v", statErr)
+	}
+}
+
+func TestMigrationRejectsSymlinkAncestorBeforeReadingLegacyTree(t *testing.T) {
+	root := t.TempDir()
+	runGitMigration(t, root, "init")
+	outside := t.TempDir()
+	for relative, content := range map[string][]byte{
+		"living/PROJECT_STATE.md":           []byte("{\"planning_status\":\"idle\"}\n"),
+		"bianchini/current/specs/system.md": []byte("outside\n"),
+	} {
+		path := filepath.Join(outside, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, content, 0o640); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "docs")); err != nil {
+		t.Skipf("symlink indisponível: %v", err)
+	}
+	runGitMigration(t, root, "add", "docs")
+	runGitMigration(t, root, "commit", "-m", "legacy symlink")
+
+	_, err := migrationCheck(root)
+	if err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("ancestral symlink deveria bloquear antes da leitura: %v", err)
+	}
+	if content, readErr := os.ReadFile(filepath.Join(outside, "bianchini", "current", "specs", "system.md")); readErr != nil || string(content) != "outside\n" {
+		t.Fatalf("conteúdo externo alterado: %q err=%v", content, readErr)
+	}
+	if _, statErr := os.Lstat(filepath.Join(root, ".bianchini")); !os.IsNotExist(statErr) {
+		t.Fatalf("migração bloqueada alterou workspace: %v", statErr)
+	}
+}
+
+func TestMigrationIgnoresForeignPlanningNamespaceAtAnyDepth(t *testing.T) {
+	root := t.TempDir()
+	runGitMigration(t, root, "init")
+	runGitMigration(t, root, "config", "user.name", "BM Test")
+	runGitMigration(t, root, "config", "user.email", "test@example.invalid")
+	legacy := filepath.Join(root, "docs", "bianchini", "result.json")
+	foreign := filepath.Join(root, "docs", "bianchini", ".Planning", "sentinel.txt")
+	for path, content := range map[string][]byte{legacy: []byte("{}\n"), foreign: []byte("foreign\n")} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, content, 0o640); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runGitMigration(t, root, "add", ".")
+	runGitMigration(t, root, "commit", "-m", "legacy")
+
+	report, err := migrationCheck(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range stateArray(report["entries"]) {
+		entry := stateObject(raw)
+		if strings.Contains(strings.ToLower(stateString(entry["source"])), "/.planning/") {
+			t.Fatalf("namespace estrangeiro entrou no mapa: %#v", entry)
+		}
+	}
+	if _, err := migrationApply(root); err != nil {
+		t.Fatal(err)
+	}
+	if content, readErr := os.ReadFile(foreign); readErr != nil || string(content) != "foreign\n" {
+		t.Fatalf("namespace estrangeiro foi alterado: %q err=%v", content, readErr)
+	}
+}
+
+func TestMigrationRollbackRetainsOnlyRecoverableCopyWhenRestoreFails(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, ".bianchini")
+	target := filepath.Join(workspace, "archive", "legacy.txt")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("preserve\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	blockedParent := filepath.Join(root, "blocked")
+	if err := os.WriteFile(blockedParent, []byte("not a directory\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	removed := []migrationCopyPair{{source: filepath.Join(blockedParent, "legacy.txt"), target: target}}
+
+	err := rollbackMigration(workspace, removed)
+	if err == nil || !strings.Contains(err.Error(), "rollback incompleto") {
+		t.Fatalf("falha de restauração deveria ficar explícita: %v", err)
+	}
+	if content, readErr := os.ReadFile(target); readErr != nil || string(content) != "preserve\n" {
+		t.Fatalf("única cópia recuperável foi apagada: %q err=%v", content, readErr)
+	}
+	if !errors.Is(err, errMigrationRollbackIncomplete) {
+		t.Fatalf("erro não classifica rollback incompleto: %v", err)
+	}
+}
+
+func TestCopyMigrationFilePreservesExactMode(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	target := filepath.Join(root, "target")
+	if err := os.WriteFile(source, []byte("mode\n"), 0o751); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(source, 0o751); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyMigrationFile(source, target); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o751 {
+		t.Fatalf("mode=%#o, esperado %#o", got, 0o751)
 	}
 }
 
