@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "phase": 0,
+  "base_commit": "7c9fa23f524623f3360ebae579048e1765095220",
+  "head_commit_at_measurement": "7c9fa23f524623f3360ebae579048e1765095220",
+  "plan_sha256": "aa170b8054c48a07f2787f7434575731f0302b9328cbae7e83998bd10ea2eacc",
+  "measured_at": "2026-09-01T14:00:13.541763+00:00",
+  "environment": {
+    "os": "Darwin 25.6.0 arm64",
+    "cpu": "Apple M5",
+    "python": "Python 3.9.6"
+  },
+  "test_shards": 22,
+  "test_shard_evidence": {
+    "status": "approved_reference_baseline",
+    "source": "PLANO_EVOLUCAO_SUSTENTAVEL_0_4_7_A_0_5.md seção 1",
+    "command": "python3 scripts/run_test_shards.py",
+    "note": "O número 22 é a execução de referência aprovada no plano. O runner completo deve ser repetido no gate da fase; este campo não inventa duração histórica."
+  },
+  "command_timings": [
+    {"command": "python3 scripts/bm.py --help", "label": "startup_help", "samples": 25, "median_ms": 100.458, "p95_ms": 127.987, "min_ms": 92.883, "max_ms": 143.803, "stdout": "discarded", "stderr": "discarded"},
+    {"command": "python3 scripts/bm.py direct classify", "label": "direct_classify", "samples": 25, "median_ms": 100.875, "p95_ms": 106.281, "min_ms": 93.394, "max_ms": 107.868, "stdout": "discarded", "stderr": "discarded"},
+    {"command": "python3 scripts/bm.py change-policy", "label": "change_policy", "samples": 25, "median_ms": 100.859, "p95_ms": 108.557, "min_ms": 94.037, "max_ms": 115.389, "stdout": "discarded", "stderr": "discarded"},
+    {"command": "python3 scripts/bm.py status <legacy-state> --format json", "label": "status_legacy_json", "samples": 25, "median_ms": 94.958, "p95_ms": 107.096, "min_ms": 92.125, "max_ms": 160.767, "stdout": "discarded", "stderr": "discarded"}
+  ],
+  "timing_method": {
+    "clock": "time.perf_counter_ns",
+    "process": "novo subprocesso por amostra",
+    "order": "25 amostras sequenciais por comando",
+    "network": false,
+    "claim_boundary": "tempo de parede local desta máquina; não é benchmark portátil"
+  },
+  "skill_context": [
+    {"skill": "executar-plano", "measurement": "prescribed_static_context", "files": 3, "bytes": 35309, "paths": ["skills/executar-plano/SKILL.md", "skills/_shared/METHOD_CONTRACT.md", "skills/_shared/ADAPTIVE_GATES.md"]},
+    {"skill": "executar-direto", "measurement": "prescribed_static_context", "files": 2, "bytes": 28559, "paths": ["skills/executar-direto/SKILL.md", "skills/_shared/METHOD_CONTRACT.md"]},
+    {"skill": "corrigir-bug", "measurement": "prescribed_static_context", "files": 2, "bytes": 27042, "paths": ["skills/corrigir-bug/SKILL.md", "skills/_shared/METHOD_CONTRACT.md"]},
+    {"skill": "homologar-sistema", "measurement": "prescribed_static_context", "files": 2, "bytes": 30528, "paths": ["skills/homologar-sistema/SKILL.md", "skills/_shared/METHOD_CONTRACT.md"]},
+    {"skill": "status-projeto", "measurement": "prescribed_static_context", "files": 2, "bytes": 22686, "paths": ["skills/status-projeto/SKILL.md", "skills/_shared/METHOD_CONTRACT.md"]}
+  ],
+  "context_measurement": {
+    "method_contract_bytes": 20548,
+    "adaptive_gates_bytes": 5709,
+    "definition": "soma byte a byte dos arquivos que a skill prescreve estaticamente como leitura obrigatória",
+    "excludes": ["bm.py", "referências condicionais", "arquivos do projeto", "cache", "memória histórica"],
+    "not_measured": ["tokens", "leitura efetiva do agente"],
+    "claim_boundary": "bytes de contexto prescrito; não representa tokens nem prova que todos os bytes foram efetivamente lidos"
+  },
+  "docviva": {
+    "definition": ".bianchini/current/** no workspace controlado",
+    "measurement": "comparação SHA-256 antes/depois por fluxo em repositório Git temporário",
+    "flows": [
+      {"flow": "model init em projeto novo", "created": [".bianchini/current/ARCHITECTURE.md", ".bianchini/current/SYSTEM_MODEL.md"], "altered": [], "deleted": [], "changed_files": 2, "bytes_after": 262},
+      {"flow": "model init em workspace existente", "created": [], "altered": [], "deleted": [], "changed_files": 0, "bytes_after": 262},
+      {"flow": "model validate", "created": [], "altered": [], "deleted": [], "changed_files": 0, "bytes_after": 262},
+      {"flow": "12 fixtures douradas iniciais", "created": [], "altered": [], "deleted": [], "changed_files": 0, "note": "spec-diff cria projeção fora de .bianchini/current; demais cenários são leitura ou erro sem mutação"}
+    ],
+    "claim_boundary": "medição estrutural por bytes; não avalia qualidade semântica do texto"
+  },
+  "persistent_artifacts": {
+    "measurement": "inventário byte a byte após model init em repositório Git temporário",
+    "files": 6,
+    "bytes": 800,
+    "inventory": [
+      {"path": ".bianchini/.gitignore", "bytes": 10},
+      {"path": ".bianchini/PROJECT.md", "bytes": 56},
+      {"path": ".bianchini/STATE.md", "bytes": 448},
+      {"path": ".bianchini/current/ARCHITECTURE.md", "bytes": 20},
+      {"path": ".bianchini/current/SYSTEM_MODEL.md", "bytes": 242},
+      {"path": ".bianchini/debug/KNOWLEDGE.md", "bytes": 24}
+    ],
+    "fixture_projection": {"flow": "spec-diff-created-output", "files_created": 1, "bytes": 564},
+    "claim_boundary": "não inclui artefatos condicionais de change, quick, debug, execução ou homologação não exercitados por esta amostra"
+  }
+}

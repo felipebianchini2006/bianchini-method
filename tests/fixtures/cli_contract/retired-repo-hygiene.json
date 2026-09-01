@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "repo-hygiene.retired",
+  "argv": ["repo-hygiene", "check", "--repo", "{repo}"],
+  "initial_tree": {"keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 2,
+    "stdout": {"kind": "empty"},
+    "stderr": "ARGPARSE: bm: error: argument command: invalid choice: 'repo-hygiene'\n",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
+  }
+}

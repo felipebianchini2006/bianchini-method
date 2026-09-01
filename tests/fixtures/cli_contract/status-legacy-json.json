@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "status",
+  "argv": ["status", "{repo}/legacy.md", "--format", "json"],
+  "initial_tree": {"legacy.md": {"text": "method_version: 1\n"}, "keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 0,
+    "stdout": {"kind": "json", "value": {"implicit_legacy": false, "method_mode": "legacy-superpowers", "method_version": 1, "mode": "legacy-superpowers", "status": "legacy"}},
+    "stderr": "",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt", "legacy.md"]}
+  }
+}

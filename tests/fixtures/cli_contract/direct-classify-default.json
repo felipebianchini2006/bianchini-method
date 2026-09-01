@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "direct.classify",
+  "argv": ["direct", "classify", "--repo", "{repo}"],
+  "initial_tree": {"keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 0,
+    "stdout": {"kind": "json", "value": {"dimensions": {"concurrency": 0, "external_effect": 0, "migration": 0, "money": 0, "scope": 0}, "overrides": [], "reasons": [], "route": "normal", "score": 0}},
+    "stderr": "",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
+  }
+}

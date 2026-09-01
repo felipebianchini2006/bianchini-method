@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "change-policy",
+  "argv": ["change-policy", "--scope-change"],
+  "initial_tree": {"keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 0,
+    "stdout": {"kind": "json", "value": {"action": "invalidate_package_and_replan_affected_scope", "classification": "material_change", "extra_review_required": true, "plan_files_mutable": false, "plan_invalidating": true, "reapproval_required": true, "redesign_allowed": true}},
+    "stderr": "",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
+  }
+}

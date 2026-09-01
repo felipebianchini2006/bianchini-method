@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "status",
+  "argv": ["status", "{repo}/legacy.md", "--format", "text"],
+  "initial_tree": {"legacy.md": {"text": "method_version: 1\n"}, "keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 0,
+    "stdout": {"kind": "text", "value": "# Status do projeto\n\n- Método: v1 legado (Superpowers)\n- Marcador implícito: não\n"},
+    "stderr": "",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt", "legacy.md"]}
+  }
+}

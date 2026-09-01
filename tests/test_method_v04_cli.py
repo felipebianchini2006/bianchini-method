@@ -1569,6 +1569,132 @@ class MethodV04Scenarios(unittest.TestCase):
             state_text = (repo / ".bianchini/STATE.md").read_text(encoding="utf-8")
             self.assertIn('"status":"idle"', state_text)
 
+    def test_cycle_close_legacy_schema1_preserves_specs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            repo = base / "repo"
+            init_git(repo)
+            cli_json("model", "init", "--repo", str(repo))
+            current_specs = repo / ".bianchini/current/specs"
+            current_specs.mkdir(parents=True, exist_ok=True)
+            (current_specs / "system.md").write_bytes(
+                b"# SPEC-LEGACY\n\nContrato legado preservado byte a byte.\n"
+            )
+            specs_before = tree_digest(current_specs)
+            change_id = str(
+                cli_json("model", "init", "--repo", str(repo), "--change", "legacy")[
+                    "change"
+                ]
+            )
+            change_root = repo / ".bianchini/changes" / change_id
+            coherence_path = change_root / "COHERENCE.md"
+            coherence_header = json.loads(
+                coherence_path.read_text(encoding="utf-8").split("---", 2)[1]
+            )
+            coherence_header.pop("planning_contract")
+            coherence_path.write_text(
+                markdown_document(coherence_header, "Coerência legada"),
+                encoding="utf-8",
+            )
+            delta = {"contracts": {"add": [{"id": "legacy_contract"}]}}
+            (change_root / "SYSTEM_MODEL.md").write_text(
+                markdown_document(
+                    empty_model(contracts=[{"id": "legacy_contract"}]),
+                    "Sistema final legado",
+                ),
+                encoding="utf-8",
+            )
+            (change_root / "plans/P01.md").write_text(
+                markdown_document(
+                    {
+                        "id": "P01",
+                        "acceptance": ["legado preservado"],
+                        "verifications": ["test_legacy"],
+                        "model_delta": delta,
+                    },
+                    "P01",
+                ),
+                encoding="utf-8",
+            )
+            structural = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--structural-only",
+            )
+            semantic = base / "semantic.json"
+            semantic.write_text(
+                json.dumps(
+                    {
+                        "prompt": "revisar legado",
+                        "inputs": structural["review_input_digest"],
+                        "sources": ["fixture"],
+                        "findings": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            checked = cli_json(
+                "coherence",
+                "check",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--semantic-report",
+                str(semantic),
+            )
+            self.assertEqual(checked["planning_contract"], 1)
+            cli_json(
+                "coherence",
+                "approve",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--digest",
+                str(checked["digest"]),
+                "--approved-by",
+                "human:test",
+            )
+            actual_delta = base / "actual-delta.json"
+            actual_delta.write_text(json.dumps(delta), encoding="utf-8")
+            cli_json(
+                "plan",
+                "complete",
+                "--repo",
+                str(repo),
+                "--change",
+                change_id,
+                "--plan",
+                "P01",
+                "--actual-delta",
+                str(actual_delta),
+                "--result",
+                "Contrato legado entregue",
+                "--verification",
+                "test_legacy passou",
+            )
+            git(repo, "add", ".")
+            git(repo, "commit", "-m", "complete legacy change")
+
+            closed = cli_json(
+                "cycle-close", "--repo", str(repo), "--change", change_id
+            )
+
+            self.assertEqual(closed["status"], "completed")
+            self.assertEqual(tree_digest(current_specs), specs_before)
+            summary = json.loads(
+                (
+                    repo / ".bianchini/archive" / change_id / "SUMMARY.md"
+                ).read_text(encoding="utf-8").split("---", 2)[1]
+            )
+            self.assertNotIn("spec_contract", summary)
+            self.assertNotIn("specs_promoted", summary)
+
     def test_direct_risk_classification_is_deterministic(self) -> None:
         normal = cli_json(
             "direct",

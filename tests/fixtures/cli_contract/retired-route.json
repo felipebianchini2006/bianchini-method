@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "route.retired",
+  "argv": ["route", "--repo", "{repo}", "--new-project"],
+  "initial_tree": {"keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 2,
+    "stdout": {"kind": "empty"},
+    "stderr": "ARGPARSE: bm: error: argument command: invalid choice: 'route'\n",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
+  }
+}

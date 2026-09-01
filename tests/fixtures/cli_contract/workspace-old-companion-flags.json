@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "workspace.companion-v2-flags",
+  "argv": ["workspace", "create", "--repo", "{repo}", "--plan", "P01", "--planning-version", "v2", "--state", "{repo}/legacy-state.json"],
+  "initial_tree": {"legacy-state.json": {"text": "{\"method_version\":2}\n"}, "keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 2,
+    "stdout": {"kind": "empty"},
+    "stderr": "ARGPARSE: bm: error: unrecognized arguments: --planning-version v2 --state {repo}/legacy-state.json\n",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt", "legacy-state.json"]}
+  }
+}

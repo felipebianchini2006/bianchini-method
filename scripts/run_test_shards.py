@@ -36,6 +36,10 @@ CORE_04_SHARDS = (
     "CoherenceTests",
 )
 
+CONTRACT_SHARDS = (
+    "CliContractScenarios",
+)
+
 SELF_UPDATE_SHARDS = (
     "SelfUpdateScenarios",
 )
@@ -79,6 +83,9 @@ def main() -> int:
     for shard in CORE_04_SHARDS:
         if run_shard("test_bm_core_modules", shard, environment) != 0:
             return 1
+    for shard in CONTRACT_SHARDS:
+        if run_shard("test_cli_contract", shard, environment) != 0:
+            return 1
     for shard in SELF_UPDATE_SHARDS:
         if run_shard("test_self_update", shard, environment) != 0:
             return 1
@@ -92,6 +99,7 @@ def main() -> int:
         len(SHARDS)
         + len(REVIEW_SHARDS)
         + len(CORE_04_SHARDS)
+        + len(CONTRACT_SHARDS)
         + len(SELF_UPDATE_SHARDS)
         + len(LINEAGE_SHARDS)
         + len(CODEX_SHARDS)

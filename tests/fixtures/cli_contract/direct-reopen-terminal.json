@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "direct.reopen",
+  "argv": ["direct", "reopen", "--repo", "{repo}", "--slug", "Q001-terminal", "--next-action", "continuar"],
+  "initial_tree": {"keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 2,
+    "stdout": {"kind": "empty"},
+    "stderr": "ORDER_VIOLATION: quick 0.4 terminal é imutável\n",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
+  }
+}
