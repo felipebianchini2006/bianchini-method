@@ -66,6 +66,43 @@
           ]
         }
       }
+    },
+    {
+      "surface": "learn.reject",
+      "argv": [
+        "learn",
+        "reject",
+        "--repo",
+        "{repo}",
+        "--candidate",
+        "{candidate_id}",
+        "--reason",
+        "caso isolado"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "id": "L813BC8BD6BAB",
+            "path": ".bianchini/.runtime/learning/rejected/L813BC8BD6BAB.json",
+            "status": "rejected"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.runtime/learning/rejected/L813BC8BD6BAB.json",
+            ".bianchini/.runtime/learning/transition.lock",
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      }
     }
   ]
 }

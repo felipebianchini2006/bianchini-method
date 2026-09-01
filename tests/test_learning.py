@@ -141,7 +141,8 @@ class GovernedLearningScenarios(unittest.TestCase):
                     nonlocal calls
                     calls += 1
                     if calls == 1:
-                        raise OSError("falha simulada após target durável")
+                        path.unlink()
+                        raise OSError("falha simulada no fsync após unlink")
                     original_unlink(path)
 
                 with mock.patch.object(
@@ -150,12 +151,41 @@ class GovernedLearningScenarios(unittest.TestCase):
                     with self.assertRaisesRegex(OSError, "falha simulada"):
                         transition()
                     self.assertTrue(target.is_file())
-                    self.assertTrue(pending.is_file())
+                    self.assertFalse(pending.exists())
                     result = transition()
 
                 self.assertEqual(result["id"], candidate["id"])
                 self.assertTrue(target.is_file())
                 self.assertFalse(pending.exists())
+
+    def test_partial_deactivate_resumes_after_durable_replace(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            self.write_source(repo)
+            candidate = propose_learning(repo)["candidates"][0]
+            approve_learning(repo, candidate["id"], candidate["digest"], "human:felipe")
+            original_write = bm_learning._atomic_write
+            calls = 0
+
+            def fail_after_replace(path: Path, content: bytes) -> None:
+                nonlocal calls
+                calls += 1
+                original_write(path, content)
+                if calls == 1:
+                    raise OSError("falha simulada após replace durável")
+
+            transition = lambda: deactivate_learning(
+                repo, candidate["id"], "contrato substituído", "human:felipe"
+            )
+            with mock.patch.object(
+                bm_learning, "_atomic_write", side_effect=fail_after_replace
+            ):
+                with self.assertRaisesRegex(OSError, "falha simulada"):
+                    transition()
+                result = transition()
+
+            self.assertFalse(result["active"])
+            self.assertEqual(calls, 1)
 
     def test_learning_atomic_write_syncs_target_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -304,6 +334,13 @@ class GovernedLearningScenarios(unittest.TestCase):
             self.assertFalse(value["active"])
             self.assertEqual(value["deactivation_reason"], "contrato substituído")
             self.assertEqual(value["approved_by"], "human:felipe")
+
+            before_retry = (repo / approved["path"]).read_bytes()
+            retried = deactivate_learning(
+                repo, candidate["id"], "contrato substituído", "human:felipe"
+            )
+            self.assertFalse(retried["active"])
+            self.assertEqual((repo / approved["path"]).read_bytes(), before_retry)
 
     def test_rejection_preserves_history_without_active_lesson(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

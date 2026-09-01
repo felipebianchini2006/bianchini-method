@@ -444,6 +444,11 @@ def _load_candidate(root: Path, candidate: str) -> tuple[Path, dict[str, Any]]:
         _fail("STALE_EVIDENCE", f"candidato corrompido: {error}")
     if not isinstance(value, dict) or _canonical(value) != raw:
         _fail("STALE_EVIDENCE", "candidato não está em forma canônica")
+    _validate_candidate_value(candidate, value)
+    return path, value
+
+
+def _validate_candidate_value(candidate: str, value: dict[str, Any]) -> None:
     stored_digest = value.get("digest")
     unsigned = {key: item for key, item in value.items() if key != "digest"}
     if stored_digest != _digest(unsigned):
@@ -479,7 +484,6 @@ def _load_candidate(root: Path, candidate: str) -> tuple[Path, dict[str, Any]]:
         r"[0-9a-f]{64}", value["source_digest"]
     ):
         _fail("STALE_EVIDENCE", "source_digest inválido no candidato")
-    return path, value
 
 
 def _safe_source(root: Path, value: str) -> Path:
@@ -503,6 +507,74 @@ def _safe_source(root: Path, value: str) -> Path:
     return candidate
 
 
+def _candidate_from_approved(
+    existing: dict[str, Any], candidate: str, digest: str, actor: str
+) -> dict[str, Any]:
+    if (
+        existing.get("status") != "approved"
+        or existing.get("active") is not True
+        or existing.get("approved_by") != actor
+        or existing.get("approved_digest") != digest
+        or not isinstance(existing.get("approved_at"), str)
+        or not existing["approved_at"].strip()
+    ):
+        _fail("STALE_EVIDENCE", "lição aprovada divergiu da decisão solicitada")
+    reconstructed = dict(existing)
+    for key in ("active", "approved_by", "approved_digest", "approved_at"):
+        reconstructed.pop(key, None)
+    reconstructed["status"] = "pending"
+    reconstructed["digest"] = digest
+    _validate_candidate_value(candidate, reconstructed)
+    return reconstructed
+
+
+def _candidate_from_rejected(
+    existing: dict[str, Any], candidate: str, reason: str
+) -> dict[str, Any]:
+    if (
+        existing.get("status") != "rejected"
+        or existing.get("rejection_reason") != reason.strip()
+        or not isinstance(existing.get("rejected_at"), str)
+        or not existing["rejected_at"].strip()
+    ):
+        _fail("STALE_EVIDENCE", "rejeição divergiu da decisão solicitada")
+    reconstructed = dict(existing)
+    reconstructed.pop("rejection_reason", None)
+    reconstructed.pop("rejected_at", None)
+    reconstructed["status"] = "pending"
+    _validate_candidate_value(candidate, reconstructed)
+    return reconstructed
+
+
+def _transition_target_value(path: Path, label: str) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        _fail("LEARNING_CANDIDATE_INVALID", f"candidato ausente: {path.stem}")
+    raw = path.read_bytes()
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as error:
+        _fail("STALE_EVIDENCE", f"{label} corrompida: {error}")
+    if not isinstance(value, dict) or _canonical(value) != raw:
+        _fail("STALE_EVIDENCE", f"{label} não está em forma canônica")
+    return value
+
+
+def _approved_retry_candidate(
+    root: Path, candidate: str, digest: str, actor: str
+) -> dict[str, Any]:
+    lessons = _fixed_dir(root, ".bianchini/current/lessons", create=False)
+    existing = _transition_target_value(lessons / f"{candidate}.json", "lição")
+    return _candidate_from_approved(existing, candidate, digest, actor)
+
+
+def _rejected_retry_candidate(
+    root: Path, candidate: str, reason: str
+) -> dict[str, Any]:
+    directory = _fixed_dir(root, ".bianchini/.runtime/learning/rejected", create=False)
+    existing = _transition_target_value(directory / f"{candidate}.json", "rejeição")
+    return _candidate_from_rejected(existing, candidate, reason)
+
+
 @_transition_locked
 def approve_learning(
     repo: str | Path, candidate: str, digest: str, approved_by: str
@@ -510,7 +582,12 @@ def approve_learning(
     root = _repo_root(repo)
     if not isinstance(approved_by, str) or not re.fullmatch(r"human:[^\s:][^\s]*", approved_by):
         _fail("HUMAN_APPROVAL_REQUIRED", "approved_by exige identidade human:<id>")
-    source_path, value = _load_candidate(root, candidate)
+    pending = _fixed_dir(root, ".bianchini/.runtime/learning/pending", create=False)
+    source_path = pending / f"{candidate}.json"
+    if source_path.is_symlink() or source_path.exists():
+        source_path, value = _load_candidate(root, candidate)
+    else:
+        value = _approved_retry_candidate(root, candidate, digest, approved_by)
     if value.get("digest") != digest:
         _fail("STALE_EVIDENCE", "digest informado não corresponde ao candidato")
     if value.get("classification") not in APPROVABLE:
@@ -595,25 +672,36 @@ def deactivate_learning(
     if (
         value.get("id") != candidate
         or value.get("status") != "approved"
-        or value.get("active", True) is False
+        or not isinstance(value.get("active"), bool)
         or not isinstance(value.get("approved_by"), str)
         or not isinstance(value.get("approved_digest"), str)
     ):
         _fail("STALE_EVIDENCE", "lição aprovada possui estado inválido")
-    deactivated = {
-        **value,
-        "active": False,
-        "deactivated_by": deactivated_by,
-        "deactivated_at": _now(),
-        "deactivation_reason": reason.strip(),
-    }
-    _atomic_write(path, _canonical(deactivated))
-    return {
+    clean_reason = reason.strip()
+    result = {
         "id": candidate,
         "status": "approved",
         "active": False,
         "path": path.relative_to(root).as_posix(),
     }
+    if value["active"] is False:
+        if (
+            value.get("deactivated_by") == deactivated_by
+            and value.get("deactivation_reason") == clean_reason
+            and isinstance(value.get("deactivated_at"), str)
+            and value["deactivated_at"].strip()
+        ):
+            return result
+        _fail("STALE_EVIDENCE", "lição já foi desativada por outra decisão")
+    deactivated = {
+        **value,
+        "active": False,
+        "deactivated_by": deactivated_by,
+        "deactivated_at": _now(),
+        "deactivation_reason": clean_reason,
+    }
+    _atomic_write(path, _canonical(deactivated))
+    return result
 
 
 @_transition_locked
@@ -621,8 +709,13 @@ def reject_learning(repo: str | Path, candidate: str, reason: str) -> dict[str, 
     root = _repo_root(repo)
     if not isinstance(reason, str) or not reason.strip():
         _fail("LEARNING_REJECTION_INVALID", "rejeição exige motivo")
-    source, value = _load_candidate(root, candidate)
     clean_reason = reason.strip()
+    pending = _fixed_dir(root, ".bianchini/.runtime/learning/pending", create=False)
+    source = pending / f"{candidate}.json"
+    if source.is_symlink() or source.exists():
+        source, value = _load_candidate(root, candidate)
+    else:
+        value = _rejected_retry_candidate(root, candidate, clean_reason)
     rejected = {
         **value,
         "status": "rejected",

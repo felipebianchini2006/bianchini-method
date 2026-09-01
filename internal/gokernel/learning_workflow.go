@@ -22,6 +22,7 @@ var (
 	learningApprovable = map[string]bool{"repeatable_procedure": true, "deterministic_invariant": true}
 	learningSuccess    = map[string]bool{"resolved": true, "completed": true, "passed": true, "accepted": true}
 	learningRemoveFile = durableRemoveFile
+	learningWriteFile  = learningAtomicWrite
 	learningValueFlags = map[string]bool{
 		"--repo": true, "--since": true, "--candidate": true, "--digest": true,
 		"--approved-by": true, "--reason": true,
@@ -280,7 +281,18 @@ func learningApprove(repo, id, digest, approvedBy string) (map[string]any, error
 	}
 	source, candidate, err := loadLearningCandidate(repo, id)
 	if err != nil {
-		return nil, err
+		pending, pendingErr := learningFixedDir(repo, ".bianchini/.runtime/learning/pending", false)
+		if pendingErr != nil {
+			return nil, err
+		}
+		source = filepath.Join(pending, id+".json")
+		if _, statErr := os.Lstat(source); !os.IsNotExist(statErr) {
+			return nil, err
+		}
+		candidate, err = learningApprovedRetryCandidate(repo, id, digest, approvedBy)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if stateString(candidate["digest"]) != digest {
 		return nil, learningError("STALE_EVIDENCE", "digest informado não corresponde ao candidato")
@@ -372,19 +384,28 @@ func learningDeactivate(repo, id, reason, actor string) (map[string]any, error) 
 	if !bytes.Equal(canonical, raw) {
 		return nil, learningError("STALE_EVIDENCE", "lição não está em forma canônica")
 	}
-	if stateString(value["id"]) != id || stateString(value["status"]) != "approved" || value["active"] == false || stateString(value["approved_by"]) == "" || stateString(value["approved_digest"]) == "" {
+	active, activeOK := value["active"].(bool)
+	if stateString(value["id"]) != id || stateString(value["status"]) != "approved" || !activeOK || stateString(value["approved_by"]) == "" || stateString(value["approved_digest"]) == "" {
 		return nil, learningError("STALE_EVIDENCE", "lição aprovada possui estado inválido")
+	}
+	cleanReason := strings.TrimSpace(reason)
+	relative, _ := filepath.Rel(repo, path)
+	result := map[string]any{"id": id, "status": "approved", "active": false, "path": filepath.ToSlash(relative)}
+	if !active {
+		if stateString(value["deactivated_by"]) == actor && stateString(value["deactivation_reason"]) == cleanReason && strings.TrimSpace(stateString(value["deactivated_at"])) != "" {
+			return result, nil
+		}
+		return nil, learningError("STALE_EVIDENCE", "lição já foi desativada por outra decisão")
 	}
 	value["active"] = false
 	value["deactivated_by"] = actor
 	value["deactivated_at"] = utcNow()
-	value["deactivation_reason"] = strings.TrimSpace(reason)
+	value["deactivation_reason"] = cleanReason
 	encoded, _ := learningCanonical(value)
-	if err := learningAtomicWrite(repo, path, encoded); err != nil {
+	if err := learningWriteFile(repo, path, encoded); err != nil {
 		return nil, err
 	}
-	relative, _ := filepath.Rel(repo, path)
-	return map[string]any{"id": id, "status": "approved", "active": false, "path": filepath.ToSlash(relative)}, nil
+	return result, nil
 }
 
 func learningReject(repo, id, reason string) (map[string]any, error) {
@@ -393,7 +414,18 @@ func learningReject(repo, id, reason string) (map[string]any, error) {
 	}
 	source, candidate, err := loadLearningCandidate(repo, id)
 	if err != nil {
-		return nil, err
+		pending, pendingErr := learningFixedDir(repo, ".bianchini/.runtime/learning/pending", false)
+		if pendingErr != nil {
+			return nil, err
+		}
+		source = filepath.Join(pending, id+".json")
+		if _, statErr := os.Lstat(source); !os.IsNotExist(statErr) {
+			return nil, err
+		}
+		candidate, err = learningRejectedRetryCandidate(repo, id, reason)
+		if err != nil {
+			return nil, err
+		}
 	}
 	rejected := cloneMap(candidate)
 	rejected["status"] = "rejected"
@@ -465,11 +497,18 @@ func loadLearningCandidate(repo, id string) (string, map[string]any, error) {
 	if !bytes.Equal(canonical, raw) {
 		return "", nil, learningError("STALE_EVIDENCE", "candidato não está em forma canônica")
 	}
+	if err := validateLearningCandidateValue(id, value); err != nil {
+		return "", nil, err
+	}
+	return path, value, nil
+}
+
+func validateLearningCandidateValue(id string, value map[string]any) error {
 	storedDigest := stateString(value["digest"])
 	unsigned := cloneMap(value)
 	delete(unsigned, "digest")
 	if storedDigest != learningDigest(unsigned) {
-		return "", nil, learningError("STALE_EVIDENCE", "digest interno do candidato divergiu")
+		return learningError("STALE_EVIDENCE", "digest interno do candidato divergiu")
 	}
 	expectedKeys := []string{"classification", "conflicts", "digest", "evidence", "id", "schema_version", "source", "source_digest", "statement", "status", "tags", "validity"}
 	keys := make([]string, 0, len(value))
@@ -478,31 +517,31 @@ func loadLearningCandidate(repo, id string) (string, map[string]any, error) {
 	}
 	sort.Strings(keys)
 	if strings.Join(keys, "\x00") != strings.Join(expectedKeys, "\x00") || stateInt(value["schema_version"]) != 1 {
-		return "", nil, learningError("STALE_EVIDENCE", "schema do candidato divergiu")
+		return learningError("STALE_EVIDENCE", "schema do candidato divergiu")
 	}
 	if stateString(value["status"]) != "pending" || !learningClasses[stateString(value["classification"])] {
-		return "", nil, learningError("STALE_EVIDENCE", "estado do candidato divergiu")
+		return learningError("STALE_EVIDENCE", "estado do candidato divergiu")
 	}
 	base := cloneMap(unsigned)
 	delete(base, "id")
 	expectedID := "L" + strings.ToUpper(learningDigest(base)[:12])
 	if stateString(value["id"]) != id || expectedID != id {
-		return "", nil, learningError("STALE_EVIDENCE", "ID não deriva do conteúdo do candidato")
+		return learningError("STALE_EVIDENCE", "ID não deriva do conteúdo do candidato")
 	}
 	for _, field := range []string{"tags", "conflicts", "evidence"} {
 		if _, err := learningTextList(value[field], field, field != "conflicts"); err != nil {
-			return "", nil, err
+			return err
 		}
 	}
 	for _, field := range []string{"statement", "validity", "source"} {
 		if strings.TrimSpace(stateString(value[field])) == "" {
-			return "", nil, learningError("STALE_EVIDENCE", field+" inválido no candidato")
+			return learningError("STALE_EVIDENCE", field+" inválido no candidato")
 		}
 	}
 	if !hexDigestPattern.MatchString(stateString(value["source_digest"])) {
-		return "", nil, learningError("STALE_EVIDENCE", "source_digest inválido no candidato")
+		return learningError("STALE_EVIDENCE", "source_digest inválido no candidato")
 	}
-	return path, value, nil
+	return nil
 }
 
 func learningSources(repo, since string) ([]string, error) {
@@ -703,29 +742,93 @@ func learningAtomicWrite(repo, path string, content []byte) error {
 	return nil
 }
 
-func learningApprovedTransitionMatches(existing, candidate map[string]any, digest, actor string) bool {
+func learningApprovedRetryCandidate(repo, id, digest, actor string) (map[string]any, error) {
+	lessons, err := learningFixedDir(repo, ".bianchini/current/lessons", false)
+	if err != nil {
+		return nil, err
+	}
+	target := filepath.Join(lessons, id+".json")
+	existing, raw, err := learningJSONObject(target, "lição")
+	if err != nil {
+		return nil, learningError("LEARNING_CANDIDATE_INVALID", "candidato ausente: "+id)
+	}
+	canonical, _ := learningCanonical(existing)
+	if !bytes.Equal(canonical, raw) {
+		return nil, learningError("STALE_EVIDENCE", "lição não está em forma canônica")
+	}
+	candidate, err := learningCandidateFromApproved(existing, id, digest, actor)
+	if err != nil {
+		return nil, err
+	}
+	return candidate, nil
+}
+
+func learningRejectedRetryCandidate(repo, id, reason string) (map[string]any, error) {
+	directory, err := learningFixedDir(repo, ".bianchini/.runtime/learning/rejected", false)
+	if err != nil {
+		return nil, err
+	}
+	target := filepath.Join(directory, id+".json")
+	existing, raw, err := learningJSONObject(target, "rejeição")
+	if err != nil {
+		return nil, learningError("LEARNING_CANDIDATE_INVALID", "candidato ausente: "+id)
+	}
+	canonical, _ := learningCanonical(existing)
+	if !bytes.Equal(canonical, raw) {
+		return nil, learningError("STALE_EVIDENCE", "rejeição não está em forma canônica")
+	}
+	candidate, err := learningCandidateFromRejected(existing, id, reason)
+	if err != nil {
+		return nil, err
+	}
+	return candidate, nil
+}
+
+func learningCandidateFromApproved(existing map[string]any, id, digest, actor string) (map[string]any, error) {
 	if stateString(existing["status"]) != "approved" || existing["active"] != true || stateString(existing["approved_by"]) != actor || stateString(existing["approved_digest"]) != digest || strings.TrimSpace(stateString(existing["approved_at"])) == "" {
+		return nil, learningError("STALE_EVIDENCE", "lição aprovada divergiu da decisão solicitada")
+	}
+	candidate := cloneMap(existing)
+	for _, key := range []string{"active", "approved_by", "approved_digest", "approved_at"} {
+		delete(candidate, key)
+	}
+	candidate["status"] = "pending"
+	candidate["digest"] = digest
+	if err := validateLearningCandidateValue(id, candidate); err != nil {
+		return nil, err
+	}
+	return candidate, nil
+}
+
+func learningCandidateFromRejected(existing map[string]any, id, reason string) (map[string]any, error) {
+	if stateString(existing["status"]) != "rejected" || stateString(existing["rejection_reason"]) != strings.TrimSpace(reason) || strings.TrimSpace(stateString(existing["rejected_at"])) == "" {
+		return nil, learningError("STALE_EVIDENCE", "rejeição divergiu da decisão solicitada")
+	}
+	candidate := cloneMap(existing)
+	delete(candidate, "rejection_reason")
+	delete(candidate, "rejected_at")
+	candidate["status"] = "pending"
+	if err := validateLearningCandidateValue(id, candidate); err != nil {
+		return nil, err
+	}
+	return candidate, nil
+}
+
+func learningApprovedTransitionMatches(existing, candidate map[string]any, digest, actor string) bool {
+	reconstructed, err := learningCandidateFromApproved(existing, stateString(candidate["id"]), digest, actor)
+	if err != nil {
 		return false
 	}
-	reconstructed := cloneMap(existing)
-	for _, key := range []string{"active", "approved_by", "approved_digest", "approved_at"} {
-		delete(reconstructed, key)
-	}
-	reconstructed["status"] = "pending"
-	reconstructed["digest"] = digest
 	left, _ := learningCanonical(reconstructed)
 	right, _ := learningCanonical(candidate)
 	return bytes.Equal(left, right)
 }
 
 func learningRejectedTransitionMatches(existing, candidate map[string]any, reason string) bool {
-	if stateString(existing["status"]) != "rejected" || stateString(existing["rejection_reason"]) != strings.TrimSpace(reason) || strings.TrimSpace(stateString(existing["rejected_at"])) == "" {
+	reconstructed, err := learningCandidateFromRejected(existing, stateString(candidate["id"]), reason)
+	if err != nil {
 		return false
 	}
-	reconstructed := cloneMap(existing)
-	delete(reconstructed, "rejection_reason")
-	delete(reconstructed, "rejected_at")
-	reconstructed["status"] = "pending"
 	left, _ := learningCanonical(reconstructed)
 	right, _ := learningCanonical(candidate)
 	return bytes.Equal(left, right)

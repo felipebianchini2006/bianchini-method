@@ -150,6 +150,46 @@
       }
     },
     {
+      "surface": "learn.approve",
+      "argv": [
+        "learn",
+        "approve",
+        "--repo",
+        "{repo}",
+        "--candidate",
+        "{candidate_id}",
+        "--digest",
+        "{candidate_digest}",
+        "--approved-by",
+        "human:fixture"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "digest": "99e6c101ba68154119cf7d11f6d6402d82974c669acdd408aa75c1e2ee215c35",
+            "id": "L813BC8BD6BAB",
+            "path": ".bianchini/current/lessons/L813BC8BD6BAB.json",
+            "status": "approved"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.runtime/learning/transition.lock",
+            ".bianchini/current/lessons/L813BC8BD6BAB.json",
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
       "surface": "learn.deactivate",
       "argv": [
         "learn",
@@ -184,6 +224,46 @@
           "moved": [],
           "preserved": [
             ".bianchini/.runtime/learning/transition.lock",
+            ".bianchini/debug/resolved/D001-retry.md",
+            "keep.txt"
+          ]
+        }
+      }
+    },
+    {
+      "surface": "learn.deactivate",
+      "argv": [
+        "learn",
+        "deactivate",
+        "--repo",
+        "{repo}",
+        "--candidate",
+        "{candidate_id}",
+        "--reason",
+        "contrato substituído",
+        "--approved-by",
+        "human:fixture"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout": {
+          "kind": "json",
+          "value": {
+            "active": false,
+            "id": "L813BC8BD6BAB",
+            "path": ".bianchini/current/lessons/L813BC8BD6BAB.json",
+            "status": "approved"
+          }
+        },
+        "stderr": "",
+        "mutations": {
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "moved": [],
+          "preserved": [
+            ".bianchini/.runtime/learning/transition.lock",
+            ".bianchini/current/lessons/L813BC8BD6BAB.json",
             ".bianchini/debug/resolved/D001-retry.md",
             "keep.txt"
           ]

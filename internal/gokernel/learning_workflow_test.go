@@ -1,6 +1,7 @@
 package gokernel
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -80,6 +81,25 @@ func TestGovernedLearningApproveAndDeactivate(t *testing.T) {
 	}
 	if deactivatedValue.(map[string]any)["active"] != false {
 		t.Fatalf("deactivated=%#v", deactivatedValue)
+	}
+	lesson := filepath.Join(repo, ".bianchini", "current", "lessons", id+".json")
+	beforeRetry, err := os.ReadFile(lesson)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retriedValue, err := runLearning([]string{"deactivate", "--repo", repo, "--candidate", id, "--reason", "contrato substituído", "--approved-by", "human:fixture"})
+	if err != nil {
+		t.Fatalf("retry idempotente falhou: %v", err)
+	}
+	if retriedValue.(map[string]any)["active"] != false {
+		t.Fatalf("retried=%#v", retriedValue)
+	}
+	afterRetry, err := os.ReadFile(lesson)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(beforeRetry, afterRetry) {
+		t.Fatal("retry reescreveu a lição e alterou deactivated_at")
 	}
 }
 
@@ -162,7 +182,10 @@ func TestGovernedLearningRetriesCanonicalPartialTransitions(t *testing.T) {
 			learningRemoveFile = func(path string) error {
 				calls++
 				if calls == 1 {
-					return errors.New("falha simulada após target durável")
+					if err := os.Remove(path); err != nil {
+						return err
+					}
+					return errors.New("falha simulada no fsync após unlink")
 				}
 				return originalRemove(path)
 			}
@@ -180,8 +203,11 @@ func TestGovernedLearningRetriesCanonicalPartialTransitions(t *testing.T) {
 				t.Fatalf("primeira transição deveria falhar após target: %v", err)
 			}
 			pending := filepath.Join(repo, ".bianchini", ".runtime", "learning", "pending", id+".json")
-			if !regularFile(target) || !regularFile(pending) {
-				t.Fatalf("estado parcial canônico não foi preservado: target=%v pending=%v", regularFile(target), regularFile(pending))
+			if !regularFile(target) {
+				t.Fatalf("target canônico não foi preservado: target=%v", regularFile(target))
+			}
+			if _, err := os.Lstat(pending); !os.IsNotExist(err) {
+				t.Fatalf("pending deveria ter sido removido antes da falha de fsync: %v", err)
 			}
 			if _, err := runLearning(args); err != nil {
 				t.Fatalf("retry não concluiu transição parcial: %v", err)
@@ -193,6 +219,42 @@ func TestGovernedLearningRetriesCanonicalPartialTransitions(t *testing.T) {
 				t.Fatalf("pending residual após retry: %v", err)
 			}
 		})
+	}
+}
+
+func TestGovernedLearningRetriesDeactivateAfterDurableReplace(t *testing.T) {
+	repo := learningTestRepo(t)
+	proposed, err := runLearning([]string{"propose", "--repo", repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate := stateObject(stateArray(proposed.(map[string]any)["candidates"])[0])
+	id, digest := stateString(candidate["id"]), stateString(candidate["digest"])
+	if _, err := runLearning([]string{"approve", "--repo", repo, "--candidate", id, "--digest", digest, "--approved-by", "human:fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	originalWrite := learningWriteFile
+	calls := 0
+	learningWriteFile = func(repo, path string, content []byte) error {
+		calls++
+		if err := originalWrite(repo, path, content); err != nil {
+			return err
+		}
+		if calls == 1 {
+			return errors.New("falha simulada após replace durável")
+		}
+		return nil
+	}
+	defer func() { learningWriteFile = originalWrite }()
+	args := []string{"deactivate", "--repo", repo, "--candidate", id, "--reason", "contrato substituído", "--approved-by", "human:fixture"}
+	if _, err := runLearning(args); err == nil || !strings.Contains(err.Error(), "falha simulada") {
+		t.Fatalf("primeira desativação deveria reportar falha pós-replace: %v", err)
+	}
+	if _, err := runLearning(args); err != nil {
+		t.Fatalf("retry não reconheceu desativação persistida: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("retry reescreveu lição já desativada: writes=%d", calls)
 	}
 }
 
