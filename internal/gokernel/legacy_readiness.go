@@ -57,7 +57,15 @@ var legacyQualityV2Changes = map[string]bool{
 }
 
 func legacyWordCount(content string) int {
-	return len(legacyPlanningWords.FindAllString(content, -1))
+	count := 0
+	for _, token := range legacyPlanningWords.FindAllString(content, -1) {
+		// O oráculo Python exige word boundary nas duas pontas. Hífens internos
+		// pertencem à palavra, mas separadores Markdown como "---" não contam.
+		if strings.Trim(token, "-") != "" {
+			count++
+		}
+	}
+	return count
 }
 
 func legacyOrderedUnique(values []string) []string {
