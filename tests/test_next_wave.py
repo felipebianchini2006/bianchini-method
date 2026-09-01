@@ -222,6 +222,8 @@ def tree_digest(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
         relative = path.relative_to(root).as_posix()
+        if ".git" in Path(relative).parts:
+            continue
         digest.update(relative.encode())
         if path.is_symlink():
             digest.update(b"SYMLINK")
