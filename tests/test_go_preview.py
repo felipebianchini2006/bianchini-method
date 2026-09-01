@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -27,6 +28,19 @@ def run(*argv: str, env: dict[str, str] | None = None) -> subprocess.CompletedPr
 
 
 class GoPreviewScenarios(unittest.TestCase):
+    def test_external_go_modules_are_reconciled_with_distributed_notices(self) -> None:
+        go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
+        external_modules = re.findall(
+            r"(?m)^\s*(?:require\s+)?(golang\.org/\S+)\s+v\S+", go_mod
+        )
+        notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+        self.assertTrue(external_modules)
+        for module in external_modules:
+            with self.subTest(module=module):
+                self.assertIn(module, notices)
+        self.assertIn("Copyright 2009 The Go Authors", notices)
+        self.assertIn("Redistribution and use in source and binary forms", notices)
+
     def test_go_unit_suite_is_green(self) -> None:
         completed = run("go", "test", "./...")
         self.assertEqual(completed.returncode, 0, completed.stderr)
