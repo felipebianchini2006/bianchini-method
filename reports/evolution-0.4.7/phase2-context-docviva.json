@@ -4,8 +4,53 @@
   "measured_at": "2026-09-01",
   "remeasured_after_audit": true,
   "remeasured_after_go_cutover": true,
+  "measurement_backend": "python_oracle",
   "context": {
-    "measurement": "bytes de SKILL.md mais pack compilado em fixture de completude versionada após o cutover Go",
+    "measurement": "bytes de SKILL.md mais pack compilado em fixture de completude versionada pelo oráculo Python após o cutover Go",
+    "measurement_backend": "python_oracle",
+    "before_source": {
+      "commit": "7c9fa23f524623f3360ebae579048e1765095220",
+      "method": "git_show_explicit_safe_paths",
+      "baseline_json_verified": true,
+      "files": [
+        {
+          "path": "skills/_shared/ADAPTIVE_GATES.md",
+          "bytes": 5709,
+          "sha256": "786c9d236f97f409c8ec8f021773bac05c22557fbe39bc0ce0ea1171470a1d0e"
+        },
+        {
+          "path": "skills/_shared/METHOD_CONTRACT.md",
+          "bytes": 20548,
+          "sha256": "5a4d3386644e91ff78a8e18d3e7954bf3d3a2b4179e22c8245ad3c6d45d5eb41"
+        },
+        {
+          "path": "skills/corrigir-bug/SKILL.md",
+          "bytes": 6494,
+          "sha256": "6b0f320dd1bde78ab22c8286165165055147649b05d572262363801bc461730a"
+        },
+        {
+          "path": "skills/executar-direto/SKILL.md",
+          "bytes": 8011,
+          "sha256": "03d2c2ed6e7a47e2e4810589dd0c86a531aa8a7a8f1898e34fa77cedfaba870c"
+        },
+        {
+          "path": "skills/executar-plano/SKILL.md",
+          "bytes": 9052,
+          "sha256": "5f84681fd46fe472c1545eedf39c043165b8937cf67f75289145009f5a905a33"
+        },
+        {
+          "path": "skills/homologar-sistema/SKILL.md",
+          "bytes": 9980,
+          "sha256": "2a38e6df3d9fc321c8e017ed7e50446dc715f869410c8f53e0fe644ded72b770"
+        },
+        {
+          "path": "skills/status-projeto/SKILL.md",
+          "bytes": 2138,
+          "sha256": "3a5a420f157cd4560470b9611823240871ac186c6932c3836fa30756caaf54d2"
+        }
+      ],
+      "claim_boundary": "bytes brutos do commit-base em pathspecs explícitos; não mede tokens nem leitura efetiva do agente"
+    },
     "default_max_bytes": 16384,
     "token_claim": "não medido; nenhuma alegação de redução de tokens",
     "cases": [
@@ -78,6 +123,82 @@
   },
   "docviva": {
     "measurement": "snapshots SHA-256 e mtimes em workspace temporário",
+    "historical_baseline": {
+      "runtime_commit": "7c9fa23f524623f3360ebae579048e1765095220",
+      "fixture_contract_commit": "c5a85f9bda9ea3e28f32c7c3e6f104063ee88d15",
+      "git_source_method": "git_show_explicit_safe_paths",
+      "runtime_files_materialized": 13,
+      "runtime_paths": [
+        "scripts/bm.py",
+        "skills/_shared/scripts/bm.py",
+        "skills/_shared/scripts/bm_coherence.py",
+        "skills/_shared/scripts/bm_context.py",
+        "skills/_shared/scripts/bm_feature_support.py",
+        "skills/_shared/scripts/bm_mutation.py",
+        "skills/_shared/scripts/bm_project_model.py",
+        "skills/_shared/scripts/bm_scope.py",
+        "skills/_shared/scripts/bm_spec_diff.py",
+        "skills/_shared/scripts/bm_update.py",
+        "skills/_shared/scripts/bm_v04_planning.py",
+        "skills/_shared/scripts/bm_v04_workflows.py",
+        "skills/_shared/scripts/bm_workspace.py"
+      ],
+      "fixture_runner_paths": [
+        "scripts/_cli_contract.py",
+        "scripts/run_cli_contract_fixtures.py"
+      ],
+      "flows": [
+        {
+          "flow": "model init em projeto novo",
+          "created": [
+            ".bianchini/current/ARCHITECTURE.md",
+            ".bianchini/current/SYSTEM_MODEL.md"
+          ],
+          "altered": [],
+          "deleted": [],
+          "changed_files": 2,
+          "bytes_after": 262
+        },
+        {
+          "flow": "model init em workspace existente",
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "changed_files": 0,
+          "bytes_after": 262
+        },
+        {
+          "flow": "model validate",
+          "created": [],
+          "altered": [],
+          "deleted": [],
+          "changed_files": 0,
+          "bytes_after": 262
+        }
+      ],
+      "fixtures": {
+        "total": 12,
+        "passed": 12,
+        "docviva_current_changed_files": 0,
+        "fixture_files": [
+          "change-policy-material.json",
+          "change-policy-read-only.json",
+          "direct-classify-default.json",
+          "direct-classify-protected.json",
+          "direct-reopen-terminal.json",
+          "retired-legacy-transition.json",
+          "retired-repo-hygiene.json",
+          "retired-route.json",
+          "spec-diff-created-output.json",
+          "status-legacy-json.json",
+          "status-legacy-text.json",
+          "workspace-old-companion-flags.json"
+        ]
+      },
+      "baseline_json_verified": true,
+      "provenance_note": "runtime Python extraído do commit-base; runner e 12 contratos dourados extraídos do commit da Fase 0 que congelou a interface",
+      "claim_boundary": "reexecução estrutural em repositórios temporários; confirma bytes e mutações de DocViva do runtime-base contra o snapshot da Fase 0, não qualidade semântica nem que as fixtures já existiam no commit-base"
+    },
     "initial_files": 2,
     "initial_bytes": 23,
     "identical_write_returned": false,
@@ -90,6 +211,8 @@
     "claim_boundary": "medição estrutural; a revisão humana continua responsável pela semântica textual"
   },
   "evidence": [
+    "scripts/measure_phase2_context_docviva.py",
+    "tests/test_phase2_metrics.py",
     "tests/test_context_pack.py",
     "tests/test_context_cli.py",
     "tests/test_context_skill_adoption.py",

@@ -50,6 +50,7 @@ PHASE2_SHARDS = (
     ("test_context_cli", "ContextCliScenarios"),
     ("test_context_skill_adoption", "ContextSkillAdoptionScenarios"),
     ("test_docviva", "DocVivaScenarios"),
+    ("test_phase2_metrics", "Phase2MetricsScenarios"),
 )
 
 PHASE3_SHARDS = (
@@ -65,6 +66,7 @@ PHASE4_SHARDS = (
 
 PHASE5_SHARDS = (
     ("test_go_preview", "GoBackendScenarios"),
+    ("test_cli_help", "CliHelpScenarios"),
 )
 
 FULL_JOURNEY_SHARDS = (
