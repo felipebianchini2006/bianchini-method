@@ -16,7 +16,7 @@ Nunca revisa por microtarefa em `grouped`.
 
 - caminho do task brief da unidade ou plano;
 - caminho do relatório do implementador;
-- caminho do review package (`bm.py review-package`);
+- caminho do review package (`bm review-package`);
 - caminho do arquivo de saída da revisão;
 - seções da spec referenciadas pela unidade.
 

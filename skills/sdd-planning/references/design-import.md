@@ -2,7 +2,7 @@
 
 Use somente quando existir `docs/design/<version>/DESIGN_MANIFEST.json` aprovado e válido para o mesmo escopo.
 
-1. Executar `bm.py design-audit verify`; arquivo solto em `docs/design` não é fonte de verdade.
+1. Executar `bm design-audit verify`; arquivo solto em `docs/design` não é fonte de verdade.
 2. Preservar originais. ZIP exige bloqueio de path traversal e symlink antes de extrair.
 3. Usar o inventário do manifesto: superfícies, contrato, prototype, tokens, screenshots, breakpoints e arquivos.
 4. Planejar pela hierarquia, tokens, componentes, estados e comportamento visível do contrato.

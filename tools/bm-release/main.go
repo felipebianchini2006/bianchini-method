@@ -53,7 +53,7 @@ func run() error {
 	output := flag.String("output", "dist", "output directory")
 	version := flag.String("version", "", "release version; defaults to skills/_shared/VERSION")
 	commit := flag.String("commit", "", "build commit; defaults to HEAD")
-	entrypoint := flag.String("entrypoint", "./cmd/bm-preview", "Go CLI package")
+	entrypoint := flag.String("entrypoint", "./cmd/bm", "Go CLI package")
 	targets := flag.String("targets", strings.Join(releaseTargets, ","), "comma-separated target matrix")
 	flag.Parse()
 

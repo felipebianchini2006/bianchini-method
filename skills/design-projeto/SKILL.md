@@ -12,11 +12,11 @@ Esta skill produz referência visual, não código de produção. O pacote perte
 ## 1. Definir o ciclo e o escopo
 
 1. Ler `.bianchini/STATE.md` e localizar a mudança `Cxxx-*` ativa.
-2. Sem workspace, executar `bm.py model init --repo <repo>` e iniciar a mudança pelo `/sdd-planning`.
+2. Sem workspace, executar `bm model init --repo <repo>` e iniciar a mudança pelo `/sdd-planning`.
 3. Usar `SCOPE.md` da mudança; sem escopo materializado, bloquear apenas o design.
 4. Não alterar requisitos, jornadas, texto obrigatório ou identidade fornecida.
 
-Resolver `../_shared/scripts/bm.py`. O manifesto será aceito pelo planejamento somente quando o hash corresponder exatamente ao escopo atual.
+Resolver o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não usar fallback Python. O manifesto será aceito pelo planejamento somente quando o hash corresponder exatamente ao escopo atual.
 
 ## 2. Decidir a profundidade
 
@@ -100,13 +100,13 @@ Listar em `files` todos os artefatos do pacote, exceto o próprio manifesto.
 Selar hashes:
 
 ```bash
-python3 <bm.py> design-audit seal --root <repo> --scope <scope> --manifest <manifest>
+<bm> design-audit seal --root <repo> --scope <scope> --manifest <manifest>
 ```
 
 Depois da aprovação explícita ou delegação inequívoca registrada no escopo, mudar `status` para `approved` e verificar:
 
 ```bash
-python3 <bm.py> design-audit verify --root <repo> --scope <scope> --manifest <manifest>
+<bm> design-audit verify --root <repo> --scope <scope> --manifest <manifest>
 ```
 
 Arquivo solto nunca é fonte de verdade. Somente manifesto `approved`, íntegro e ligado ao `SCOPE.md` da mudança pode entrar no planejamento.

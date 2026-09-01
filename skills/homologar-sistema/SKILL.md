@@ -7,7 +7,7 @@ description: Use para homologar explicitamente o release candidate ligado a uma 
 
 **Anuncie:** "Homologando RC <id> no sistema real."
 
-Resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py). O CLI e o pack do RC fornecem o contrato operacional necessário.
+Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. O CLI e o pack do RC fornecem o contrato operacional necessário.
 
 ## Princípio obrigatório
 
@@ -22,10 +22,10 @@ Automação reduz repetição, mas não elimina o passe real. Um E2E pode servir
 
 ## 1. Rota e pré-condições
 
-1. Ler `.bianchini/STATE.md` e executar `bm.py model validate --repo <repo>`.
+1. Ler `.bianchini/STATE.md` e executar `bm model validate --repo <repo>`.
 2. Confirmar mudança, planos e resultados concluídos, além do fingerprint completo do RC: `id`, `revision`, `build`, `checksum`.
 3. Localizar a raiz única do ciclo do RC em `.bianchini/changes/Cxxx-*` ou, após o `cycle-close`, em `.bianchini/archive/Cxxx-*`. Criar ali `results/HOMOLOGATION.md` com frontmatter mínimo `schema_version: 1`, `fingerprint`, `change`, `status: running`, listas vazias de `gates`, `blockers`, `findings` e `required_refs` apontando somente para resultados já existentes do mesmo ciclo. Não sobrescrever uma homologação existente.
-4. Compilar `bm.py context pack --repo <repo> --unit RC:<fingerprint>` e usar somente suas referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a homologação; não montar contexto manual.
+4. Compilar `bm context pack --repo <repo> --unit RC:<fingerprint>` e usar somente suas referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a homologação; não montar contexto manual.
 5. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
 6. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
 
@@ -38,7 +38,7 @@ No RC atual:
 1. executar todos os comandos de `verification.release`, incluindo suíte unitária completa configurada, integração/contratos aplicáveis, regressão completa, E2E das jornadas críticas, build e mutação exigida pela política;
 2. reunir relatórios e logs sanitizados, confirmando que evidência de mutação pertence ao commit/RC atual e ao seam exigido;
 3. vincular cada evidência ao mesmo `rc`, `revision`, `build` e `checksum`;
-4. executar `bm.py proof-map` para identificar o que a automação realmente prova;
+4. executar `bm proof-map` para identificar o que a automação realmente prova;
 5. corrigir falha de produto antes de avançar.
 
 Homologação confirma as provas produzidas nos gates e depois opera o produto; não iniciar uma nova campanha unitária, de integração, E2E ou mutação dentro desta skill. Evidência obrigatória ausente ou obsoleta retorna ao `executar-plano`/`corrigir-bug` e mantém `BLOQUEADO`.
@@ -128,7 +128,7 @@ Após duas ondas de homologação sem convergir, declarar `BLOQUEADO`. Com telem
 
 - `verification.release: passed` ou exceção de escopo explícita;
 - unitários, integração/contratos, regressão e E2E crítico do `verification.release` aprovados;
-- evidência de mutação vigente quando `bm.py policy` marcar `selective` ou `required_selective`;
+- evidência de mutação vigente quando `bm policy` marcar `selective` ou `required_selective`;
 - todas as plataformas e perfis obrigatórios executados no RC real;
 - todos os fluxos críticos e ações primárias da matriz com execução real `passed`;
 - varredura visual concluída para toda interface aplicável;
@@ -143,7 +143,7 @@ Ao aceitar, registrar `status: accepted`, fingerprint e evidências em `HOMOLOGA
 
 ## 8. Manual conforme escopo
 
-Resolver política com `bm.py policy`:
+Resolver política com `bm policy`:
 
 - `manual_pdf: none`: não gerar e não bloquear;
 - `manual_pdf: quick_start`: gerar guia curto em Markdown e PDF;

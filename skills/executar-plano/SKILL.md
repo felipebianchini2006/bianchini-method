@@ -9,17 +9,17 @@ description: Use para executar planos aprovados do Bianchini Method 0.4 com work
 
 Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `/status-projeto`; executar todos somente quando o pedido atual for explícito.
 
-Resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py) e use [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md) somente no gate aplicável. O CLI e o pack carregam o contrato operacional da unidade.
+Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows e use [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md) somente no gate aplicável. Ausência bloqueia; não use fallback Python. O CLI e o pack carregam o contrato operacional da unidade.
 
 ## 1. Preflight
 
 1. Ler `.bianchini/STATE.md`; sem ele, bloquear e orientar `/migrar-bianchini` ou `/sdd-planning` conforme o projeto.
 2. Confirmar `status: approved|executing`, digest vigente, `COHERENCE.md` em `approved` e planos solicitados aprovados. Ler `schedule.plan_waves` e `schedule.task_waves` do checkpoint.
-3. Projetar a onda executável com `bm.py roadmap next-wave --repo <repo> --change C001 --format json`. O host pode paralelizar somente `parallel_units`; o CLI não cria agentes nem escolhe modelo.
+3. Projetar a onda executável com `bm roadmap next-wave --repo <repo> --change C001 --format json`. O host pode paralelizar somente `parallel_units`; o CLI não cria agentes nem escolhe modelo.
 4. Validar o modelo sem reabrir a auditoria aprovada:
 
 ```bash
-bm.py model validate --repo <repo> --change C001
+bm model validate --repo <repo> --change C001
 ```
 
 5. Bloquear `ERROR`, `WARNING` aberto, plano `stale`, dependência incompleta, consumidor sem provider e divergência do modelo.
@@ -32,7 +32,7 @@ Não executar `coherence check` nem `impact analyze` como consulta de preflight:
 Criar o workspace por plano somente a partir do repositório fonte limpo:
 
 ```bash
-bm.py workspace create --repo <repo> --change C001 --plan P01
+bm workspace create --repo <repo> --change C001 --plan P01
 ```
 
 O comando bloqueia pacote sem `COHERENCE.md` aprovado, plano `stale`, qualquer artefato do manifesto divergente do checkpoint ou do `HEAD`, Git sujo ou ID inválido. Para retomar, use `workspace locate|resume --repo <repo> --change C001 --plan P01`; dentro do workspace, use `workspace check --repo <workspace>`.
@@ -46,7 +46,7 @@ Respeite `mise` e configuração equivalente. Instale/aquela dependência soment
 Compile o contexto da tarefa antes de editar:
 
 ```bash
-bm.py context pack --repo <workspace> --unit C001/P01/T03
+bm context pack --repo <workspace> --unit C001/P01/T03
 ```
 
 Valide o pack retornado e carregue somente suas fontes e referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a unidade; regenere o pack sem reler o contrato completo ou criar fallback manual.
@@ -138,7 +138,7 @@ No HEAD final:
 4. executar, quando houver mudança material:
 
 ```bash
-bm.py impact analyze --repo <repo> --change C001 --plan P01 \
+bm impact analyze --repo <repo> --change C001 --plan P01 \
   --changed-contract <id>
 ```
 
@@ -148,7 +148,7 @@ bm.py impact analyze --repo <repo> --change C001 --plan P01 \
    verificado usado por ela:
 
 ```bash
-bm.py plan complete --repo <repo> --change C001 --plan P01 --task T01 \
+bm plan complete --repo <repo> --change C001 --plan P01 --task T01 \
   --context-pack .bianchini/.runtime/context/C001-P01-T01.json \
   --result "<resultado da tarefa>" \
   --verification "<evidência da tarefa>"
@@ -157,7 +157,7 @@ bm.py plan complete --repo <repo> --change C001 --plan P01 --task T01 \
 8. depois de todas as tarefas, materializar o delta real em JSON e executar:
 
 ```bash
-bm.py plan complete --repo <repo> --change C001 --plan P01 \
+bm plan complete --repo <repo> --change C001 --plan P01 \
   --actual-delta <delta-real.json> \
   --result "<resultado>" \
   --verification "<evidência>" \
@@ -188,7 +188,7 @@ Depois do último plano:
 8. mover a mudança concluída para `.bianchini/archive/`;
 9. deixar `STATE.md` compacto em `idle` com `last_completed` e próxima ação.
 
-Depois dos gates aplicáveis e com Git limpo, execute `bm.py cycle-close --repo <repo> --change C001`. O CLI recompõe o modelo pelos resultados, promove arquitetura/modelo e arquiva a mudança com rollback de falha intermediária.
+Depois dos gates aplicáveis e com Git limpo, execute `bm cycle-close --repo <repo> --change C001`. O CLI recompõe o modelo pelos resultados, promove arquitetura/modelo e arquiva a mudança com rollback de falha intermediária.
 
 Existência isolada de endpoint, tabela, fila ou tela não comprova integração. Diferencie código, testes, sandbox, deploy, efeito externo e homologação humana.
 

@@ -1021,7 +1021,7 @@ func legacyValidateQualityV2Plan(planPath, content string, readiness map[string]
 		if change == "" {
 			errors = append(errors, fmt.Sprintf("plano %s / %s: campo Change ausente", planPath, section.heading))
 		} else if !legacyQualityV2Changes[change] {
-			errors = append(errors, fmt.Sprintf("plano %s / %s: Change inválido %q; use categoria factual suportada por bm.py policy", planPath, section.heading, change))
+			errors = append(errors, fmt.Sprintf("plano %s / %s: Change inválido %q; use categoria factual suportada por bm policy", planPath, section.heading, change))
 		}
 		rawRefs := legacyUnitField(section.content, "Readiness refs")
 		if rawRefs == "" {

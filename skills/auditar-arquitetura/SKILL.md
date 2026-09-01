@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 **Anuncie:** "Auditando hotspots e mudanças recentes; o resultado será somente um relatório."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`.
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python.
 
 ## Contrato
 
@@ -18,7 +18,7 @@ Um defeito funcional, de segurança ou integridade diretamente demonstrável nã
 
 ## Rota
 
-1. Se existir `.bianchini/STATE.md`, executar `bm.py model validate --repo <repo>` e usar somente seus ponteiros atuais.
+1. Se existir `.bianchini/STATE.md`, executar `bm model validate --repo <repo>` e usar somente seus ponteiros atuais.
 2. Sem `.bianchini`, auditar apenas o intervalo Git solicitado; não inicializar nem migrar o método.
 3. Se o repositório não tiver Git ou histórico suficiente, declarar a limitação e auditar apenas o delta fornecido explicitamente.
 

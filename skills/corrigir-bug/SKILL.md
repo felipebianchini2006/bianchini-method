@@ -7,7 +7,7 @@ description: Use para diagnosticar e corrigir bugs com sessão persistente, hip�
 
 **Anuncie:** "Abrindo ou retomando um debug persistente no Bianchini Method 0.4."
 
-Resolva `bm.py`. O CLI e o pack do caso fornecem o contrato operacional necessário.
+Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. O CLI e o pack do caso fornecem o contrato operacional necessário.
 
 Princípio: nenhum fix antes de uma causa sustentada por evidência. Sintoma, correlação e componente onde a falha aparece não são automaticamente causa raiz.
 
@@ -19,10 +19,10 @@ novo. Se houver documentação anterior reconhecida, o CLI retorna
 de debug pode cair em armazenamento anterior.
 
 ```bash
-bm.py debug list --repo <repo>
-bm.py debug start --repo <repo> ...
-bm.py debug status --repo <repo> ...
-bm.py debug resume --repo <repo> ...
+bm debug list --repo <repo>
+bm debug start --repo <repo> ...
+bm debug status --repo <repo> ...
+bm debug resume --repo <repo> ...
 ```
 
 O CLI aloca `Dxxx` em `.bianchini/debug/active/` e atualiza `STATE.md` sem copiar o histórico do caso.
@@ -30,7 +30,7 @@ O CLI aloca `Dxxx` em `.bianchini/debug/active/` e atualiza `STATE.md` sem copia
 Compile o contexto do caso antes da investigação:
 
 ```bash
-bm.py context pack --repo <repo> --unit D004
+bm context pack --repo <repo> --unit D004
 ```
 
 Use o pack como fonte primária. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia o caso; regenere o pack sem reler o contrato completo ou criar fallback manual.
@@ -60,7 +60,7 @@ intake → reproduced → diagnosed → red → fixing → green
 → regression_checked → documented → resolved | blocked | escalated
 ```
 
-Use `bm.py debug checkpoint --repo <repo> ...` em cada transição. O CLI bloqueia avanço sem a evidência exigida, GREEN antes de RED e evidência anterior ao último patch.
+Use `bm debug checkpoint --repo <repo> ...` em cada transição. O CLI bloqueia avanço sem a evidência exigida, GREEN antes de RED e evidência anterior ao último patch.
 
 No diagnóstico, use `--hypothesis`, `--experiment`, `--eliminated-hypothesis` e `--root-cause`. Em `regression_checked`, registre ao menos um `--neighbor-regression`. Em `documented`, registre `--residual-risk`. O CLI mantém esses campos estruturados no `Dxxx`.
 
@@ -146,13 +146,13 @@ Bug que restaura spec aceita não altera a spec. Se a investigação provar que 
 ## 8. Finalizar
 
 ```bash
-bm.py debug finish --repo <repo> ...
+bm debug finish --repo <repo> ...
 ```
 
 Quando a resolução demonstrar um padrão causal reutilizável, a finalização pode
 nomear explicitamente uma proposta com `--learning-classification`,
 `--learning-statement`, `--learning-tag` e `--learning-validity`. Isso cria apenas
-uma fonte elegível para `bm.py learn propose`; aprovação humana continua separada
+uma fonte elegível para `bm learn propose`; aprovação humana continua separada
 e obrigatória.
 
 `resolved` exige causa, RED, GREEN, reprodução original, regressão vizinha e documentação vigentes. `blocked` exige condição externa específica. `escalated` preserva toda a investigação.

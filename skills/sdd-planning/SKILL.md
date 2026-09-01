@@ -7,7 +7,7 @@ description: Use para planejar mudanças multifase com arquitetura global, Proje
 
 **Anuncie:** "Planejando o sistema completo com Bianchini Method 0.4."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md) e [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md). Resolva [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py) uma vez.
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md) e [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md). Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows uma vez. Ausência bloqueia; não use fallback Python.
 
 Esta skill planeja; não edita código de produção. Toda operação determinística pertence ao CLI.
 
@@ -16,12 +16,12 @@ Esta skill planeja; não edita código de produção. Toda operação determiní
 ## 1. Preflight
 
 1. Ler regras do repositório, `.bianchini/STATE.md` quando existir, manifests, lockfiles, CI, testes e histórico recente.
-2. Sem `.bianchini/`, executar `bm.py model init --repo <repo>` para criar o workspace.
+2. Sem `.bianchini/`, executar `bm model init --repo <repo>` para criar o workspace.
 3. Se existir documentação anterior do Bianchini, não adaptar nem importar durante o planejamento: instruir `/migrar-bianchini`.
 4. Nunca ler `.planning/` como estado, contexto ou fallback.
 5. Confirmar Git, stack, escopo e trabalho ativo. Mudança concorrente no mesmo workspace bloqueia.
-6. Se houver mudança ativa com status `scope_ready`, executar `bm.py scope verify --repo <repo> --change Cxxx-slug`, reutilizar seu ID e não resumir novamente o PDF.
-7. Sem mudança ativa, iniciar com `bm.py model init --repo <repo> --change "<nome curto>"` e usar o ID `Cxxx-slug` retornado.
+6. Se houver mudança ativa com status `scope_ready`, executar `bm scope verify --repo <repo> --change Cxxx-slug`, reutilizar seu ID e não resumir novamente o PDF.
+7. Sem mudança ativa, iniciar com `bm model init --repo <repo> --change "<nome curto>"` e usar o ID `Cxxx-slug` retornado.
 
 Escopo vindo de PDF só entra quando `scope verify` retornar `verified: true` e `ready_for_sdd`. Digest inválido, fonte trocada ou `SCOPE.md` alterado bloqueia. Mudança ativa em outro estágio não é substituída.
 
@@ -112,7 +112,7 @@ Preserve 100% do escopo. Setup, config e docs entram na primeira entrega que os 
 Depois de materializar todos os planos, gere o roadmap. Não o mantenha manualmente:
 
 ```bash
-bm.py roadmap sync --repo <repo> --change C001
+bm roadmap sync --repo <repo> --change C001
 ```
 
 ## 5. Simular todas as fases
@@ -126,10 +126,10 @@ S0 atual → S1 após P01 → S2 após P02 → ... → Sn final
 Execute:
 
 ```bash
-bm.py roadmap sync --repo <repo> --change C001
-bm.py model validate --repo <repo> --change C001
-bm.py coherence check --repo <repo> --change C001 --structural-only
-bm.py impact analyze --repo <repo> --change C001 --plan <Pxx>
+bm roadmap sync --repo <repo> --change C001
+bm model validate --repo <repo> --change C001
+bm coherence check --repo <repo> --change C001 --structural-only
+bm impact analyze --repo <repo> --change C001 --plan <Pxx>
 ```
 
 O estrutural bloqueia ciclo de fase ou tarefa, cobertura faltante, referência desconhecida, provider ausente, consumidor adiantado, ownership incompatível, migração fora de ordem, journey incompleta, efeito externo sem guard e divergência de `Sn`. A resposta inclui ondas determinísticas de fases e tarefas executáveis em paralelo.
@@ -178,7 +178,7 @@ Não registrar raciocínio interno. O CLI persiste somente findings normalizados
 Normalize pelo CLI:
 
 ```bash
-bm.py coherence check --repo <repo> --change C001 \
+bm coherence check --repo <repo> --change C001 \
   --semantic-report <relatorio.json>
 ```
 
@@ -204,7 +204,7 @@ Antes da aprovação:
 Somente depois da aprovação humana, grave o checkpoint:
 
 ```bash
-bm.py coherence approve --repo <repo> --change C001 \
+bm coherence approve --repo <repo> --change C001 \
   --digest <digest-retornado-pelo-check> \
   --approved-by "<responsável>"
 ```

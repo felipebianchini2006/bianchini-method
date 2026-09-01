@@ -141,7 +141,7 @@ def _mutation(before: dict[str, bytes], after: dict[str, bytes]) -> dict[str, An
 def _engine_command(engine: str, binary: Path | None) -> list[str]:
     if engine == "python":
         return [sys.executable, str(PYTHON_ENGINE)]
-    executable = binary or ROOT / "bin" / "bm-preview"
+    executable = binary or ROOT / "bin" / "bm"
     if not executable.is_file():
         raise FileNotFoundError(f"backend Go explícito ausente: {executable}")
     return [str(executable)]

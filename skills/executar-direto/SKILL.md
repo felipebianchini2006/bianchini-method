@@ -7,7 +7,7 @@ description: Use para executar uma entrega coesa como quick normal ou protegido,
 
 **Anuncie:** "Classificando e executando este quick com Bianchini Method 0.4."
 
-Use somente por invocação explícita de `/executar-direto` e resolva `bm.py`. Não acione outra metodologia. A escolha explícita deste fluxo é a decisão de roteamento: o quick nunca aciona `/sdd-planning`, independentemente do score, dos hazards ou da complexidade encontrada.
+Use somente por invocação explícita de `/executar-direto` e resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. Não acione outra metodologia. A escolha explícita deste fluxo é a decisão de roteamento: o quick nunca aciona `/sdd-planning`, independentemente do score, dos hazards ou da complexidade encontrada.
 
 Planos, specs e decisões já existentes em `.bianchini/` são documentação e rastreio. Use-os como contexto confiável, sem exigir novo planejamento para executar a tarefa solicitada.
 
@@ -41,7 +41,7 @@ Cada dimensão vale `0`, `1` ou `2`:
 Execute antes de editar:
 
 ```bash
-bm.py direct classify --repo <repo> \
+bm direct classify --repo <repo> \
   --scope-score <0..2> \
   --external-effect-score <0..2> \
   --migration-score <0..2> \
@@ -70,7 +70,7 @@ Em `direct start`, sinalize `--payment-flow` e/ou `--webhook-flow`. O CLI deriva
 
 ## 3. Iniciar ou retomar
 
-Execute `bm.py direct start` com objetivo, escopo, estado atual, aceite, verificações, cinco scores e overrides retornados por `classify`. O CLI aloca `Qxxx` e persiste:
+Execute `bm direct start` com objetivo, escopo, estado atual, aceite, verificações, cinco scores e overrides retornados por `classify`. O CLI aloca `Qxxx` e persiste:
 
 ```text
 .bianchini/quick/Qxxx-slug/
@@ -84,7 +84,7 @@ O brief contém score, justificativas, modo, não objetivos, arquivos/interfaces
 Depois de iniciar ou localizar o quick, compile seu contexto operacional:
 
 ```bash
-bm.py context pack --repo <repo> --unit Q012
+bm context pack --repo <repo> --unit Q012
 ```
 
 Use o pack como fonte primária. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a execução; regenere o pack sem reler o contrato completo ou montar contexto manual.
@@ -124,11 +124,11 @@ Trabalhe continuamente, com o menor diff correto:
 
 Quando houver trabalho independente, despache em paralelo pesquisa localizada, implementação com ownership separado ou revisão especializada. Não terceirize a decisão de aceite, a integração do diff, os checkpoints nem a conclusão do quick.
 
-Use `bm.py direct checkpoint` para registrar arquivo alterado, comando, resultado e evidência estruturada. Evidência de comando `passed` exige `exit_code: 0`; browser, screenshot ou manual exige referência reproduzível. Toda evidência fica vinculada ao digest do brief e ao fingerprint da árvore.
+Use `bm direct checkpoint` para registrar arquivo alterado, comando, resultado e evidência estruturada. Evidência de comando `passed` exige `exit_code: 0`; browser, screenshot ou manual exige referência reproduzível. Toda evidência fica vinculada ao digest do brief e ao fingerprint da árvore.
 
 O checkpoint reavalia os paths declarados. Registre guards adicionais com `--guard`. No `finish`, o CLI compara também o diff real; piso maior exige os guards novos e nunca redireciona para `/sdd-planning`.
 
-Não instalar framework de qualidade, criar abstração futura ou abrir tarefa por camada de teste. Em retomada, use `bm.py direct status` e leia apenas `PROGRESS.md`.
+Não instalar framework de qualidade, criar abstração futura ou abrir tarefa por camada de teste. Em retomada, use `bm direct status` e leia apenas `PROGRESS.md`.
 
 ## 6. Concluir
 

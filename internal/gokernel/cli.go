@@ -143,7 +143,7 @@ func riskInputError(message string) error {
 
 func runVersion(args []string) (any, error) {
 	if len(args) == 0 {
-		return fmt.Sprintf("bm-preview %s (go-preview, %s)\n", Version, BuildCommit), nil
+		return fmt.Sprintf("bm %s (go, %s)\n", Version, BuildCommit), nil
 	}
 	if len(args) == 1 && args[0] == "--json" {
 		return versionMetadata(), nil
@@ -200,36 +200,6 @@ func runChangePolicy(args []string) (any, error) {
 		"reapproval_required":   reapproval,
 		"redesign_allowed":      planInvalidating,
 	}, nil
-}
-
-func runWorkspace(args []string) (any, error) {
-	if len(args) == 0 {
-		return nil, argparseError("the following arguments are required: action")
-	}
-	if args[0] != "create" {
-		return nil, argparseError(fmt.Sprintf("argument action: invalid choice: '%s'", args[0]))
-	}
-	unknown := make([]string, 0)
-	for index := 1; index < len(args); index++ {
-		arg := args[index]
-		switch arg {
-		case "--repo", "--plan":
-			if index+1 >= len(args) {
-				return nil, argparseError("argument " + arg + ": expected one argument")
-			}
-			index++
-		default:
-			unknown = append(unknown, arg)
-			if strings.HasPrefix(arg, "--") && index+1 < len(args) && !strings.HasPrefix(args[index+1], "--") {
-				unknown = append(unknown, args[index+1])
-				index++
-			}
-		}
-	}
-	if len(unknown) > 0 {
-		return nil, argparseError("unrecognized arguments: " + strings.Join(unknown, " "))
-	}
-	return nil, domainError("NOT_IMPLEMENTED", "workspace create não está disponível no backend go-preview")
 }
 
 type parsedFlags struct {

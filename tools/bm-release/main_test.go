@@ -26,7 +26,7 @@ func TestReleaseArchiveIsDeterministicAndContainsNativeCLI(t *testing.T) {
 	first := filepath.Join(temporary, "first.tar.gz")
 	second := filepath.Join(temporary, "second.tar.gz")
 	for _, output := range []string{first, second} {
-		if err := createReleaseArchive(root, output, "bianchini-method_0.4.6_darwin-arm64", binary, "bm", epoch); err != nil {
+		if err := createReleaseArchive(root, output, "bianchini-method_0.5.0_darwin-arm64", binary, "bm", epoch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -43,10 +43,13 @@ func TestReleaseArchiveIsDeterministicAndContainsNativeCLI(t *testing.T) {
 	}
 
 	entries := readReleaseArchive(t, first)
-	prefix := "bianchini-method_0.4.6_darwin-arm64/"
+	prefix := "bianchini-method_0.5.0_darwin-arm64/"
 	for _, required := range []string{
 		prefix + "skills/_shared/VERSION",
 		prefix + "skills/_shared/bin/bm",
+		prefix + "skills/_shared/LICENSE",
+		prefix + "skills/_shared/THIRD_PARTY_NOTICES.md",
+		prefix + "LICENSE",
 		prefix + "THIRD_PARTY_NOTICES.md",
 	} {
 		entry, ok := entries[required]

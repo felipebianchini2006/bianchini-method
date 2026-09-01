@@ -2229,7 +2229,7 @@ class SkillBehaviorContracts(unittest.TestCase):
         ):
             self.assertIn(expected, contract)
         self.assertIn("mudança ativa com status `scope_ready`", planning)
-        self.assertIn("bm.py scope verify", planning)
+        self.assertIn("bm scope verify", planning)
         self.assertIn("não resumir novamente o PDF", planning)
         self.assertIn("SCOPE.md` selado", method)
         self.assertIn("ready_for_sdd", method)
@@ -2251,7 +2251,7 @@ class SkillBehaviorContracts(unittest.TestCase):
             "requirements: [REQ-001, NFR-001]",
             "tasks:",
             "risk_seam",
-            "bm.py roadmap sync",
+            "bm roadmap sync",
             "review_input_digest",
             "SCOPE → fase → tarefa",
         ):

@@ -32,7 +32,7 @@ func assertJSONEqual(t *testing.T, got, want string) {
 	}
 }
 
-func TestVersionJSONIdentifiesExplicitPreviewBackend(t *testing.T) {
+func TestVersionJSONIdentifiesOfficialBackend(t *testing.T) {
 	code, stdout, stderr := runCLI(t, "version", "--json")
 	if code != 0 || stderr != "" {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
@@ -43,14 +43,16 @@ func TestVersionJSONIdentifiesExplicitPreviewBackend(t *testing.T) {
 		BuildCommit         string   `json:"build_commit"`
 		ImplementedSurfaces []string `json:"implemented_surfaces"`
 		Official            bool     `json:"official"`
+		Preview             bool     `json:"preview"`
+		Version             string   `json:"version"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Engine != "go-preview" || result.ContractVersion != "0.4" {
+	if result.Engine != "go" || result.ContractVersion != "0.4" || !result.Official || result.Preview || result.Version != "0.5.0" {
 		t.Fatalf("unexpected version identity: %+v", result)
 	}
-	if result.Official || result.BuildCommit == "" || len(result.ImplementedSurfaces) == 0 {
+	if result.BuildCommit == "" || len(result.ImplementedSurfaces) != 58 {
 		t.Fatalf("missing build metadata: %+v", result)
 	}
 }

@@ -181,7 +181,7 @@ def validate_quality_v2_plan(
         elif change not in CHANGE_KINDS:
             errors.append(
                 f"plano {plan_path} / {heading}: Change inválido {change!r}; "
-                "use categoria factual suportada por bm.py policy"
+                "use categoria factual suportada por bm policy"
             )
         raw_refs = field_value(section, "Readiness refs")
         if raw_refs is None:

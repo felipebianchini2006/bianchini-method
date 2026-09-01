@@ -1,6 +1,6 @@
 # Contrato do Bianchini Method 0.4
 
-Referência normativa das skills públicas. Use [`scripts/bm.py`](scripts/bm.py) para operações determinísticas; não replique em prompt validação, score, grafo, digest, escrita atômica ou migração.
+Referência normativa das skills públicas. Use o binário empacotado `bin/bm` no Unix ou `bin/bm.exe` no Windows para operações determinísticas; não replique em prompt validação, score, grafo, digest, escrita atômica ou migração. Ausência do binário bloqueia: não existe fallback Python.
 
 ## Workspace canônico
 
@@ -48,13 +48,13 @@ formatos anteriores. O primeiro `direct start` ou `debug start` inicializa
 
 `/preparar-escopo` transforma um PDF local em `SCOPE.md` da mudança, sem criar arquitetura, roadmap ou planos. O PDF bruto, a extração por página e imagens temporárias não entram no Git. `.planning/` permanece fora de toda leitura e escrita.
 
-O documento só recebe status `ready_for_sdd` quando `bm.py scope seal` confirmar seções completas, IDs únicos, fontes por página, aceite observável, zero item sem fonte, zero questão aberta, zero decisão bloqueante e zero contradição. O frontmatter registra nome e SHA-256 do PDF, páginas, modo `native | ocr | mixed`, cobertura e digest do escopo.
+O documento só recebe status `ready_for_sdd` quando `bm scope seal` confirmar seções completas, IDs únicos, fontes por página, aceite observável, zero item sem fonte, zero questão aberta, zero decisão bloqueante e zero contradição. O frontmatter registra nome e SHA-256 do PDF, páginas, modo `native | ocr | mixed`, cobertura e digest do escopo.
 
 ```bash
-bm.py scope seal --repo <repo> --change C001-slug \
+bm scope seal --repo <repo> --change C001-slug \
   --source <escopo.pdf> --draft <scope-draft.md> \
   --pages <total> --extraction native|ocr|mixed
-bm.py scope verify --repo <repo> --change C001-slug [--source <escopo.pdf>]
+bm scope verify --repo <repo> --change C001-slug [--source <escopo.pdf>]
 ```
 
 O selo é fail-closed e grava o `SCOPE.md` atomicamente. Falha não substitui o documento anterior nem muda o estado para `scope_ready`. O `/sdd-planning` reutiliza o `SCOPE.md` selado da mudança ativa, verifica o digest e não reinterpreta o PDF como uma segunda fonte de escopo.
@@ -112,8 +112,8 @@ Sn = sistema final esperado
 `Sn` deve ser equivalente ao `SYSTEM_MODEL.md` da mudança. No fechamento aceito, esse modelo substitui `.bianchini/current/SYSTEM_MODEL.md`.
 
 ```bash
-bm.py model init --repo <repo> [--change <nome-curto>]
-bm.py model validate --repo <repo> [--change C001]
+bm model init --repo <repo> [--change <nome-curto>]
+bm model validate --repo <repo> [--change C001]
 ```
 
 ## Coerência estrutural e semântica
@@ -143,9 +143,9 @@ Interpretativo e registrado: abstração especulativa, módulo raso, complexidad
 O revisor semântico normaliza um relatório; não grava raciocínio interno. Se um achado puder virar contrato ou invariante verificável, ele volta ao `StructuralValidator`. Caso contrário permanece `WARNING` ou `INFO`. Revisão indisponível nunca é declarada como executada.
 
 ```bash
-bm.py coherence check --repo <repo> --change C001 --structural-only
-bm.py coherence check --repo <repo> --change C001 --semantic-report <relatorio.json>
-bm.py coherence approve --repo <repo> --change C001 \
+bm coherence check --repo <repo> --change C001 --structural-only
+bm coherence check --repo <repo> --change C001 --semantic-report <relatorio.json>
+bm coherence approve --repo <repo> --change C001 \
   --digest <digest> --approved-by "<responsável>"
 ```
 
@@ -197,7 +197,7 @@ O modo e o gate de revisão formam um contrato único: `grouped → plan_gate`, 
 `ROADMAP.md` não é uma segunda fonte manual. Ele é gerado deterministicamente dos planos:
 
 ```bash
-bm.py roadmap sync --repo <repo> --change C001
+bm roadmap sync --repo <repo> --change C001
 ```
 
 O check exige igualdade byte a byte com essa projeção. Assim, editar fase, dependência, resultado, requisito, modo ou lista de tarefas sem sincronizar o roadmap falha.
@@ -231,7 +231,7 @@ original é preservado. Planos independentes continuam executáveis. Nova audito
 e nova aprovação produzem o próximo digest global.
 
 ```bash
-bm.py impact analyze --repo <repo> --change C001 --plan P03 \
+bm impact analyze --repo <repo> --change C001 --plan P03 \
   [--changed-contract <id> ...]
 ```
 
@@ -245,7 +245,7 @@ Antes de editar código:
 4. exigir Git limpo e criar o workspace isolado pelo CLI:
 
 ```bash
-bm.py workspace create --repo <repo> --change C001 --plan P01
+bm workspace create --repo <repo> --change C001 --plan P01
 ```
 
 O gate exige `COHERENCE.md` em `approved` ou `approved_with_stale`, artefatos do pacote idênticos ao `HEAD` e o plano solicitado fora da lista `stale`. O segundo
@@ -269,7 +269,7 @@ Detalhe interno ou ajuste limitado é registrado. Mudança material recalcula o 
 Após cada plano, registrar o delta real, comparar `provides/consumes`, aplicar ao modelo, recalcular impacto, repetir integrações afetadas e atualizar `STATE.md`. Existência isolada de endpoint, tabela ou tela não prova integração.
 
 ```bash
-bm.py plan complete --repo <repo> --change C001 --plan P01 \
+bm plan complete --repo <repo> --change C001 --plan P01 \
   --actual-delta <delta-real.json> \
   --result "<resultado entregue>" \
   --verification "<evidência vigente>" \
@@ -318,7 +318,7 @@ Cada dimensão vale `0..2`:
 Sinais críticos como `scope=2`, migração destrutiva, concorrência não controlada, ownership indefinido, regra financeira ambígua, arquitetura material nova ou várias entregas independentes tornam ou mantêm o quick protegido. Eles reforçam guards e evidências sem trocar de fluxo.
 
 ```bash
-bm.py direct classify --repo <repo> \
+bm direct classify --repo <repo> \
   --scope-score <0..2> \
   --external-effect-score <0..2> \
   --migration-score <0..2> \
@@ -347,7 +347,7 @@ intake → reproduced → diagnosed → red → fixing → green
 ```
 
 ```bash
-bm.py debug start|list|status|resume|checkpoint|finish --repo <repo> ...
+bm debug start|list|status|resume|checkpoint|finish --repo <repo> ...
 ```
 
 `debug start` também inicializa o workspace quando não existe estado anterior.
@@ -364,8 +364,8 @@ Bug que restaura contrato aceito não muda spec. Contrato errado exige decisão 
 Não existe adaptador permanente. Projetos anteriores terminam no fluxo em que estão e depois executam:
 
 ```bash
-bm.py migrate check --repo <repo>
-bm.py migrate apply --repo <repo>
+bm migrate check --repo <repo>
+bm migrate apply --repo <repo>
 ```
 
 Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` estão aposentados e devem ser rejeitados pela CLI sem criar ou alterar workspace.
@@ -379,7 +379,7 @@ Colisão, formato desconhecido, symlink externo, path traversal, checksum diverg
 Toda tarefa terminal atualiza `STATE.md` atomicamente. O fechamento exige modelo final equivalente, jornadas ponta a ponta, gates de release, homologação e revisão final aplicáveis. Então sincroniza specs/modelo atuais e move a mudança para `archive/`.
 
 ```bash
-bm.py cycle-close --repo <repo> --change C001
+bm cycle-close --repo <repo> --change C001
 ```
 
 Relatar separadamente: código/commit, testes, sandbox, deploy, efeito em produção/provedor e homologação humana. Um limite não comprova o seguinte.

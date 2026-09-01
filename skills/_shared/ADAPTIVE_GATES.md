@@ -13,7 +13,7 @@ Quando a telemetria estiver habilitada, registrar após o gate apenas duração,
 ## Composição por estágio
 
 - `fast`: unitários focados quando houver lógica, integração/contrato focada quando uma fronteira mudar e regressão diretamente relacionada. Não roda E2E completo nem mutation testing.
-- `plan`: suítes afetadas de unitários e integração/contrato, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva somente quando `bm.py policy` exigir.
+- `plan`: suítes afetadas de unitários e integração/contrato, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva somente quando `bm policy` exigir.
 - `release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E de todas as jornadas críticas, regressão completa configurada, evidência de mutação vigente quando obrigatória e build do RC.
 
 Essas famílias compõem os comandos do estágio. Não criar tarefa, revisão ou subagente por camada de teste. E2E continua orientado a jornada crítica, não a cada tela. Mutation testing usa escopo por seam de risco; nunca usa score global como meta.

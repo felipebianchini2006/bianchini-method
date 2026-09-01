@@ -1,4 +1,4 @@
-"""Gates executáveis do backend Go explicitamente experimental."""
+"""Gates executáveis do backend Go oficial."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GO_ENTRYPOINT = ROOT / "cmd" / "bm-preview"
+GO_ENTRYPOINT = ROOT / "cmd" / "bm"
 
 
 def run(*argv: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -27,7 +27,18 @@ def run(*argv: str, env: dict[str, str] | None = None) -> subprocess.CompletedPr
     )
 
 
-class GoPreviewScenarios(unittest.TestCase):
+class GoBackendScenarios(unittest.TestCase):
+    def test_public_skills_resolve_only_the_native_binary(self) -> None:
+        active_documents = [ROOT / "skills" / "_shared" / "METHOD_CONTRACT.md"]
+        active_documents.extend(sorted((ROOT / "skills").glob("*/SKILL.md")))
+        content = "\n".join(
+            path.read_text(encoding="utf-8") for path in active_documents
+        )
+        self.assertNotIn("scripts/bm.py", content)
+        self.assertNotIn("bm.py", content)
+        self.assertIn("_shared/bin/bm", content)
+        self.assertIn("não use fallback Python", content)
+
     def test_external_go_modules_are_reconciled_with_distributed_notices(self) -> None:
         go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
         external_modules = re.findall(
@@ -45,7 +56,7 @@ class GoPreviewScenarios(unittest.TestCase):
         completed = run("go", "test", "./...")
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
-    def test_preview_has_no_python_or_shell_fallback_and_reports_its_backend(self) -> None:
+    def test_official_has_no_python_or_shell_fallback_and_reports_its_backend(self) -> None:
         sources = "\n".join(
             path.read_text(encoding="utf-8")
             for root in (ROOT / "cmd", ROOT / "internal")
@@ -58,22 +69,24 @@ class GoPreviewScenarios(unittest.TestCase):
         self.assertNotIn('exec.Command("python3', sources)
         self.assertNotIn('exec.Command("sh", "-c"', sources)
         self.assertNotIn('exec.Command("bash", "-c"', sources)
-        with tempfile.TemporaryDirectory(prefix="bm-go-preview-") as temp:
-            binary = Path(temp) / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+        with tempfile.TemporaryDirectory(prefix="bm-go-") as temp:
+            binary = Path(temp) / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             versioned = run(str(binary), "version", "--json", env={"PATH": ""})
             self.assertEqual(versioned.returncode, 0, versioned.stderr)
             payload = json.loads(versioned.stdout)
-            self.assertEqual(payload["engine"], "go-preview")
+            self.assertEqual(payload["engine"], "go")
             self.assertEqual(payload["contract_version"], "0.4")
-            self.assertFalse(payload["official"])
+            self.assertEqual(payload["version"], "0.5.0")
+            self.assertTrue(payload["official"])
+            self.assertFalse(payload["preview"])
             self.assertGreater(len(payload["implemented_surfaces"]), 0)
 
     def test_all_registered_fixtures_have_byte_level_parity(self) -> None:
         with tempfile.TemporaryDirectory(prefix="bm-go-parity-") as temp:
-            binary = Path(temp) / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = Path(temp) / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             parity = run(
                 "python3",
@@ -102,8 +115,8 @@ class GoPreviewScenarios(unittest.TestCase):
             "api/openapi.yaml",
         )
         with tempfile.TemporaryDirectory(prefix="bm-go-risk-parity-") as temp:
-            binary = Path(temp) / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = Path(temp) / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             for changed_file in cases:
                 with self.subTest(changed_file=changed_file):
@@ -117,8 +130,8 @@ class GoPreviewScenarios(unittest.TestCase):
     def test_go_and_python_reject_unsafe_risk_paths_identically(self) -> None:
         changed_files = ("src/cafe\u0301.py", "src/.planning/x")
         with tempfile.TemporaryDirectory(prefix="bm-go-risk-unicode-") as temp:
-            binary = Path(temp) / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = Path(temp) / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             for changed_file in changed_files:
                 with self.subTest(changed_file=changed_file):
@@ -145,8 +158,8 @@ class GoPreviewScenarios(unittest.TestCase):
             ),
         )
         with tempfile.TemporaryDirectory(prefix="bm-go-policy-parity-") as temp:
-            binary = Path(temp) / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = Path(temp) / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             for arguments in cases:
                 with self.subTest(arguments=arguments):
@@ -161,8 +174,8 @@ class GoPreviewScenarios(unittest.TestCase):
     def test_go_adapter_render_and_install_match_python_oracle(self) -> None:
         with tempfile.TemporaryDirectory(prefix="bm-go-adapter-parity-") as temp:
             base = Path(temp)
-            binary = base / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = base / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             for host in ("generic", "codex", "claude-compatible"):
                 with self.subTest(host=host):
@@ -205,8 +218,8 @@ class GoPreviewScenarios(unittest.TestCase):
     def test_go_validate_state_matches_python_oracle(self) -> None:
         with tempfile.TemporaryDirectory(prefix="bm-go-state-parity-") as temp:
             base = Path(temp)
-            binary = base / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = base / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             cases = (
                 (str(ROOT / "tests" / "fixtures" / "project-state-v2.json"),),
@@ -230,8 +243,8 @@ class GoPreviewScenarios(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix="bm-go-model-parity-") as temp:
             base = Path(temp)
-            binary = base / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = base / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             python_repo = base / "python-repo"
             go_repo = base / "go-repo"
@@ -377,12 +390,12 @@ model_delta:
             )
 
     def test_go_scope_seal_and_verify_match_python_oracle(self) -> None:
-        from test_method_v04_cli import detailed_scope_body, write_text_pdf
+        from tests.test_method_v04_cli import detailed_scope_body, write_text_pdf
 
         with tempfile.TemporaryDirectory(prefix="bm-go-scope-parity-") as temp:
             base = Path(temp)
-            binary = base / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = base / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             source = base / "scope.pdf"
             draft = base / "draft.md"
@@ -438,12 +451,12 @@ model_delta:
                 self.assertTrue(json.loads(verified.stdout)["verified"])
 
     def test_go_next_wave_matches_python_oracle_without_mutation(self) -> None:
-        from test_next_wave import NextWaveScenarios, tree_digest
+        from tests.test_next_wave import NextWaveScenarios, tree_digest
 
         with tempfile.TemporaryDirectory(prefix="bm-go-wave-parity-") as temp:
             base = Path(temp)
-            binary = base / "bm-preview"
-            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm-preview")
+            binary = base / "bm"
+            built = run("go", "build", "-trimpath", "-o", str(binary), "./cmd/bm")
             self.assertEqual(built.returncode, 0, built.stderr)
             scenario = NextWaveScenarios(
                 "test_next_wave_is_deterministic_parallel_and_excludes_stale_blocked"
@@ -463,7 +476,7 @@ model_delta:
             self.assertEqual(json.loads(go.stdout), json.loads(python.stdout))
             self.assertEqual(tree_digest(repo), before)
 
-    def test_preview_cross_compiles_for_required_matrix(self) -> None:
+    def test_official_cross_compiles_for_required_matrix(self) -> None:
         targets = (
             ("linux", "amd64"),
             ("linux", "arm64"),
@@ -475,7 +488,7 @@ model_delta:
             digests: dict[str, str] = {}
             for goos, goarch in targets:
                 suffix = ".exe" if goos == "windows" else ""
-                target = Path(temp) / f"bm-preview-{goos}-{goarch}{suffix}"
+                target = Path(temp) / f"bm-{goos}-{goarch}{suffix}"
                 environment = {
                     **os.environ,
                     "CGO_ENABLED": "0",
@@ -488,7 +501,7 @@ model_delta:
                     "-trimpath",
                     "-o",
                     str(target),
-                    "./cmd/bm-preview",
+                    "./cmd/bm",
                     env=environment,
                 )
                 self.assertEqual(built.returncode, 0, built.stderr)

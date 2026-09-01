@@ -409,7 +409,7 @@ class ContextSkillAdoptionScenarios(unittest.TestCase):
                 content = (ROOT / "skills" / name / "SKILL.md").read_text(
                     encoding="utf-8"
                 )
-                self.assertIn("bm.py context pack", content)
+                self.assertIn("bm context pack", content)
                 self.assertIn("PACK_INCOMPLETE", content)
                 self.assertNotRegex(content, r"Leia \[.*METHOD_CONTRACT\.md")
 

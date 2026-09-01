@@ -23,6 +23,11 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Validate Python syntax
         run: |
           python3 -m py_compile \
@@ -41,17 +46,14 @@ jobs:
       - name: Run complete sharded suite
         run: python3 scripts/run_test_shards.py
 
+      - name: Validate native backend
+        run: |
+          go test ./...
+          go vet ./...
+          go build -trimpath -o /tmp/bm ./cmd/bm
+
       - name: Validate CLI entrypoints
         run: |
-          python3 scripts/bm.py --help > /tmp/bm-help.txt
-          grep -q "spec-diff" /tmp/bm-help.txt
-          grep -q "mutation-evidence" /tmp/bm-help.txt
-          grep -q "update-bm" /tmp/bm-help.txt
-          grep -q "scope" /tmp/bm-help.txt
-          grep -q "roadmap" /tmp/bm-help.txt
-          python3 scripts/bm.py proof-map --help | grep -q "mutation-evidence"
-          python3 scripts/bm.py scope --help | grep -q "seal"
-          python3 scripts/bm.py scope --help | grep -q "verify"
-          python3 scripts/bm.py roadmap --help | grep -q "sync"
-          python3 scripts/bm.py update-bm --help | grep -q -- "--check"
-          test "$(cat skills/_shared/VERSION)" = "0.4.6"
+          /tmp/bm version --json | grep -q '"official":true'
+          python3 scripts/run_cli_contract_fixtures.py --engine go --binary /tmp/bm
+          test "$(cat skills/_shared/VERSION)" = "0.5.0"

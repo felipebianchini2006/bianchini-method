@@ -7,7 +7,7 @@ description: Use para transformar PDF de escopo, briefing, proposta ou RFP em SC
 
 **Anuncie:** "Transformando o PDF em escopo rastreável para o SDD."
 
-Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e [`references/scope-contract.md`](references/scope-contract.md). Resolva `../_shared/scripts/bm.py` uma vez.
+Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e [`references/scope-contract.md`](references/scope-contract.md). Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows uma vez. Ausência bloqueia; não use fallback Python.
 
 Esta skill interpreta o pedido. O CLI valida, calcula digests, sela `SCOPE.md` e atualiza o estado. Não criar arquitetura, roadmap, fases, plano de implementação ou código de produção.
 
@@ -58,8 +58,8 @@ Nunca ler `.planning/` como contexto ou fallback.
 Sem `.bianchini/`, inicialize o workspace. Sem trabalho ativo, crie a mudança somente depois da revisão:
 
 ```bash
-bm.py model init --repo <repo>
-bm.py model init --repo <repo> --change "<nome curto>"
+bm model init --repo <repo>
+bm model init --repo <repo> --change "<nome curto>"
 ```
 
 Uma mudança ativa de outro tipo ou já além do intake bloqueia. Uma mudança ativa ainda em `planning` pode receber o escopo quando corresponde ao mesmo pedido.
@@ -67,7 +67,7 @@ Uma mudança ativa de outro tipo ou já além do intake bloqueia. Uma mudança a
 Salve o draft fora do repositório, em diretório temporário, e sele:
 
 ```bash
-bm.py scope seal --repo <repo> --change C001-slug \
+bm scope seal --repo <repo> --change C001-slug \
   --source <escopo.pdf> --draft <scope-draft.md> \
   --pages <total> --extraction native|ocr|mixed
 ```
@@ -77,7 +77,7 @@ bm.py scope seal --repo <repo> --change C001-slug \
 Verifique novamente:
 
 ```bash
-bm.py scope verify --repo <repo> --change C001-slug --source <escopo.pdf>
+bm scope verify --repo <repo> --change C001-slug --source <escopo.pdf>
 ```
 
 Somente `verified: true` e `status: ready_for_sdd` concluem esta skill. Depois remova o diretório temporário. Não executar `/sdd-planning` automaticamente, salvo quando o pedido atual também solicitar o planejamento.

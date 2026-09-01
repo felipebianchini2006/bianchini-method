@@ -1,6 +1,8 @@
-# Bianchini Method 0.4
+# Bianchini Method 0.5
 
 Método spec-driven para planejar e executar mudanças com visão do sistema completo, coerência entre fases, documentação viva e verificação proporcional ao risco.
+
+O pacote `0.5.0` usa um CLI Go nativo como backend oficial e mantém o contrato público do método `0.4`. O Python permanece no repositório somente como oráculo explícito de compatibilidade; não há fallback automático entre linguagens.
 
 O salto do `0.4` é tratar o planejamento como um grafo de contratos:
 
@@ -168,8 +170,8 @@ GREEN antes de RED e evidência anterior ao último patch são rejeitados. Casos
 Não existe adaptador permanente. Projetos anteriores terminam seu ciclo e usam:
 
 ```bash
-python3 skills/_shared/scripts/bm.py migrate check --repo .
-python3 skills/_shared/scripts/bm.py migrate apply --repo .
+skills/_shared/bin/bm migrate check --repo .
+skills/_shared/bin/bm migrate apply --repo .
 ```
 
 `check` é somente leitura. `apply` exige Git limpo e projeto concluído/`idle`, preserva histórico, usa checksums e rollback, e produz manifesto em `.bianchini/archive/import-AAAA-MM-DD/`.
@@ -241,40 +243,43 @@ Erros públicos do fluxo 0.4 incluem `MODEL_MISMATCH`, `COHERENCE_ERROR`,
 Exemplos:
 
 ```bash
-python3 skills/_shared/scripts/bm.py model init --repo .
-python3 skills/_shared/scripts/bm.py model init --repo . --change checkout
-python3 skills/_shared/scripts/bm.py scope seal --repo . --change C001-checkout --source escopo.pdf --draft /tmp/scope-draft.md --pages 12 --extraction native
-python3 skills/_shared/scripts/bm.py scope verify --repo . --change C001-checkout --source escopo.pdf
-python3 skills/_shared/scripts/bm.py roadmap sync --repo . --change C001
-python3 skills/_shared/scripts/bm.py model validate --repo . --change C001
-python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --structural-only
-python3 skills/_shared/scripts/bm.py coherence check --repo . --change C001 --semantic-report semantic-review.json
-python3 skills/_shared/scripts/bm.py coherence approve --repo . --change C001 --digest <digest> --approved-by "<responsável>"
-python3 skills/_shared/scripts/bm.py impact analyze --repo . --change C001 --plan P02
-python3 skills/_shared/scripts/bm.py workspace create --repo . --change C001 --plan P01
-python3 skills/_shared/scripts/bm.py plan complete --repo . --change C001 --plan P01 --actual-delta actual-delta.json --result "<resultado>" --verification "<evidência>" --completed-task T01
-python3 skills/_shared/scripts/bm.py cycle-close --repo . --change C001
+skills/_shared/bin/bm model init --repo .
+skills/_shared/bin/bm model init --repo . --change checkout
+skills/_shared/bin/bm scope seal --repo . --change C001-checkout --source escopo.pdf --draft /tmp/scope-draft.md --pages 12 --extraction native
+skills/_shared/bin/bm scope verify --repo . --change C001-checkout --source escopo.pdf
+skills/_shared/bin/bm roadmap sync --repo . --change C001
+skills/_shared/bin/bm model validate --repo . --change C001
+skills/_shared/bin/bm coherence check --repo . --change C001 --structural-only
+skills/_shared/bin/bm coherence check --repo . --change C001 --semantic-report semantic-review.json
+skills/_shared/bin/bm coherence approve --repo . --change C001 --digest <digest> --approved-by "<responsável>"
+skills/_shared/bin/bm impact analyze --repo . --change C001 --plan P02
+skills/_shared/bin/bm workspace create --repo . --change C001 --plan P01
+skills/_shared/bin/bm plan complete --repo . --change C001 --plan P01 --actual-delta actual-delta.json --result "<resultado>" --verification "<evidência>" --completed-task T01
+skills/_shared/bin/bm cycle-close --repo . --change C001
 ```
 
 ## Instalação local
 
-Copie o diretório `skills` inteiro:
+Baixe o archive da release `0.5.0` correspondente a `darwin-arm64`, `darwin-amd64`, `linux-arm64`, `linux-amd64` ou `windows-amd64`. Verifique o arquivo com `SHA256SUMS`, extraia e copie o diretório `skills` inteiro:
 
 ```bash
-cp -R skills/. ~/.codex/skills/
+shasum -a 256 -c SHA256SUMS
+cp -R bianchini-method_0.5.0_<plataforma>/skills/. ~/.codex/skills/
 # Claude Code: troque ~/.codex por ~/.claude
 ```
+
+O binário fica em `_shared/bin/bm` no Unix ou `_shared/bin/bm.exe` no Windows. A instalação é inválida se ele estiver ausente; as skills não usam Python como fallback.
 
 Atualização é sempre explícita:
 
 ```bash
-python3 ~/.codex/skills/_shared/scripts/bm.py update-bm --check
-python3 ~/.codex/skills/_shared/scripts/bm.py update-bm
+~/.codex/skills/_shared/bin/bm update-bm --check
+~/.codex/skills/_shared/bin/bm update-bm
 ```
 
-A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal.
+A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal. O updater `0.5.0` autentica manifesto, `SHA256SUMS`, tamanho e digest do archive antes da troca transacional com lock, journal e backup.
 
-Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem parte da interface `0.4`. Artefatos anteriores reconhecidos entram somente por `/migrar-bianchini` ou `bm.py migrate`.
+Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem parte da interface `0.4`. Artefatos anteriores reconhecidos entram somente por `/migrar-bianchini` ou `bm migrate`.
 
 ## Uso
 
@@ -296,7 +301,11 @@ Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem par
 
 ```bash
 python3 scripts/run_test_shards.py
-python3 scripts/bm.py --help
+go test ./...
+go test -race ./...
+go vet ./...
+go build -trimpath -o bin/bm ./cmd/bm
+python3 scripts/run_cli_contract_fixtures.py --engine go --binary ./bin/bm
 ```
 
-O CLI usa biblioteca padrão Python. Testes cobrem intake de PDF, selo e rastreabilidade do `SCOPE.md`, fases/tarefas tipadas, roadmap derivado, manifesto aprovado, workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.
+O backend oficial é Go. `python3 scripts/bm.py` é somente o oráculo de paridade durante a janela de compatibilidade. Testes cobrem intake de PDF, selo e rastreabilidade do `SCOPE.md`, fases/tarefas tipadas, roadmap derivado, manifesto aprovado, workspace, ProjectModel, coerência determinística, impacto seletivo, quick, debug, migração, aliases de caminho, transações e preservação de `.planning/`.

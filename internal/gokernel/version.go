@@ -5,7 +5,7 @@ package gokernel
 var BuildCommit = "unknown"
 
 const (
-	Version         = "0.4.7-preview"
+	Version         = "0.5.0"
 	ContractVersion = "0.4"
 )
 
@@ -85,10 +85,10 @@ func versionMetadata() VersionMetadata {
 	return VersionMetadata{
 		BuildCommit:         BuildCommit,
 		ContractVersion:     ContractVersion,
-		Engine:              "go-preview",
+		Engine:              "go",
 		ImplementedSurfaces: surfaces,
-		Official:            false,
-		Preview:             true,
+		Official:            true,
+		Preview:             false,
 		Version:             Version,
 	}
 }

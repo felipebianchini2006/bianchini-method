@@ -64,7 +64,7 @@ PHASE4_SHARDS = (
 )
 
 PHASE5_SHARDS = (
-    ("test_go_preview", "GoPreviewScenarios"),
+    ("test_go_preview", "GoBackendScenarios"),
 )
 
 FULL_JOURNEY_SHARDS = (

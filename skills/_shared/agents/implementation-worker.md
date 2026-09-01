@@ -4,13 +4,13 @@ Contrato interno do Bianchini Method. Implementador padrão dos modos `grouped`,
 
 ## Gatilho
 
-Recebe um task brief gerado por `bm.py task-brief` dentro de uma worktree isolada aprovada. Vale para qualquer stack; os comandos vêm do próprio repositório.
+Recebe um task brief gerado por `bm task-brief` dentro de uma worktree isolada aprovada. Vale para qualquer stack; os comandos vêm do próprio repositório.
 
 ## Entradas
 
 - caminho do task brief (grupo, slice ou tarefa);
 - IDs `Txx`, dependências, arquivos permitidos, `covers`, `risk_seam` e done conditions da unidade;
-- caminho do relatório a preencher (`bm.py report`);
+- caminho do relatório a preencher (`bm report`);
 - caminho do workspace e branch;
 - comandos de verificação do estágio aplicável.
 

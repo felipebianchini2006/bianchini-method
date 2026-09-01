@@ -7,14 +7,14 @@ description: Use para migrar uma única vez documentação anterior do Bianchini
 
 **Anuncie:** "Validando uma migração única para `.bianchini`."
 
-Use por invocação explícita. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva `bm.py`. Não implemente adaptador de compatibilidade.
+Use por invocação explícita. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. Não implemente adaptador de compatibilidade.
 
 ## 1. Verificar sem alterar
 
 Sempre comece por:
 
 ```bash
-bm.py migrate check --repo <repo>
+bm migrate check --repo <repo>
 ```
 
 `check` deve confirmar:
@@ -47,7 +47,7 @@ Se o usuário pediu apenas avaliação, pare após `check` e entregue a prévia.
 Quando o pedido atual autorizar a migração e `check` passar:
 
 ```bash
-bm.py migrate apply --repo <repo>
+bm migrate apply --repo <repo>
 ```
 
 O CLI deve:
@@ -68,7 +68,7 @@ Não mover, copiar, converter, renumerar ou apagar `.planning/`. Não usar seus 
 Depois de `apply`:
 
 ```bash
-bm.py model validate --repo <repo>
+bm model validate --repo <repo>
 ```
 
 Confirme:

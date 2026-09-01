@@ -1,6 +1,6 @@
 # Contrato do SCOPE.md vindo de PDF
 
-O draft não contém frontmatter. `bm.py scope seal` adiciona identidade, fonte, cobertura, horário e digest.
+O draft não contém frontmatter. `bm scope seal` adiciona identidade, fonte, cobertura, horário e digest.
 
 ## Ordem obrigatória
 

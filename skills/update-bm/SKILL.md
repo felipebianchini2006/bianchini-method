@@ -10,14 +10,14 @@ disable-model-invocation: true
 
 Esta skill é exclusivamente manual. Não verificar ou atualizar automaticamente durante planejamento, execução, correção ou homologação.
 
-Resolva o CLI empacotado em [`../_shared/scripts/bm.py`](../_shared/scripts/bm.py). A raiz instalada é o diretório `skills` que contém esta skill e `_shared`.
+Resolva o CLI empacotado em `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. A raiz instalada é o diretório `skills` que contém esta skill e `_shared`. Ausência bloqueia; não use fallback Python.
 
 ## Verificar sem alterar
 
 Quando o argumento for `check`, `status` ou `--check`:
 
 ```bash
-python3 <bm.py> update-bm --check --format text
+<bm> update-bm --check --format text
 ```
 
 Informar versão instalada, versão oficial e se existe atualização. Falha de rede não autoriza assumir que a instalação está atualizada.
@@ -27,7 +27,7 @@ Informar versão instalada, versão oficial e se existe atualização. Falha de 
 Sem argumento, ou com `update`:
 
 ```bash
-python3 <bm.py> update-bm --format text
+<bm> update-bm --format text
 ```
 
 O comando usa somente a `main` oficial de `felipebianchini2006/bianchini-method`.
