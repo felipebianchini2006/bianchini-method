@@ -67,6 +67,10 @@ PHASE5_SHARDS = (
     ("test_go_preview", "GoPreviewScenarios"),
 )
 
+FULL_JOURNEY_SHARDS = (
+    ("test_full_journey", "FullJourneyScenarios"),
+)
+
 SELF_UPDATE_SHARDS = (
     "SelfUpdateScenarios",
 )
@@ -128,6 +132,9 @@ def main() -> int:
     for module, shard in PHASE5_SHARDS:
         if run_shard(module, shard, environment) != 0:
             return 1
+    for module, shard in FULL_JOURNEY_SHARDS:
+        if run_shard(module, shard, environment) != 0:
+            return 1
     for shard in SELF_UPDATE_SHARDS:
         if run_shard("test_self_update", shard, environment) != 0:
             return 1
@@ -147,6 +154,7 @@ def main() -> int:
         + len(PHASE3_SHARDS)
         + len(PHASE4_SHARDS)
         + len(PHASE5_SHARDS)
+        + len(FULL_JOURNEY_SHARDS)
         + len(SELF_UPDATE_SHARDS)
         + len(LINEAGE_SHARDS)
         + len(CODEX_SHARDS)
