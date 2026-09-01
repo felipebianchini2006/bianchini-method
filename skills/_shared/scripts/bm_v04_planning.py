@@ -780,6 +780,9 @@ def coherence_check(
     state.setdefault("pointers", {})["coherence"] = (
         f".bianchini/changes/{directory.name}/COHERENCE.md"
     )
+    active = state.get("active_work")
+    if isinstance(active, dict):
+        active["status"] = state["status"]
     workspace.write_state(state)
     result = {
         "change": directory.name,

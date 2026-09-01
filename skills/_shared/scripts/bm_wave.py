@@ -447,16 +447,23 @@ def _completed_results(
     plan_results: dict[str, dict[str, Any]] = {}
     task_results: dict[tuple[str, str], dict[str, Any]] = {}
     results_dir = change / "results"
-    for child in _children(root, results_dir, "results"):
-        if not child.is_file() or not PLAN_ID.fullmatch(child.stem):
-            continue
-        if child.stem not in known_plans:
-            _fail("WAVE_INCOMPLETE", f"resultado pertence a plano desconhecido: {child.stem}")
-        value = _frontmatter(root, child, f"resultado {child.stem}")
-        contract = known_plans[child.stem]
-        _validate_plan_result(value, contract, change.name)
-        plan_results[child.stem] = value
-        completed_plans.add(child.stem)
+    _reject_symlink_chain(root, results_dir, "results")
+    if results_dir.exists():
+        if not results_dir.is_dir():
+            _fail("WAVE_INCOMPLETE", "results deve ser diretório")
+        for child in _children(root, results_dir, "results"):
+            if not child.is_file() or not PLAN_ID.fullmatch(child.stem):
+                continue
+            if child.stem not in known_plans:
+                _fail(
+                    "WAVE_INCOMPLETE",
+                    f"resultado pertence a plano desconhecido: {child.stem}",
+                )
+            value = _frontmatter(root, child, f"resultado {child.stem}")
+            contract = known_plans[child.stem]
+            _validate_plan_result(value, contract, change.name)
+            plan_results[child.stem] = value
+            completed_plans.add(child.stem)
 
     tasks_root = results_dir / "tasks"
     if tasks_root.exists():
