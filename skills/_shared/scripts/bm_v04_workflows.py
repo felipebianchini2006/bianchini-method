@@ -19,7 +19,7 @@ from typing import Any, Iterable
 
 import bm_docviva
 import bm_risk
-from bm_project_model import ProjectModel, read_frontmatter
+from bm_project_model import ProjectModel, plan_file_for_id, read_frontmatter
 from bm_workspace import MethodWorkspace
 
 
@@ -818,7 +818,7 @@ def _reference_exists(root: Path, reference: str) -> bool:
         if not base.is_dir():
             continue
         for directory in base.glob(f"{change}*"):
-            if any((directory / "plans").glob(f"{plan}*.md")):
+            if plan_file_for_id(directory / "plans", plan) is not None:
                 return True
     return False
 

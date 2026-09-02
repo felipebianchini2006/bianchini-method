@@ -247,9 +247,12 @@ func waveRoadmapPlans(root, change string) ([]planContract, []string, error) {
 		if !info.Mode().IsRegular() || filepath.Ext(name) != ".md" || !strings.HasPrefix(name, "P") {
 			continue
 		}
-		identifier := strings.TrimSuffix(name, ".md")
-		if !wavePlanID.MatchString(identifier) {
+		identifier, valid := planFileID(name)
+		if !valid {
 			return nil, nil, waveError("WAVE_INCOMPLETE", "arquivo de plano com identidade inválida: "+name)
+		}
+		if _, duplicate := byID[identifier]; duplicate {
+			return nil, nil, waveError("WAVE_INCOMPLETE", "arquivos de plano duplicam identidade: "+identifier)
 		}
 		actual = append(actual, identifier)
 		byID[identifier] = child
@@ -268,6 +271,9 @@ func waveRoadmapPlans(root, change string) ([]planContract, []string, error) {
 		plan, loadErr := parsePlanContract(value)
 		if loadErr != nil {
 			return nil, nil, waveError("WAVE_INCOMPLETE", "plano "+identifier+" inválido: "+loadErr.Error())
+		}
+		if plan.id != identifier {
+			return nil, nil, waveError("WAVE_INCOMPLETE", "arquivo "+filepath.Base(byID[identifier])+" diverge do id "+plan.id)
 		}
 		expected := map[string]any{
 			"id": plan.id, "result": strings.TrimSpace(stateString(plan.value["result"])), "depends_on": normalizedPlanStrings(plan, "depends_on"),
@@ -396,8 +402,26 @@ func waveArtifactManifest(root, change string, coherence map[string]any, planIDs
 		return nil, waveError("WAVE_INCOMPLETE", "pacote aprovado exige artifact_manifest")
 	}
 	required := []string{"SCOPE.md", "RESEARCH.md", "ARCHITECTURE.md", "SYSTEM_MODEL.md", "ROADMAP.md"}
+	planFiles := map[string]string{}
+	for relative := range manifest {
+		if !strings.HasPrefix(relative, "plans/") {
+			continue
+		}
+		identifier, valid := planFileID(strings.TrimPrefix(relative, "plans/"))
+		if !valid || strings.Count(relative, "/") != 1 {
+			return nil, waveError("WAVE_INCOMPLETE", "arquivo de plano com identidade inválida no artifact_manifest: "+relative)
+		}
+		if _, duplicate := planFiles[identifier]; duplicate {
+			return nil, waveError("WAVE_INCOMPLETE", "artifact_manifest duplica identidade de plano: "+identifier)
+		}
+		planFiles[identifier] = relative
+	}
 	for _, identifier := range planIDs {
-		required = append(required, "plans/"+identifier+".md")
+		relative, exists := planFiles[identifier]
+		if !exists {
+			return nil, waveError("WAVE_INCOMPLETE", "artifact_manifest não contém o plano "+identifier)
+		}
+		required = append(required, relative)
 	}
 	requiredSet := stringSet(required)
 	if len(manifest) != len(required) || len(unknownMapKeys(manifest, requiredSet)) > 0 || len(missingMapKeys(manifest, required)) > 0 {

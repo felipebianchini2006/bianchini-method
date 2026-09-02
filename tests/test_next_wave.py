@@ -290,8 +290,11 @@ class NextWaveScenarios(unittest.TestCase):
             plan("P05"),
             plan("P06"),
         ]
+        plan_filenames = {
+            str(value["id"]): f"{value['id']}-entrega.md" for value in values
+        }
         for value in values:
-            (change / f"plans/{value['id']}.md").write_text(
+            (change / "plans" / plan_filenames[str(value["id"])]).write_text(
                 document(value, str(value["id"])), encoding="utf-8"
             )
 
@@ -358,7 +361,7 @@ class NextWaveScenarios(unittest.TestCase):
                 "ARCHITECTURE.md",
                 "SYSTEM_MODEL.md",
                 "ROADMAP.md",
-                *(f"plans/{value['id']}.md" for value in values),
+                *(f"plans/{plan_filenames[str(value['id'])]}" for value in values),
             ]
         }
         findings = [
@@ -526,6 +529,17 @@ class NextWaveScenarios(unittest.TestCase):
             )
             self.assertEqual(first["completed_units"], ["C001/P06"])
 
+    def test_next_wave_rejects_duplicate_descriptive_plan_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root, change = self.make_repo(Path(temp))
+            canonical = change / "plans/P01.md"
+            canonical.write_bytes((change / "plans/P01-entrega.md").read_bytes())
+
+            with self.assertRaisesRegex(
+                WaveError, "arquivos de plano duplicam identidade: P01"
+            ):
+                next_wave(root, "C001")
+
     def test_completed_task_advances_local_wave_and_records_satisfied_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root, change = self.make_repo(Path(temp))
@@ -684,7 +698,7 @@ class NextWaveScenarios(unittest.TestCase):
             "ARCHITECTURE.md",
             "SYSTEM_MODEL.md",
             "ROADMAP.md",
-            "plans/P01.md",
+            "plans/P01-entrega.md",
             "specs/expected/system.md",
             "specs/MANIFEST.json",
             "specs/diff.md",
@@ -889,7 +903,7 @@ class NextWaveScenarios(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
             root, change = self.make_repo(base)
-            plan_path = change / "plans/P01.md"
+            plan_path = change / "plans/P01-entrega.md"
             outside = base / "outside.md"
             outside.write_text(plan_path.read_text(encoding="utf-8"), encoding="utf-8")
             plan_path.unlink()

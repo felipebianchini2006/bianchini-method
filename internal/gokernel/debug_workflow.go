@@ -421,11 +421,9 @@ func debugReferenceExists(workspace methodWorkspace, reference string) bool {
 			if entry.Type()&os.ModeSymlink != 0 || !entry.IsDir() || !strings.HasPrefix(entry.Name(), parts[0]) {
 				continue
 			}
-			plans, _ := filepath.Glob(filepath.Join(base, entry.Name(), "plans", parts[1]+"*.md"))
-			for _, plan := range plans {
-				if regularFile(plan) {
-					return true
-				}
+			plan, found := planFileForID(filepath.Join(base, entry.Name(), "plans"), parts[1])
+			if found && regularFile(plan) {
+				return true
 			}
 		}
 	}

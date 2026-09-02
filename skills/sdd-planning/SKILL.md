@@ -49,7 +49,7 @@ Crie, nesta ordem. Quando houver `SCOPE.md` selado pelo `/preparar-escopo`, pres
 SCOPE.md         resultados, limites, aceite e ações externas; criar somente sem intake selado
 ARCHITECTURE.md  decisões, stack, seams, trade-offs e alternativas
 SYSTEM_MODEL.md  módulos, contratos, ownership, dados, integrações e journeys
-plans/Pxx-*.md   fases e tarefas tipadas
+plans/Pxx.md ou plans/Pxx-*.md   fases e tarefas tipadas
 ROADMAP.md       visão derivada de todas as fases e suas relações
 ```
 
@@ -59,7 +59,7 @@ Não use a LLM para decidir ordem topológica, cobertura ou referências válida
 
 ## 4. Planejar por contratos
 
-Cada plano em `plans/Pxx-entrega.md` representa uma entrega rejeitável ou verificável. Não criar tarefa por arquivo, camada de teste, ferramenta ou documento.
+Cada plano em `plans/Pxx.md` ou `plans/Pxx-entrega.md` representa uma entrega rejeitável ou verificável. O prefixo `Pxx` é a identidade canônica e deve coincidir com o `id` do frontmatter; o sufixo descritivo em kebab-case é opcional. Não criar tarefa por arquivo, camada de teste, ferramenta ou documento.
 
 O frontmatter de cada plano declara:
 

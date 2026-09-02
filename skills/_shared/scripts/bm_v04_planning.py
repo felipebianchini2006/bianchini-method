@@ -21,7 +21,13 @@ from bm_coherence import (
     StructuralValidator,
     TaskDependencyGraph,
 )
-from bm_project_model import PlanContract, ProjectModel, read_frontmatter
+from bm_project_model import (
+    PlanContract,
+    ProjectModel,
+    plan_file_for_id,
+    plan_file_id,
+    read_frontmatter,
+)
 import bm_scope
 import bm_close
 import bm_context
@@ -518,13 +524,27 @@ def _load_package(
             bm_scope.verify_scope(repo, directory.name)
         except bm_scope.ScopeError as error:
             raise PlanningError("STALE_EVIDENCE", str(error)) from error
+    plan_paths = sorted((directory / "plans").glob("P*.md"))
+    plans: list[PlanContract] = []
+    seen: set[str] = set()
     try:
         current = ProjectModel.from_system_model(workspace.current_system_model)
         expected = ProjectModel.from_system_model(directory / "SYSTEM_MODEL.md")
-        plans = [
-            PlanContract.from_markdown(path)
-            for path in sorted((directory / "plans").glob("P*.md"))
-        ]
+        for path in plan_paths:
+            identifier = plan_file_id(path)
+            if identifier is None:
+                raise ValueError(
+                    f"arquivo de plano com identidade inválida: {path.name}"
+                )
+            if identifier in seen:
+                raise ValueError(
+                    f"arquivos de plano duplicam identidade: {identifier}"
+                )
+            plan = PlanContract.from_markdown(path)
+            if plan.id != identifier:
+                raise ValueError(f"arquivo {path.name} diverge do id {plan.id}")
+            seen.add(identifier)
+            plans.append(plan)
     except ValueError as error:
         raise PlanningError("MODEL_MISMATCH", str(error)) from error
     if not plans:
@@ -1483,15 +1503,15 @@ def execution_workspace_create(
             "MISSING_PROVIDER",
             f"contratos consumidos ainda ausentes: {', '.join(missing_contracts)}",
         )
-    plan_matches = sorted((directory / "plans").glob(f"{plan}*.md"))
-    if len(plan_matches) != 1:
+    plan_path = plan_file_for_id(directory / "plans", plan)
+    if plan_path is None:
         raise PlanningError("MODEL_MISMATCH", f"{plan} deve localizar exatamente um plano")
     head = _git(root, "rev-parse", "HEAD")
     required_paths = [directory / "COHERENCE.md"]
     if planning_contract >= 2:
         required_paths.extend(directory / relative for relative in manifest)
     else:
-        required_paths.extend((directory / "SYSTEM_MODEL.md", plan_matches[0]))
+        required_paths.extend((directory / "SYSTEM_MODEL.md", plan_path))
     for required in required_paths:
         relative = required.relative_to(root).as_posix()
         if not _git(root, "ls-files", "--error-unmatch", relative):

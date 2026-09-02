@@ -115,11 +115,23 @@ func loadRoadmapPackage(repo, change string) (methodWorkspace, string, []planCon
 	}
 	sort.Strings(paths)
 	plans := make([]planContract, 0, len(paths))
+	seen := map[string]bool{}
 	for _, path := range paths {
+		identifier, valid := planFileID(path)
+		if !valid {
+			return methodWorkspace{}, "", nil, workflowError("COHERENCE_ERROR", "arquivo de plano com identidade inválida: "+filepath.Base(path))
+		}
+		if seen[identifier] {
+			return methodWorkspace{}, "", nil, workflowError("COHERENCE_ERROR", "arquivos de plano duplicam identidade: "+identifier)
+		}
 		plan, loadErr := loadPlanContract(path)
 		if loadErr != nil {
 			return methodWorkspace{}, "", nil, workflowError("MODEL_MISMATCH", loadErr.Error())
 		}
+		if plan.id != identifier {
+			return methodWorkspace{}, "", nil, workflowError("MODEL_MISMATCH", "arquivo "+filepath.Base(path)+" diverge do id "+plan.id)
+		}
+		seen[identifier] = true
 		plans = append(plans, plan)
 	}
 	return workspace, directory, plans, nil

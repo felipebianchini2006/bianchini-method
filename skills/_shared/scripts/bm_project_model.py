@@ -28,6 +28,9 @@ MODEL_SECTIONS = (
 MODEL_ID = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]*$")
 PLAN_ID = re.compile(r"^P[0-9]{2,}$")
 TASK_ID = re.compile(r"^T[0-9]{2,}$")
+PLAN_FILENAME = re.compile(
+    r"^(P[0-9]{2,})(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?\.md$"
+)
 PLAN_V2_FIELDS = frozenset(
     {
         "schema_version",
@@ -540,6 +543,20 @@ class PlanContract:
         }
 
 
+def plan_file_id(path: str | Path) -> str | None:
+    match = PLAN_FILENAME.fullmatch(Path(path).name)
+    return match.group(1) if match else None
+
+
+def plan_file_for_id(directory: str | Path, identifier: str) -> Path | None:
+    matches = [
+        path
+        for path in sorted(Path(directory).glob(f"{identifier}*.md"))
+        if plan_file_id(path) == identifier
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
 def _normalize_section(section: str, raw: Any) -> dict[str, dict[str, Any]]:
     if isinstance(raw, Mapping):
         entries = []
@@ -755,11 +772,14 @@ def _split_flow_list(value: str) -> list[str]:
 
 __all__ = [
     "MODEL_SECTIONS",
+    "PLAN_FILENAME",
     "PLAN_ID",
     "PlanContract",
     "ProjectModel",
     "TASK_ID",
     "TaskContract",
     "TaskVerification",
+    "plan_file_for_id",
+    "plan_file_id",
     "read_frontmatter",
 ]

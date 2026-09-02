@@ -363,7 +363,7 @@ class FullJourneyScenarios(unittest.TestCase):
             )
             self.write_managed_specs(repo, change_root, *TRACEABLE_SCOPE_IDS)
 
-        (change_root / "plans/P01.md").write_text(
+        (change_root / "plans/P01-health-journey.md").write_text(
             markdown_document(plan, "P01 — Health journey"), encoding="utf-8"
         )
         if legacy_schema:

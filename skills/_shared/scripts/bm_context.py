@@ -22,6 +22,7 @@ from bm_feature_support import (
     sha256_bytes,
     unit_sections,
 )
+from bm_project_model import plan_file_for_id
 from bm_spec_package import SpecPackageError, parse_spec_requirements
 
 
@@ -775,7 +776,12 @@ def _change_context(
     change = _find_prefixed_directory(
         root, root / ".bianchini/changes", change_id, "mudança"
     )
-    plan_path = change / f"plans/{plan_id}.md"
+    plan_path = plan_file_for_id(change / "plans", plan_id)
+    if plan_path is None:
+        _context_fail(
+            "PACK_INCOMPLETE",
+            f"plano {plan_id} deve localizar exatamente um arquivo",
+        )
     plan = sources.frontmatter(plan_path, f"plano {plan_id}")
     if plan.get("id") != plan_id:
         _context_fail("PACK_INCOMPLETE", f"plano {plan_id} possui id divergente")

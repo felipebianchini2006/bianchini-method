@@ -431,7 +431,11 @@ func contextChangePayload(root string, reader *contextSourceReader, state map[st
 	if err != nil {
 		return nil, err
 	}
-	plan, err := reader.frontmatter(filepath.Join(change, "plans", planID+".md"), "plano "+planID)
+	planPath, found := planFileForID(filepath.Join(change, "plans"), planID)
+	if !found {
+		return nil, contextError("PACK_INCOMPLETE", "plano "+planID+" deve localizar exatamente um arquivo")
+	}
+	plan, err := reader.frontmatter(planPath, "plano "+planID)
 	if err != nil {
 		return nil, err
 	}

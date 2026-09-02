@@ -84,7 +84,7 @@ func TestCoherenceSchemaOneStructuralCheckAndApproval(t *testing.T) {
 	}
 }
 
-func TestCoherenceSchemaTwoCheckReviewAndApprove(t *testing.T) {
+func TestCoherenceSchemaTwoCheckReviewApproveAndStartDescriptivePlan(t *testing.T) {
 	repo := t.TempDir()
 	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestCoherenceSchemaTwoCheckReviewAndApprove(t *testing.T) {
 		t.Fatal(err)
 	}
 	planDocument, _ := frontmatterDocument(roadmapPlan("P01", nil), "# P01", false)
-	if err := os.WriteFile(filepath.Join(directory, "plans", "P01.md"), planDocument, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(directory, "plans", "P01-fundacao.md"), planDocument, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(directory, "specs", "expected", "api.md"), []byte("# API\n\n## API-001: Responde saúde\n"), 0o600); err != nil {
@@ -163,5 +163,17 @@ func TestCoherenceSchemaTwoCheckReviewAndApprove(t *testing.T) {
 	}
 	if approved["status"] != "approved" || approved["digest"] != digest || approved["approved_by"] != "human:test" {
 		t.Fatalf("approved=%#v", approved)
+	}
+	code, stdout, stderr = runCLI(t, "roadmap", "next-wave", "--repo", repo, "--change", change)
+	if code != 0 || stderr != "" {
+		t.Fatalf("next-wave code=%d stderr=%q", code, stderr)
+	}
+	var wave map[string]any
+	if err := json.Unmarshal([]byte(stdout), &wave); err != nil {
+		t.Fatal(err)
+	}
+	eligible := stateArray(wave["eligible_wave"])
+	if len(eligible) != 1 || stateString(eligible[0]) != "C001/P01/T01" {
+		t.Fatalf("wave=%#v", wave)
 	}
 }

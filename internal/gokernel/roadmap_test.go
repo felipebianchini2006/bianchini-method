@@ -111,3 +111,30 @@ func TestRoadmapSyncRequiresV2Plans(t *testing.T) {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
+
+func TestRoadmapSyncRejectsDuplicatePlanFileIdentity(t *testing.T) {
+	repo := goGitRoot(t)
+	if code, _, stderr := runCLI(t, "model", "init", "--repo", repo); code != 0 {
+		t.Fatal(stderr)
+	}
+	code, stdout, stderr := runCLI(t, "model", "init", "--repo", repo, "--change", "Roadmap")
+	if code != 0 {
+		t.Fatal(stderr)
+	}
+	var created map[string]any
+	_ = json.Unmarshal([]byte(stdout), &created)
+	directory := filepath.Join(repo, ".bianchini", "changes", stateString(created["change"]))
+	document, err := frontmatterDocument(roadmapPlan("P01", nil), "# P01", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"P01.md", "P01-fundacao.md"} {
+		if err := os.WriteFile(filepath.Join(directory, "plans", name), document, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, stdout, stderr = runCLI(t, "roadmap", "sync", "--repo", repo, "--change", "C001")
+	if code != 3 || stdout != "" || !strings.Contains(stderr, "arquivos de plano duplicam identidade: P01") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}

@@ -180,18 +180,18 @@ func executionWorkspaceCreate(root, change, plan, target string, dependencies ex
 	if len(missingContracts) > 0 {
 		return nil, workflowError("MISSING_PROVIDER", "contratos consumidos ainda ausentes: "+strings.Join(missingContracts, ", "))
 	}
-	planPaths, _ := filepath.Glob(filepath.Join(pack.directory, "plans", plan+"*.md"))
-	if len(planPaths) != 1 {
+	planPath, found := planFileForID(filepath.Join(pack.directory, "plans"), plan)
+	if !found {
 		return nil, workflowError("MODEL_MISMATCH", plan+" deve localizar exatamente um plano")
 	}
-	if err := pack.workspace.validateWorkspacePath(planPaths[0]); err != nil {
+	if err := pack.workspace.validateWorkspacePath(planPath); err != nil {
 		return nil, workflowError("MODEL_MISMATCH", plan+" deve localizar exatamente um plano")
 	}
 	head, err := dependencies.git(root, "rev-parse", "HEAD")
 	if err != nil {
 		return nil, executionWorkspaceGitError(err)
 	}
-	if err := executionWorkspaceValidateCommittedPackage(root, pack, planPaths[0], manifest, dependencies.git); err != nil {
+	if err := executionWorkspaceValidateCommittedPackage(root, pack, planPath, manifest, dependencies.git); err != nil {
 		return nil, err
 	}
 	identity, branch, err := executionWorkspaceIdentity(filepath.Base(pack.directory), plan)

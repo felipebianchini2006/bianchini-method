@@ -12,12 +12,11 @@ from typing import Any
 
 import bm_spec_package
 from bm_coherence import DependencyGraph, TaskDependencyGraph
-from bm_project_model import PlanContract, ProjectModel
+from bm_project_model import PLAN_ID, PlanContract, ProjectModel, plan_file_id
 
 
 CHANGE_PREFIX = re.compile(r"^C[0-9]{3}$")
 CHANGE_FULL = re.compile(r"^C[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+)*$")
-PLAN_ID = re.compile(r"^P[0-9]{2,}$")
 TASK_ID = re.compile(r"^T[0-9]{2,}$")
 APPROVED_STATUSES = frozenset({"approved", "approved_with_stale"})
 BLOCKING_SEVERITIES = frozenset({"ERROR", "WARNING"})
@@ -209,26 +208,31 @@ def _load_plans(
 ) -> list[PlanContract]:
     plans_dir = change / "plans"
     children = _children(root, plans_dir, "plans")
-    invalid_plan_files = [
-        child.name
-        for child in children
-        if child.is_file()
-        and child.suffix == ".md"
-        and child.name.startswith("P")
-        and not PLAN_ID.fullmatch(child.stem)
-    ]
-    if invalid_plan_files:
-        _fail(
-            "WAVE_INCOMPLETE",
-            "arquivo de plano com identidade inválida: " + invalid_plan_files[0],
-        )
-    actual_files = [
-        child for child in children if child.is_file() and PLAN_ID.fullmatch(child.stem)
-    ]
+    actual_ids: list[str] = []
+    by_id: dict[str, Path] = {}
+    for child in children:
+        if (
+            not child.is_file()
+            or child.suffix != ".md"
+            or not child.name.startswith("P")
+        ):
+            continue
+        identifier = plan_file_id(child)
+        if identifier is None:
+            _fail(
+                "WAVE_INCOMPLETE",
+                "arquivo de plano com identidade inválida: " + child.name,
+            )
+        if identifier in by_id:
+            _fail(
+                "WAVE_INCOMPLETE",
+                "arquivos de plano duplicam identidade: " + identifier,
+            )
+        actual_ids.append(identifier)
+        by_id[identifier] = child
     phase_ids = [str(phase["id"]) for phase in phases]
-    if [path.stem for path in actual_files] != sorted(phase_ids):
+    if sorted(actual_ids) != sorted(phase_ids):
         _fail("WAVE_INCOMPLETE", "ROADMAP.md diverge dos arquivos de plano")
-    by_id = {path.stem: path for path in actual_files}
     plans: list[PlanContract] = []
     for phase in phases:
         identifier = str(phase["id"])
@@ -237,6 +241,11 @@ def _load_plans(
             contract = PlanContract.from_mapping(raw)
         except ValueError as error:
             _fail("WAVE_INCOMPLETE", f"plano {identifier} inválido: {error}")
+        if contract.id != identifier:
+            _fail(
+                "WAVE_INCOMPLETE",
+                f"arquivo {by_id[identifier].name} diverge do id {contract.id}",
+            )
         expected = {
             "id": contract.id,
             "result": contract.result,
@@ -287,13 +296,38 @@ def _validate_artifact_manifest(
     manifest = coherence.get("artifact_manifest")
     if not isinstance(manifest, dict):
         _fail("WAVE_INCOMPLETE", "pacote aprovado exige artifact_manifest")
+    plan_files: dict[str, str] = {}
+    for relative in manifest:
+        if not isinstance(relative, str) or not relative.startswith("plans/"):
+            continue
+        identifier = plan_file_id(relative.removeprefix("plans/"))
+        if identifier is None or relative.count("/") != 1:
+            _fail(
+                "WAVE_INCOMPLETE",
+                "arquivo de plano com identidade inválida no artifact_manifest: "
+                + relative,
+            )
+        if identifier in plan_files:
+            _fail(
+                "WAVE_INCOMPLETE",
+                "artifact_manifest duplica identidade de plano: " + identifier,
+            )
+        plan_files[identifier] = relative
+    missing_plans = [
+        identifier for identifier in plan_ids if identifier not in plan_files
+    ]
+    if missing_plans:
+        _fail(
+            "WAVE_INCOMPLETE",
+            "artifact_manifest não contém o plano " + missing_plans[0],
+        )
     required = [
         "SCOPE.md",
         "RESEARCH.md",
         "ARCHITECTURE.md",
         "SYSTEM_MODEL.md",
         "ROADMAP.md",
-        *(f"plans/{identifier}.md" for identifier in plan_ids),
+        *(plan_files[identifier] for identifier in plan_ids),
     ]
     if set(manifest) != set(required):
         missing = sorted(set(required) - set(manifest))
