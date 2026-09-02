@@ -45,13 +45,13 @@
         "stdout": {
           "kind": "json",
           "value": {
-            "archive": ".bianchini/archive/import-2026-09-01",
+            "archive": ".bianchini/archive/import-{date}",
             "eligible": true,
             "entries": [
               {
                 "sha256": "b2726c3438a5fc08756c61cca7e7a091826cf966490bee790f39644712d0205a",
                 "source": "docs/living/PROJECT_STATE.md",
-                "target": ".bianchini/archive/import-2026-09-01/legacy/PROJECT_STATE.md"
+                "target": ".bianchini/archive/import-{date}/legacy/PROJECT_STATE.md"
               },
               {
                 "sha256": "72493351300307bdebd861c48adddc91dad738fcb14f6d00810a89643476134f",
@@ -61,17 +61,17 @@
               {
                 "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
                 "source": "artifacts/bianchini/C001/result.json",
-                "target": ".bianchini/archive/import-2026-09-01/artifacts-bianchini/C001/result.json"
+                "target": ".bianchini/archive/import-{date}/artifacts-bianchini/C001/result.json"
               },
               {
                 "sha256": "e613c6eb9bb2a277b39cbfc3aac62585c11a9ee978cd55a7a2623c8f51d87bfd",
                 "source": "docs/design/C001/prototype.html",
-                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/prototype.html"
+                "target": ".bianchini/archive/import-{date}/docs-design/C001/prototype.html"
               },
               {
                 "sha256": "b597b6c57b9cf6c70995555fdfb5f74a17668c8c65b6bc4c15de5508e15310f9",
                 "source": "docs/design/C001/DESIGN_MANIFEST.json",
-                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/DESIGN_MANIFEST.json"
+                "target": ".bianchini/archive/import-{date}/docs-design/C001/DESIGN_MANIFEST.json"
               }
             ]
           }
@@ -111,7 +111,7 @@
               {
                 "sha256": "b2726c3438a5fc08756c61cca7e7a091826cf966490bee790f39644712d0205a",
                 "source": "docs/living/PROJECT_STATE.md",
-                "target": ".bianchini/archive/import-2026-09-01/legacy/PROJECT_STATE.md"
+                "target": ".bianchini/archive/import-{date}/legacy/PROJECT_STATE.md"
               },
               {
                 "sha256": "72493351300307bdebd861c48adddc91dad738fcb14f6d00810a89643476134f",
@@ -121,20 +121,20 @@
               {
                 "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
                 "source": "artifacts/bianchini/C001/result.json",
-                "target": ".bianchini/archive/import-2026-09-01/artifacts-bianchini/C001/result.json"
+                "target": ".bianchini/archive/import-{date}/artifacts-bianchini/C001/result.json"
               },
               {
                 "sha256": "e613c6eb9bb2a277b39cbfc3aac62585c11a9ee978cd55a7a2623c8f51d87bfd",
                 "source": "docs/design/C001/prototype.html",
-                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/prototype.html"
+                "target": ".bianchini/archive/import-{date}/docs-design/C001/prototype.html"
               },
               {
                 "sha256": "b597b6c57b9cf6c70995555fdfb5f74a17668c8c65b6bc4c15de5508e15310f9",
                 "source": "docs/design/C001/DESIGN_MANIFEST.json",
-                "target": ".bianchini/archive/import-2026-09-01/docs-design/C001/DESIGN_MANIFEST.json"
+                "target": ".bianchini/archive/import-{date}/docs-design/C001/DESIGN_MANIFEST.json"
               }
             ],
-            "manifest": "{repo}/.bianchini/archive/import-2026-09-01/MANIFEST.md",
+            "manifest": "{repo}/.bianchini/archive/import-{date}/MANIFEST.md",
             "state": "{repo}/.bianchini/STATE.md",
             "status": "migrated"
           }
@@ -145,7 +145,7 @@
             ".bianchini/.gitignore",
             ".bianchini/PROJECT.md",
             ".bianchini/STATE.md",
-            ".bianchini/archive/import-2026-09-01/MANIFEST.md",
+            ".bianchini/archive/import-{date}/MANIFEST.md",
             ".bianchini/current/ARCHITECTURE.md",
             ".bianchini/current/SYSTEM_MODEL.md",
             ".bianchini/current/specs/MANIFEST.json",
@@ -156,7 +156,7 @@
           "moved": [
             {
               "from": "artifacts/bianchini/C001/result.json",
-              "to": ".bianchini/archive/import-2026-09-01/artifacts-bianchini/C001/result.json"
+              "to": ".bianchini/archive/import-{date}/artifacts-bianchini/C001/result.json"
             },
             {
               "from": "docs/bianchini/current/specs/system.md",
@@ -164,15 +164,15 @@
             },
             {
               "from": "docs/design/C001/DESIGN_MANIFEST.json",
-              "to": ".bianchini/archive/import-2026-09-01/docs-design/C001/DESIGN_MANIFEST.json"
+              "to": ".bianchini/archive/import-{date}/docs-design/C001/DESIGN_MANIFEST.json"
             },
             {
               "from": "docs/design/C001/prototype.html",
-              "to": ".bianchini/archive/import-2026-09-01/docs-design/C001/prototype.html"
+              "to": ".bianchini/archive/import-{date}/docs-design/C001/prototype.html"
             },
             {
               "from": "docs/living/PROJECT_STATE.md",
-              "to": ".bianchini/archive/import-2026-09-01/legacy/PROJECT_STATE.md"
+              "to": ".bianchini/archive/import-{date}/legacy/PROJECT_STATE.md"
             }
           ],
           "preserved": [

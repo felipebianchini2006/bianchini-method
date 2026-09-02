@@ -26,6 +26,7 @@ FIXED_GIT_ENV = {
 ISO_TIMESTAMP = re.compile(
     r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\b"
 )
+MIGRATION_ARCHIVE_DATE = re.compile(r"\bimport-\d{4}-\d{2}-\d{2}\b")
 
 
 def _safe_relative(value: str) -> Path:
@@ -71,7 +72,8 @@ def _replace(value: str, repo: Path, temp: Path) -> str:
 
 
 def _normalize_text(value: str, repo: Path, temp: Path) -> str:
-    return ISO_TIMESTAMP.sub("{timestamp}", _replace(value, repo, temp))
+    normalized = MIGRATION_ARCHIVE_DATE.sub("import-{date}", _replace(value, repo, temp))
+    return ISO_TIMESTAMP.sub("{timestamp}", normalized)
 
 
 def _normalize_json(value: Any, repo: Path, temp: Path) -> Any:
@@ -302,7 +304,7 @@ def _check_expected(
     if actual_stderr != expected["stderr"]:
         errors.append(f"stderr divergiu: {actual_stderr!r}")
 
-    mutation = _mutation(before, after)
+    mutation = _normalize_json(_mutation(before, after), repo, temp)
     expected_mutation = expected["mutations"]
     for key in ("created", "altered", "deleted", "moved"):
         if mutation[key] != expected_mutation.get(key, []):
