@@ -155,6 +155,15 @@ func (model projectModel) digest() string {
 	return sha256Bytes(encoded)
 }
 
+func (model projectModel) hasComponent(identifier string) bool {
+	for _, section := range modelCollections {
+		if model.sections[section][identifier] != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (model projectModel) differences(expected projectModel) map[string]any {
 	result := map[string]any{}
 	for _, section := range modelCollections {

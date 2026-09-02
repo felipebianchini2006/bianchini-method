@@ -174,8 +174,7 @@ func executionWorkspaceCreate(root, change, plan, target string, dependencies ex
 		return nil, workflowError("MODEL_MISMATCH", err.Error())
 	}
 	missingContracts := missingExecutionValues(consumes, func(value string) bool {
-		_, exists := effective.sections["contracts"][value]
-		return exists
+		return effective.hasComponent(value)
 	})
 	if len(missingContracts) > 0 {
 		return nil, workflowError("MISSING_PROVIDER", "contratos consumidos ainda ausentes: "+strings.Join(missingContracts, ", "))

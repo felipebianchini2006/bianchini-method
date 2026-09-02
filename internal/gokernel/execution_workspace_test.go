@@ -35,7 +35,7 @@ func executionWorkspacePlanFixture(dependsOn, consumes []string) map[string]any 
 	}
 }
 
-func executionWorkspaceRepository(t *testing.T, plan map[string]any) (string, string) {
+func executionWorkspaceRepository(t *testing.T, plan map[string]any, currentDeltas ...map[string]any) (string, string) {
 	t.Helper()
 	repo := filepath.Join(t.TempDir(), "repo")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
@@ -50,6 +50,24 @@ func executionWorkspaceRepository(t *testing.T, plan map[string]any) (string, st
 	executionWorkspaceGit(t, repo, "config", "user.email", "fixture@example.invalid")
 	if _, err := initializeModelWorkspace(repo); err != nil {
 		t.Fatal(err)
+	}
+	for _, delta := range currentDeltas {
+		workspace := newMethodWorkspace(repo)
+		current, err := loadProjectModel(workspace.currentMod)
+		if err != nil {
+			t.Fatal(err)
+		}
+		updated, err := current.applyDelta(delta)
+		if err != nil {
+			t.Fatal(err)
+		}
+		document, err := frontmatterDocument(updated.mapping(), "# Modelo atual", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(workspace.currentMod, document, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	created, err := createModelChange(repo, "health journey")
 	if err != nil {
@@ -109,6 +127,23 @@ func executionWorkspaceRepository(t *testing.T, plan map[string]any) (string, st
 	executionWorkspaceGit(t, repo, "add", ".")
 	executionWorkspaceGit(t, repo, "commit", "-q", "-m", "approved package")
 	return repo, change
+}
+
+func TestExecutionWorkspaceCreateAcceptsConsumedEffectiveModelComponent(t *testing.T) {
+	plan := executionWorkspacePlanFixture(nil, []string{"account_session"})
+	currentDelta := map[string]any{
+		"interfaces": map[string]any{
+			"add": []any{map[string]any{"id": "account_session", "provider": "identity_access"}},
+		},
+	}
+	repo, change := executionWorkspaceRepository(t, plan, currentDelta)
+	target := filepath.Join(filepath.Dir(repo), "execution-worktree")
+
+	if _, err := runExecutionWorkspace([]string{
+		"create", "--repo", repo, "--change", change, "--plan", "P01", "--target", target,
+	}); err != nil {
+		t.Fatalf("consume de interface efetiva deveria permitir workspace: %v", err)
+	}
 }
 
 func executionWorkspaceResult(t *testing.T, value any) map[string]any {

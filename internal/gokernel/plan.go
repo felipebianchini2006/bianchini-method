@@ -273,7 +273,7 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 	}
 	missingContracts := []string{}
 	for _, contract := range normalizedPlanStrings(plan, "consumes") {
-		if effectiveBefore.sections["contracts"][contract] == nil {
+		if !effectiveBefore.hasComponent(contract) {
 			missingContracts = append(missingContracts, contract)
 		}
 	}

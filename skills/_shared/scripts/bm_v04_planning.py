@@ -1370,7 +1370,7 @@ def plan_complete(
             "delta entregue diverge do plano; execute impact analyze e revalide o pacote",
         )
     effective_before = _effective_model(current, plans, results)
-    missing_contracts = sorted(set(plan.consumes) - set(effective_before.contracts))
+    missing_contracts = sorted(set(plan.consumes) - effective_before.component_ids())
     if missing_contracts:
         raise PlanningError(
             "MISSING_PROVIDER",
@@ -1497,7 +1497,7 @@ def execution_workspace_create(
             f"dependências ainda não concluídas: {', '.join(missing_dependencies)}",
         )
     effective = _effective_model(current, plans, results)
-    missing_contracts = sorted(set(contract.consumes) - set(effective.contracts))
+    missing_contracts = sorted(set(contract.consumes) - effective.component_ids())
     if missing_contracts:
         raise PlanningError(
             "MISSING_PROVIDER",
