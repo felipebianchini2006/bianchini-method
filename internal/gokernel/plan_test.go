@@ -95,3 +95,44 @@ func TestPlanCompleteSchemaOneWritesResultAndPendingCloseState(t *testing.T) {
 		t.Fatalf("state=%#v", state)
 	}
 }
+
+func TestPlanReopenRestoresExecutableStateAndKeepsAudit(t *testing.T) {
+	repo, change := executionWorkspaceRepository(t, executionWorkspacePlanFixture(nil, nil))
+	directory := filepath.Join(repo, ".bianchini", "changes", change)
+	result := map[string]any{"schema_version": 1, "change": change, "plan": "P01", "status": "completed", "actual_delta": map[string]any{}}
+	document, err := frontmatterDocument(result, "# Resultado P01\n\nResultado anterior.", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultPath := filepath.Join(directory, "results", "P01.md")
+	if err := os.WriteFile(resultPath, document, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	workspace := newMethodWorkspace(repo)
+	state, err := workspace.readState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state["status"], state["current_unit"] = "pending_close", nil
+	if err := workspace.writeState(state, "# Estado atual"); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := reopenPlan(repo, change, "P01", "", "código mudou depois da prova")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stateString(reopened["status"]) != "reopened" {
+		t.Fatalf("reopened=%#v", reopened)
+	}
+	if _, err := os.Stat(resultPath); !os.IsNotExist(err) {
+		t.Fatalf("resultado deveria sair do estado concluído: %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(directory, "results", "reopened"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("audit entries=%d err=%v", len(entries), err)
+	}
+	state, err = workspace.readState()
+	if err != nil || stateString(state["status"]) != "approved" || stateString(state["current_unit"]) != "P01" {
+		t.Fatalf("state=%#v err=%v", state, err)
+	}
+}

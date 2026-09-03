@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "surface": "verify.review",
+  "argv": ["verify", "review", "--repo", "{repo}", "--change", "C001", "--scope", "plan", "--plan", "P01", "--reviewer", "reviewer", "--verdict", "approved", "--proof", "proof-00000000000000000000000000000000"],
+  "initial_tree": {"keep.txt": {"text": "preservar\n"}},
+  "expected": {
+    "exit_code": 3,
+    "stdout": {"kind": "empty"},
+    "stderr": "DIRTY_WORKSPACE: o diretório não é uma raiz Git\n",
+    "mutations": {"created": [], "altered": [], "deleted": [], "moved": [], "preserved": ["keep.txt"]}
+  }
+}

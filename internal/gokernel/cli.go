@@ -63,6 +63,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runImpact(args[1:])
 	case "plan":
 		result, err = runPlan(args[1:])
+	case "verify":
+		result, err = runVerify(args[1:])
 	case "change-policy":
 		result, err = runChangePolicy(args[1:])
 	case "policy":
@@ -200,7 +202,7 @@ var actionCommandSpecs = map[string]actionCommandSpec{
 		actions: []string{"verify"}, valueFlags: flagSet("--state", "--root", "--plan", "--risk-seam", "--tool", "--command", "--report", "--revision", "--classifications", "--output"), booleanFlags: flagSet(),
 	},
 	"plan": {
-		actions: []string{"complete"}, valueFlags: flagSet("--repo", "--change", "--plan", "--task", "--context-pack", "--actual-delta", "--result", "--verification", "--completed-task"), booleanFlags: flagSet(),
+		actions: []string{"complete", "reopen"}, valueFlags: flagSet("--repo", "--change", "--plan", "--task", "--context-pack", "--actual-delta", "--result", "--verification", "--proof", "--review", "--reason", "--completed-task"), booleanFlags: flagSet(),
 	},
 	"planning-check": {
 		actions: []string{"record"}, valueFlags: flagSet("--state", "--root", "--report"), booleanFlags: flagSet(),
@@ -218,7 +220,12 @@ var actionCommandSpecs = map[string]actionCommandSpec{
 		actions: []string{"record", "summary"}, valueFlags: flagSet("--state", "--root", "--plan", "--phase", "--at", "--input-tokens", "--output-tokens", "--duration-ms", "--fix-rounds", "--gate-failures", "--homologation-bugs"), booleanFlags: flagSet(),
 	},
 	"workspace": {
-		actions: []string{"create", "check", "locate", "resume"}, valueFlags: flagSet("--repo", "--plan", "--change", "--target"), booleanFlags: flagSet(),
+		actions: []string{"create", "check", "locate", "resume", "finish"}, valueFlags: flagSet("--repo", "--plan", "--change", "--target"), booleanFlags: flagSet(),
+	},
+	"verify": {
+		actions:      []string{"task", "plan", "release", "review", "status"},
+		valueFlags:   flagSet("--repo", "--change", "--plan", "--task", "--context-pack", "--evidence", "--retry-reason", "--scope", "--reviewer", "--verdict", "--proof", "--finding", "--build", "--checksum", "--delivery"),
+		booleanFlags: flagSet(),
 	},
 }
 

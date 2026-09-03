@@ -59,13 +59,13 @@
         "unit": "C001/P01/T01",
         "before_bytes": 35309,
         "before_files": 3,
-        "skill_bytes_after": 10150,
+        "skill_bytes_after": 10156,
         "pack_bytes": 5924,
-        "after_bytes": 16074,
+        "after_bytes": 16080,
         "after_files": 2,
         "pack_sources": 15,
-        "reduction_bytes": 19235,
-        "reduction_percent": 54.48
+        "reduction_bytes": 19229,
+        "reduction_percent": 54.46
       },
       {
         "skill": "executar-direto",
@@ -98,26 +98,26 @@
         "unit": "RC:build-a",
         "before_bytes": 30528,
         "before_files": 2,
-        "skill_bytes_after": 10791,
+        "skill_bytes_after": 11082,
         "pack_bytes": 1985,
-        "after_bytes": 12776,
+        "after_bytes": 13067,
         "after_files": 2,
         "pack_sources": 3,
-        "reduction_bytes": 17752,
-        "reduction_percent": 58.15
+        "reduction_bytes": 17461,
+        "reduction_percent": 57.2
       },
       {
         "skill": "status-projeto",
         "unit": "C001/P01",
         "before_bytes": 22686,
         "before_files": 2,
-        "skill_bytes_after": 2452,
+        "skill_bytes_after": 2520,
         "pack_bytes": 6159,
-        "after_bytes": 8611,
+        "after_bytes": 8679,
         "after_files": 2,
         "pack_sources": 14,
-        "reduction_bytes": 14075,
-        "reduction_percent": 62.04
+        "reduction_bytes": 14007,
+        "reduction_percent": 61.74
       }
     ]
   },

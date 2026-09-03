@@ -92,7 +92,7 @@ TRANSITIONS: dict[str, dict[str, set[str]]] = {
         "stop": {"stopped"},
     },
     "parked": {"stop": {"stopped"}},
-    "completed": {},
+    "completed": {"reopen": {"awaiting_review"}},
     "stopped": {},
 }
 VERIFICATION_TEST_ROOTS = {
@@ -126,7 +126,6 @@ PROOF_FIELDS = (
     "reachable_scenario",
 )
 PROOF_STORE_VERSION = 1
-MAX_INITIAL_BLOCKERS = 3
 PROOF_ID = re.compile(r"^proof-[0-9a-f]{32}$")
 
 
@@ -1879,15 +1878,6 @@ def command_freeze(args: argparse.Namespace) -> dict[str, Any]:
                         "deferred_at": now(),
                     }
                 )
-            elif len(accepted_root_causes) >= MAX_INITIAL_BLOCKERS:
-                hardening.append(
-                    {
-                        **sanitized_hardening(finding),
-                        "disposition": "hardening",
-                        "deferred_reason": "limite de três blockers iniciais consolidados atingido",
-                        "deferred_at": now(),
-                    }
-                )
             else:
                 finding["root_cause"] = root_cause
                 accepted_root_causes[root_cause_key] = finding["id"]
@@ -2397,6 +2387,40 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
+    path = Path(args.sidecar)
+    state, recovered, migrated = load_sidecar(path)
+    if state["phase"] != "completed":
+        raise GuardError("reopen exige unidade completed")
+    if not nonempty(args.reason):
+        raise GuardError("reopen exige reason")
+    root = Path(state["repository_root"])
+    head = current_head(root)
+    if head == state["last_review_head"]:
+        raise GuardError("reopen exige mudança posterior ao HEAD revisado")
+    base, head = verify_delta(
+        root, state["last_review_head"], head, state["last_review_head"]
+    )
+    transition(state, "reopen", "awaiting_review")
+    state["completed_at"] = None
+    state["gates"] = {}
+    state["pending_delta"] = {
+        "kind": "fix",
+        "base": base,
+        "head": head,
+        "submitted_at": now(),
+    }
+    event(state, "reopened", reason=args.reason.strip(), head=head)
+    write_atomic(path, state)
+    return {
+        "phase": state["phase"],
+        "next_action": "review_delta",
+        "recovered": recovered,
+        "migrated": migrated,
+        "state": state,
+    }
+
+
 def command_status(args: argparse.Namespace) -> dict[str, Any]:
     state, recovered, migrated = load_sidecar(Path(args.sidecar))
     result = {
@@ -2494,6 +2518,11 @@ def parser() -> argparse.ArgumentParser:
     decision.add_argument("--kind", choices=("internal", "local_block"), required=True)
     decision.add_argument("--summary", required=True)
     decision.set_defaults(handler=command_decision)
+
+    reopen = subparsers.add_parser("reopen")
+    reopen.add_argument("--sidecar", required=True)
+    reopen.add_argument("--reason", required=True)
+    reopen.set_defaults(handler=command_reopen)
 
     for name, handler in (
         ("complete", command_complete),

@@ -38,7 +38,7 @@ func runExecutionWorkspaceWithDependencies(args []string, dependencies execution
 		return nil, argparseError("the following arguments are required: action")
 	}
 	action := args[0]
-	if !oneOf(action, "create", "check", "locate", "resume") {
+	if !oneOf(action, "create", "check", "locate", "resume", "finish") {
 		return nil, argparseError(fmt.Sprintf("argument action: invalid choice: '%s'", action))
 	}
 	flags, err := parseFlags(args[1:], map[string]bool{
@@ -59,20 +59,90 @@ func runExecutionWorkspaceWithDependencies(args []string, dependencies execution
 		return nil, err
 	}
 	change, plan := lastValue(flags, "--change"), lastValue(flags, "--plan")
-	if action != "check" && (change == "" || plan == "") {
+	if action != "check" && action != "finish" && (change == "" || plan == "") {
 		if action == "create" {
 			return nil, fmt.Errorf("--change e --plan são obrigatórios para criar workspace 0.4")
 		}
 		return nil, fmt.Errorf("--change e --plan são obrigatórios para %s no método 0.4", action)
+	}
+	if action == "finish" && change == "" {
+		return nil, fmt.Errorf("--change é obrigatório para finalizar workspaces")
 	}
 	switch action {
 	case "create":
 		return executionWorkspaceCreate(root, change, plan, lastValue(flags, "--target"), dependencies)
 	case "check":
 		return executionWorkspaceCheck(root, dependencies.git)
+	case "finish":
+		return executionWorkspaceFinish(root, change, plan, dependencies.git)
 	default:
 		return executionWorkspaceLocate(root, change, plan, action == "resume", dependencies.git)
 	}
+}
+
+func executionWorkspaceFinish(root, change, plan string, git func(string, ...string) (string, error)) (map[string]any, error) {
+	prefix := strings.SplitN(change, "-", 2)[0]
+	if !executionChangePrefix.MatchString(prefix) {
+		return nil, workflowError("MODEL_MISMATCH", "change exige C seguido de três dígitos")
+	}
+	wantedPrefix := "bm/" + strings.ToLower(prefix) + "-"
+	wantedBranch := ""
+	if plan != "" {
+		_, branch, err := executionWorkspaceIdentity(change, plan)
+		if err != nil {
+			return nil, err
+		}
+		wantedBranch = branch
+	}
+	output, err := git(root, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, executionWorkspaceGitError(err)
+	}
+	type candidate struct{ path, branch string }
+	candidates := []candidate{}
+	for _, record := range parseExecutionWorktrees(output) {
+		branch := strings.TrimPrefix(record["branch"], "refs/heads/")
+		if branch == "" || branch == record["branch"] || !strings.HasPrefix(branch, wantedPrefix) || wantedBranch != "" && branch != wantedBranch {
+			continue
+		}
+		path := filepath.Clean(record["worktree"])
+		if path == root {
+			continue
+		}
+		metadataPaths, _ := filepath.Glob(filepath.Join(path, ".bianchini", ".runtime", "workspace-*.json"))
+		if len(metadataPaths) != 1 {
+			return nil, workflowError("DIRTY_WORKSPACE", "workspace "+path+" não possui identidade confiável")
+		}
+		metadata, metadataErr := readExecutionWorkspaceMetadata(metadataPaths[0])
+		if metadataErr != nil || stateString(metadata["source_repo"]) != root || strings.SplitN(stateString(metadata["change"]), "-", 2)[0] != prefix || stateString(metadata["branch"]) != branch {
+			return nil, workflowError("DIRTY_WORKSPACE", "workspace "+path+" possui identidade divergente")
+		}
+		status, statusErr := git(path, "status", "--porcelain")
+		if statusErr != nil || status != "" {
+			return nil, workflowError("DIRTY_WORKSPACE", "workspace possui alterações não integradas: "+path)
+		}
+		if _, ancestorErr := git(root, "merge-base", "--is-ancestor", branch, "HEAD"); ancestorErr != nil {
+			return nil, workflowError("UNMERGED_WORKSPACE", "branch ainda não está integrada no HEAD: "+branch)
+		}
+		candidates = append(candidates, candidate{path: path, branch: branch})
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].branch < candidates[j].branch })
+	removedWorktrees, removedBranches := []string{}, []string{}
+	for _, item := range candidates {
+		if _, err := git(root, "worktree", "remove", item.path); err != nil {
+			return nil, executionWorkspaceGitError(err)
+		}
+		removedWorktrees = append(removedWorktrees, item.path)
+		if _, err := git(root, "branch", "-d", item.branch); err != nil {
+			return nil, executionWorkspaceGitError(err)
+		}
+		removedBranches = append(removedBranches, item.branch)
+	}
+	_, _ = git(root, "worktree", "prune")
+	return map[string]any{
+		"change": change, "status": "clean", "removed_worktrees": removedWorktrees,
+		"removed_branches": removedBranches, "remaining": 0,
+	}, nil
 }
 
 func executionWorkspaceRepositoryRoot(repo string, git func(string, ...string) (string, error)) (string, error) {

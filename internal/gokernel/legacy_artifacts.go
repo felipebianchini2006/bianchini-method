@@ -107,7 +107,27 @@ func legacyWriteTaskBrief(planValue, task, tasks, group, outputValue, stateValue
 	labels := make([]string, 0)
 	sections := make([]string, 0)
 	title := group
-	if group != "" {
+	typedPlan, typed, err := typedTaskBriefPlan(plan, contentBytes)
+	if err != nil {
+		return nil, err
+	}
+	if typed {
+		if group != "" {
+			return nil, fmt.Errorf("--group não é suportado em plano tipado; selecione os IDs Txx declarados")
+		}
+		labels, err = legacyParseTaskSelector(tasks + task)
+		if err != nil {
+			return nil, err
+		}
+		labels, sections, err = typedTaskBriefSections(typedPlan, labels)
+		if err != nil {
+			return nil, err
+		}
+		title = strings.Join(labels, ", ")
+		if len(labels) > 1 && stateString(typedPlan.value["execution"]) != "grouped" {
+			return nil, fmt.Errorf("brief com várias tarefas exige execution grouped no contrato tipado")
+		}
+	} else if group != "" {
 		labels = []string{group}
 		section, extractErr := legacyExtractGroup(content, group)
 		if extractErr != nil {
@@ -197,6 +217,57 @@ func legacyWriteTaskBrief(planValue, task, tasks, group, outputValue, stateValue
 		"group_digest": groupDigest, "tasks": labels, "unit_digests": unitDigests,
 		"hydrated": hydrate, "context_digest": contextDigest,
 	}, nil
+}
+
+func typedTaskBriefPlan(path string, content []byte) (planContract, bool, error) {
+	if frontmatterPattern.FindSubmatch(content) == nil {
+		return planContract{}, false, nil
+	}
+	metadata, err := readStructuredFrontmatter(path)
+	if err != nil {
+		return planContract{}, false, err
+	}
+	if stateInt(metadata["schema_version"]) != 2 {
+		return planContract{}, false, nil
+	}
+	plan, err := parsePlanContract(metadata)
+	if err != nil {
+		return planContract{}, false, fmt.Errorf("contrato tipado inválido: %w", err)
+	}
+	return plan, true, nil
+}
+
+func typedTaskBriefSections(plan planContract, selectors []string) ([]string, []string, error) {
+	tasks := map[string]map[string]any{}
+	for _, task := range planTasks(plan) {
+		tasks[stateString(task["id"])] = task
+	}
+	labels := make([]string, 0, len(selectors))
+	sections := make([]string, 0, len(selectors))
+	seen := map[string]bool{}
+	for _, selector := range selectors {
+		identifier := selector
+		if _, exists := tasks[identifier]; !exists {
+			if number, err := strconv.Atoi(selector); err == nil {
+				identifier = fmt.Sprintf("T%02d", number)
+			}
+		}
+		task := tasks[identifier]
+		if task == nil {
+			return nil, nil, fmt.Errorf("tarefa %s não encontrada no contrato tipado %s", selector, plan.id)
+		}
+		if seen[identifier] {
+			continue
+		}
+		seen[identifier] = true
+		canonical, err := json.MarshalIndent(canonicalTaskMapping(task), "", "  ")
+		if err != nil {
+			return nil, nil, fmt.Errorf("tarefa %s inválida", identifier)
+		}
+		labels = append(labels, identifier)
+		sections = append(sections, "### Tarefa "+identifier+" — contrato canônico\n\n```json\n"+string(canonical)+"\n```\n")
+	}
+	return labels, sections, nil
 }
 
 func legacyParseTaskSelector(selector string) ([]string, error) {

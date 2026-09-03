@@ -95,13 +95,17 @@ tasks:
     action: <mudança concreta no seam público>
     verify:
       kind: command | procedure
-      run: <comando ou procedimento determinístico>
+      argv: [<executável>, <arg1>, <arg2>]
+      cwd: .
+      timeout_seconds: 300
       proves: <o que a evidência demonstra>
     done: <condição objetiva de conclusão>
     risk_seam: <fronteira estável de risco>
 ```
 
 Cada `Txx` é uma unidade executável e verificável, não uma nota em prosa. A tarefa deve caber no contexto de execução, indicar arquivos confinados ao repositório, cobrir ao menos um ID rastreável do `SCOPE.md` e declarar suas dependências. Caminho absoluto, `..`, `./`, barra invertida e `.planning/` são proibidos.
+
+Para `kind: command`, use exatamente um de `argv` ou `run`; `argv` é preferido e não passa por shell. Para `kind: procedure`, use `run` como descrição determinística, não declare `argv` e planeje o artefato real que será entregue como evidência. `cwd` é relativo ao repositório e `timeout_seconds` fica entre 1 e 3600.
 
 O modo define a granularidade obrigatória: `grouped → plan_gate`, `slice → per_slice`, `strict → per_task`. O CLI rejeita combinações incompatíveis, campos extras, IDs duplicados, dependência futura/cíclica, requisito sem tarefa e referência de módulo/interface/dado ausente no modelo.
 

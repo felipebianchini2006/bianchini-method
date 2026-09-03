@@ -2234,10 +2234,11 @@ class SkillBehaviorContracts(unittest.TestCase):
         self.assertIn("SCOPE.md` selado", method)
         self.assertIn("ready_for_sdd", method)
 
-    def test_executor_has_no_branch_fallback_or_task_minimum(self) -> None:
+    def test_executor_uses_primary_checkout_without_task_minimum(self) -> None:
         executor = read(SKILLS["executar-plano"])
         planning = read(SKILLS["sdd-planning"])
-        self.assertIn("Não existe fallback para editar na branch principal", executor)
+        self.assertIn("No uso solo, trabalhe no checkout primário", executor)
+        self.assertIn("não crie branch ou worktree intermediário", executor)
         self.assertIn("entrega rejeitável ou verificável", planning)
         self.assertNotIn("4–10 tarefas", planning)
 

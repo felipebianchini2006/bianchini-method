@@ -5,8 +5,8 @@
 - Schema do registry: `1`
 - Contrato: `0.4`
 - Base congelada: `7c9fa23f524623f3360ebae579048e1765095220`
-- Comandos do parser: `31`
-- Superfícies do parser: `58`
+- Comandos do parser: `32`
+- Superfícies do parser: `65`
 
 ## Convenções
 
@@ -47,7 +47,12 @@
 ### `bm plan`
 
 - Geração: `core_0_4`
-- Parser: `action;choices=complete;required | --repo;type=Path;default="$CWD" | --change;required | --plan;required | --task;default=null | --context-pack;type=Path;default=null | --actual-delta;type=Path;default=null | --result;required | --verification;action=append;default=[] | --completed-task;action=append;default=[]`
+- Parser: `action;choices=complete,reopen;required | --repo;type=Path;default="$CWD" | --change;required | --plan;required | --task;default=null | --context-pack;type=Path;default=null | --actual-delta;type=Path;default=null | --result;default=null | --verification;action=append;default=[] | --proof;action=append;default=[] | --review;default=null | --reason;default=null | --completed-task;action=append;default=[]`
+
+### `bm verify`
+
+- Geração: `core_0_4`
+- Parser: `action;choices=task,plan,release,review,status;required | --repo;type=Path;default="$CWD" | --change;default=null | --plan;default=null | --task;default=null | --context-pack;type=Path;default=null | --evidence;type=Path;default=null | --retry-reason;default=null | --scope;choices=task,plan,release;default=null | --reviewer;default=null | --verdict;choices=approved,changes_requested;default=null | --proof;action=append;default=[] | --finding;action=append;default=[] | --build;default=null | --checksum;default=null | --delivery;choices=ready,not_applicable;default=null`
 
 ### `bm context`
 
@@ -112,7 +117,7 @@
 ### `bm workspace`
 
 - Geração: `core_0_4`
-- Parser: `action;choices=create,check,locate,resume;required | --repo;type=Path;default="$CWD" | --plan;default=null | --change;default=null | --target;type=Path;default=null`
+- Parser: `action;choices=create,check,locate,resume,finish;required | --repo;type=Path;default="$CWD" | --plan;default=null | --change;default=null | --target;type=Path;default=null`
 
 ### `bm task-brief`
 
@@ -183,7 +188,13 @@
 | `coherence.check` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/COHERENCE.md | v04_planning.coherence_check | skills/_shared/scripts/bm_v04_planning.py | skills/sdd-planning/SKILL.md | coherence-check<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_change_model_coherence_and_impact_are_integrated |
 | `coherence.approve` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/COHERENCE.md<br>.bianchini/STATE.md | v04_planning.coherence_approve | skills/_shared/scripts/bm_v04_planning.py | skills/sdd-planning/SKILL.md | coherence-approve<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_typed_planning_binds_scope_roadmap_tasks_semantic_review_and_package |
 | `impact.analyze` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/COHERENCE.md<br>.bianchini/STATE.md | v04_planning.impact_analyze | skills/_shared/scripts/bm_v04_planning.py | skills/executar-plano/SKILL.md<br>skills/sdd-planning/SKILL.md | impact-analyze<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_change_model_coherence_and_impact_are_integrated |
-| `plan.complete` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/<plan>.md<br>.bianchini/changes/<change>/results/tasks/<plan>/<task>.md<br>.bianchini/STATE.md | v04_planning.plan_complete<br>v04_planning.task_complete | skills/_shared/scripts/bm_v04_planning.py | skills/executar-plano/SKILL.md | plan-complete<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_typed_plan_completion_requires_every_task<br>tests/test_next_wave.py::test_public_task_completion_verifies_pack_and_advances_wave |
+| `plan.complete` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/<plan>.md<br>.bianchini/changes/<change>/results/tasks/<plan>/<task>.md<br>.bianchini/STATE.md | v04_planning.plan_complete<br>v04_planning.task_complete | skills/_shared/scripts/bm_v04_planning.py | skills/executar-plano/SKILL.md | plan-complete<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_typed_plan_completion_requires_every_task<br>tests/test_next_wave.py::test_public_task_completion_verifies_pack_and_advances_wave<br>internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation |
+| `plan.reopen` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/reopened/**<br>.bianchini/changes/<change>/results/<plan>.md ou tarefa selecionada<br>.bianchini/STATE.md | v04.require_workspace | skills/_shared/scripts/bm_v04_workflows.py | skills/executar-plano/SKILL.md | plan-reopen<br>internal/gokernel/plan_test.go::TestPlanReopenRestoresExecutableStateAndKeepsAudit |
+| `verify.task` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/proofs/** | v04.require_workspace | skills/_shared/scripts/bm_v04_workflows.py | skills/executar-plano/SKILL.md | verify-task<br>internal/gokernel/verification_test.go::TestVerifyTaskExecutesStructuredCommandAndReusesPassingProof |
+| `verify.plan` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/proofs/** | v04.require_workspace | skills/_shared/scripts/bm_v04_workflows.py | skills/executar-plano/SKILL.md | verify-plan<br>internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation |
+| `verify.release` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/proofs/**<br>.bianchini/changes/<change>/results/RELEASE.md | v04.require_workspace | skills/_shared/scripts/bm_v04_workflows.py | skills/executar-plano/SKILL.md<br>skills/homologar-sistema/SKILL.md | verify-release<br>internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation |
+| `verify.review` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/changes/<change>/results/reviews/**<br>.bianchini/changes/<change>/results/RELEASE.md quando scope=release | v04.require_workspace | skills/_shared/scripts/bm_v04_workflows.py | skills/executar-plano/SKILL.md | verify-review<br>internal/gokernel/verification_test.go::TestProofAndReviewBecomeStaleAfterCodeChanges |
+| `verify.status` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04.require_workspace | skills/_shared/scripts/bm_v04_workflows.py | skills/executar-plano/SKILL.md<br>skills/status-projeto/SKILL.md | verify-status<br>internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation |
 | `context.pack` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | .bianchini/.runtime/context/** | compile_context_pack | skills/_shared/scripts/bm_context.py | skills/corrigir-bug/SKILL.md<br>skills/executar-direto/SKILL.md<br>skills/executar-plano/SKILL.md<br>skills/homologar-sistema/SKILL.md<br>skills/status-projeto/SKILL.md | context-pack<br>success-context<br>tests/test_context_cli.py::test_context_pack_and_verify_are_public_and_json_observable |
 | `context.verify` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | verify_context_pack | skills/_shared/scripts/bm_context.py | — | context-verify<br>success-context<br>tests/test_context_cli.py::test_context_pack_and_verify_are_public_and_json_observable |
 | `adapter.render` | operational | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | render_adapter | skills/_shared/scripts/bm_host_adapters.py | — | adapter-render<br>tests/test_phase3_cli.py::test_adapter_render_and_explicit_install_are_public |
@@ -214,6 +225,7 @@
 | `workspace.check` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04_planning.execution_workspace_check | skills/_shared/scripts/bm_v04_planning.py | codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md | workspace-check<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_execution_workspace_uses_change_and_plan_identity |
 | `workspace.locate` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04_planning.execution_workspace_locate | skills/_shared/scripts/bm_v04_planning.py | — | workspace-locate<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_execution_workspace_uses_change_and_plan_identity |
 | `workspace.resume` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | nenhuma | v04_planning.execution_workspace_locate | skills/_shared/scripts/bm_v04_planning.py | codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md | workspace-resume<br>success-full-lifecycle<br>tests/test_method_v04_cli.py::test_execution_workspace_uses_change_and_plan_identity |
+| `workspace.finish` | core_0_4 | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | worktrees bm/<change>-<plan> limpos e integrados<br>branches locais bm/<change>-<plan> integradas | v04.require_workspace | skills/_shared/scripts/bm_v04_workflows.py | skills/executar-plano/SKILL.md | workspace-finish<br>internal/gokernel/execution_workspace_test.go::TestExecutionWorkspaceFinishRemovesOnlyCleanMergedWorkspaceAndBranch |
 | `task-brief` | companion | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | arquivo informado por --output | write_task_brief | skills/_shared/scripts/bm.py | codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md | task-brief<br>success-legacy-operations<br>tests/test_context_efficiency.py::test_hydrated_task_brief_contains_only_referenced_context |
 | `spec-diff` | operational | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | arquivo informado por --output | spec_diff | skills/_shared/scripts/bm_spec_diff.py | — | spec-diff-created-output<br>tests/test_context_efficiency.py::test_spec_diff_derives_added_modified_and_removed_requirements |
 | `mutation-evidence.verify` | operational | JSON object indentado, chaves ordenadas, UTF-8 e newline final | 0, 2, 3, 4 | arquivo informado por --output | mutation_evidence_verify | skills/_shared/scripts/bm_mutation.py | — | mutation-evidence-verify<br>success-mutation-evidence<br>tests/test_context_efficiency.py::test_mutation_evidence_accepts_classified_survivors_and_ignores_score |

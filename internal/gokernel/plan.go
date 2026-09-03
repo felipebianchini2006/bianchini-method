@@ -18,19 +18,25 @@ func runPlan(args []string) (any, error) {
 	if len(args) == 0 {
 		return nil, argparseError("the following arguments are required: action")
 	}
-	if args[0] != "complete" {
+	if !oneOf(args[0], "complete", "reopen") {
 		return nil, argparseError(fmt.Sprintf("argument action: invalid choice: '%s'", args[0]))
 	}
 	flags, err := parseFlags(args[1:], map[string]bool{
 		"--repo": true, "--change": true, "--plan": true, "--task": true,
 		"--context-pack": true, "--actual-delta": true, "--result": true,
-		"--verification": true, "--completed-task": true,
+		"--verification": true, "--proof": true, "--review": true, "--reason": true, "--completed-task": true,
 	}, map[string]bool{})
 	if err != nil {
 		return nil, err
 	}
 	missing := []string{}
-	for _, flag := range []string{"--change", "--plan", "--result"} {
+	required := []string{"--change", "--plan"}
+	if args[0] == "complete" {
+		required = append(required, "--result")
+	} else {
+		required = append(required, "--reason")
+	}
+	for _, flag := range required {
 		if lastValue(flags, flag) == "" {
 			missing = append(missing, flag)
 		}
@@ -45,6 +51,9 @@ func runPlan(args []string) (any, error) {
 			return nil, err
 		}
 	}
+	if args[0] == "reopen" {
+		return reopenPlan(repo, lastValue(flags, "--change"), lastValue(flags, "--plan"), lastValue(flags, "--task"), lastValue(flags, "--reason"))
+	}
 	task := lastValue(flags, "--task")
 	pack := lastValue(flags, "--context-pack")
 	delta := lastValue(flags, "--actual-delta")
@@ -55,7 +64,7 @@ func runPlan(args []string) (any, error) {
 		if delta != "" || len(flags.values["--completed-task"]) > 0 {
 			return nil, userError("plan complete --task não aceita --actual-delta ou --completed-task")
 		}
-		return taskComplete(repo, lastValue(flags, "--change"), lastValue(flags, "--plan"), task, pack, lastValue(flags, "--result"), flags.values["--verification"])
+		return taskComplete(repo, lastValue(flags, "--change"), lastValue(flags, "--plan"), task, pack, lastValue(flags, "--result"), flags.values["--verification"], flags.values["--proof"], lastValue(flags, "--review"))
 	}
 	if delta == "" {
 		return nil, userError("plan complete exige --actual-delta")
@@ -63,7 +72,7 @@ func runPlan(args []string) (any, error) {
 	if pack != "" {
 		return nil, userError("plan complete sem --task não aceita --context-pack")
 	}
-	return completePlan(repo, lastValue(flags, "--change"), lastValue(flags, "--plan"), delta, lastValue(flags, "--result"), flags.values["--verification"], flags.values["--completed-task"])
+	return completePlan(repo, lastValue(flags, "--change"), lastValue(flags, "--plan"), delta, lastValue(flags, "--result"), flags.values["--verification"], flags.values["--proof"], lastValue(flags, "--review"), flags.values["--completed-task"])
 }
 
 func approvedPlanPackage(repo, change string) (coherencePackage, map[string]any, error) {
@@ -94,7 +103,7 @@ func planByID(plans []planContract, identifier string) (planContract, error) {
 	return matches[0], nil
 }
 
-func taskComplete(repo, change, planID, taskID, packPath, result string, verifications []string) (map[string]any, error) {
+func taskComplete(repo, change, planID, taskID, packPath, result string, verifications, proofIDs []string, reviewID string) (map[string]any, error) {
 	pack, coherence, err := approvedPlanPackage(repo, change)
 	if err != nil {
 		return nil, err
@@ -167,7 +176,21 @@ func taskComplete(repo, change, planID, taskID, packPath, result string, verific
 	if summary == "" {
 		return nil, workflowError("DOCVIVA_INCOMPLETE", "conclusão da tarefa exige resultado")
 	}
-	if len(evidence) == 0 {
+	if plan.schema == 2 {
+		if len(evidence) > 0 {
+			return nil, workflowError("STALE_EVIDENCE", "plano schema 2 não aceita texto em --verification; use --proof")
+		}
+		evidence, err = validateProofSet(pack, proofIDs, "task", planID, taskID, true)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateProofContext(pack, evidence, stateString(verified["digest"])); err != nil {
+			return nil, err
+		}
+		if err := validateVerificationReview(pack, reviewID, "task", planID, taskID, evidence, true); err != nil {
+			return nil, err
+		}
+	} else if len(evidence) == 0 {
 		return nil, workflowError("STALE_EVIDENCE", "conclusão da tarefa exige verificação")
 	}
 	payload := map[string]any{
@@ -199,7 +222,7 @@ func taskComplete(repo, change, planID, taskID, packPath, result string, verific
 	}, nil
 }
 
-func completePlan(repo, change, planID, actualDeltaPath, result string, verifications, completedTasks []string) (map[string]any, error) {
+func completePlan(repo, change, planID, actualDeltaPath, result string, verifications, proofIDs []string, reviewID string, completedTasks []string) (map[string]any, error) {
 	pack, coherence, err := approvedPlanPackage(repo, change)
 	if err != nil {
 		return nil, err
@@ -253,7 +276,18 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 		return nil, workflowError("MISSING_PROVIDER", "dependências ainda não concluídas: "+strings.Join(missingDependencies, ", "))
 	}
 	evidence := nonemptyUnique(verifications)
-	if len(evidence) == 0 {
+	if plan.schema == 2 {
+		if len(evidence) > 0 {
+			return nil, workflowError("STALE_EVIDENCE", "plano schema 2 não aceita texto em --verification; use --proof")
+		}
+		evidence, err = validateProofSet(pack, proofIDs, "plan", planID, "", true)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateVerificationReview(pack, reviewID, "plan", planID, "", evidence, true); err != nil {
+			return nil, err
+		}
+	} else if len(evidence) == 0 {
 		return nil, workflowError("STALE_EVIDENCE", "conclusão do plano exige verificação")
 	}
 	summary := strings.TrimSpace(result)
@@ -525,4 +559,138 @@ func nonemptyUnique(values []string) []string {
 		}
 	}
 	return result
+}
+
+func reopenPlan(repo, change, planID, taskID, reason string) (map[string]any, error) {
+	root, err := repositoryRoot(repo)
+	if err != nil {
+		return nil, err
+	}
+	pack, coherence, err := approvedPlanPackage(root, change)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := planByID(pack.plans, planID)
+	if err != nil {
+		return nil, err
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, workflowError("DOCVIVA_INCOMPLETE", "reopen exige motivo")
+	}
+	results, err := planResultPayloads(pack.workspace, pack.directory)
+	if err != nil {
+		return nil, err
+	}
+	if taskID != "" {
+		if plan.schema != 2 || taskByID(plan, taskID) == nil {
+			return nil, workflowError("MODEL_MISMATCH", "tarefa desconhecida: "+planID+"/"+taskID)
+		}
+		taskResults, loadErr := planTaskResultPayloads(pack.workspace, pack.directory, plan, stateString(coherence["digest"]))
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		if taskResults[taskID] == nil {
+			return nil, workflowError("COHERENCE_ERROR", planID+"/"+taskID+" não está concluída")
+		}
+		dependents := []string{}
+		for _, task := range planTasks(plan) {
+			id := stateString(task["id"])
+			if taskResults[id] != nil && containsString(normalizedTaskStrings(task, "depends_on"), taskID) {
+				dependents = append(dependents, id)
+			}
+		}
+		if len(dependents) > 0 {
+			return nil, workflowError("IMPACT_STALE", "reabra primeiro as tarefas dependentes: "+strings.Join(dependents, ", "))
+		}
+		if results[planID] != nil {
+			return nil, workflowError("IMPACT_STALE", "reabra o plano "+planID+" antes da tarefa")
+		}
+		path := filepath.Join(pack.directory, "results", "tasks", planID, taskID+".md")
+		original, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil, workflowError("DOCVIVA_INCOMPLETE", readErr.Error())
+		}
+		if err := os.Remove(path); err != nil {
+			return nil, workflowError("DOCVIVA_INCOMPLETE", err.Error())
+		}
+		auditPath, err := writeReopenAudit(pack, planID, taskID, reason)
+		if err != nil {
+			_ = pack.workspace.atomicWrite(path, original)
+			return nil, err
+		}
+		if err := setReopenedState(pack, planID, coherence); err != nil {
+			return nil, rollbackReopen(pack, path, original, auditPath, err)
+		}
+		return map[string]any{"change": filepath.Base(pack.directory), "plan": planID, "task": taskID, "status": "reopened", "reason": reason}, nil
+	}
+	if results[planID] == nil {
+		return nil, workflowError("COHERENCE_ERROR", planID+" não está concluído")
+	}
+	dependents := []string{}
+	for _, candidate := range pack.plans {
+		if results[candidate.id] != nil && containsString(normalizedPlanStrings(candidate, "depends_on"), planID) {
+			dependents = append(dependents, candidate.id)
+		}
+	}
+	if len(dependents) > 0 {
+		return nil, workflowError("IMPACT_STALE", "reabra primeiro os planos dependentes: "+strings.Join(dependents, ", "))
+	}
+	path := filepath.Join(pack.directory, "results", planID+".md")
+	original, readErr := os.ReadFile(path)
+	if readErr != nil {
+		return nil, workflowError("DOCVIVA_INCOMPLETE", readErr.Error())
+	}
+	if err := os.Remove(path); err != nil {
+		return nil, workflowError("DOCVIVA_INCOMPLETE", err.Error())
+	}
+	auditPath, err := writeReopenAudit(pack, planID, "", reason)
+	if err != nil {
+		_ = pack.workspace.atomicWrite(path, original)
+		return nil, err
+	}
+	if err := setReopenedState(pack, planID, coherence); err != nil {
+		return nil, rollbackReopen(pack, path, original, auditPath, err)
+	}
+	return map[string]any{"change": filepath.Base(pack.directory), "plan": planID, "status": "reopened", "reason": reason}, nil
+}
+
+func writeReopenAudit(pack coherencePackage, planID, taskID, reason string) (string, error) {
+	payload := map[string]any{
+		"schema_version": 1, "change": filepath.Base(pack.directory), "plan": planID,
+		"task": nullableString(taskID), "reason": reason, "reopened_at": utcNow(),
+	}
+	encoded, _ := json.MarshalIndent(payload, "", "  ")
+	name := planID
+	if taskID != "" {
+		name += "-" + taskID
+	}
+	name += "-" + waveStableDigest(payload)[:12] + ".json"
+	path := filepath.Join(pack.directory, "results", "reopened", name)
+	if err := pack.workspace.atomicWrite(path, append(encoded, '\n')); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func rollbackReopen(pack coherencePackage, resultPath string, result []byte, auditPath string, cause error) error {
+	restoreErr := pack.workspace.atomicWrite(resultPath, result)
+	removeErr := os.Remove(auditPath)
+	if restoreErr != nil || removeErr != nil {
+		return workflowError("DOCVIVA_INCOMPLETE", "reopen falhou e o rollback dos artefatos ficou incompleto")
+	}
+	return cause
+}
+
+func setReopenedState(pack coherencePackage, planID string, coherence map[string]any) error {
+	state, err := pack.workspace.readState()
+	if err != nil {
+		return err
+	}
+	state["current_unit"], state["status"], state["blockers"] = planID, "approved", []any{}
+	state["next_action"], state["digest"], state["updated_at"] = "Reexecutar "+planID+" de "+filepath.Base(pack.directory)+".", coherence["digest"], utcNow()
+	if active, ok := state["active_work"].(map[string]any); ok {
+		active["status"] = "approved"
+	}
+	return pack.workspace.writeState(state, "# Estado atual")
 }

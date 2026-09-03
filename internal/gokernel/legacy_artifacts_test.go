@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -48,6 +49,64 @@ func TestRunTaskBriefRejectsUngroupedMultiSelection(t *testing.T) {
 	_, err := runTaskBrief([]string{"--plan", plan, "--tasks", "1,2", "--output", filepath.Join(root, "brief.md")})
 	if err == nil || !strings.Contains(err.Error(), "Execution: grouped") {
 		t.Fatalf("expected grouped failure, got %v", err)
+	}
+}
+
+func TestRunTaskBriefUsesTypedTaskContractInsteadOfMarkdownHeadings(t *testing.T) {
+	root := t.TempDir()
+	planPath := filepath.Join(root, "P01.md")
+	plan := roadmapPlan("P01", nil,
+		map[string]any{
+			"id": "T01", "name": "Entregar contrato", "result": "Contrato observável",
+			"covers": []any{"REQ-001"}, "depends_on": []any{}, "files": []any{"src/contract.go"},
+			"action": "Implementar pelo limite público.",
+			"verify": map[string]any{"kind": "command", "run": "go test ./...", "proves": "contrato público"},
+			"done":   "Contrato validado.", "risk_seam": "public-api",
+		},
+		map[string]any{
+			"id": "T02", "name": "Entregar consumidor", "result": "Consumidor observável",
+			"covers": []any{"REQ-001"}, "depends_on": []any{"T01"}, "files": []any{"src/consumer.go"},
+			"action": "Integrar pelo contrato.",
+			"verify": map[string]any{"kind": "command", "run": "go test ./...", "proves": "integração pública"},
+			"done":   "Integração validada.", "risk_seam": "public-api",
+		},
+	)
+	document, err := frontmatterDocument(plan, "# P01\n\n### Task T01\n\nCONTEÚDO FALSO DO CORPO\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(planPath, document, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(root, "brief.md")
+	result, err := runTaskBrief([]string{"--plan", planPath, "--task", "T02", "--output", output})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value := result.(map[string]any)
+	if !reflect.DeepEqual(value["tasks"], []string{"T02"}) {
+		t.Fatalf("tasks=%#v", value["tasks"])
+	}
+	content, _ := os.ReadFile(output)
+	brief := string(content)
+	if !strings.Contains(brief, `"id": "T02"`) || !strings.Contains(brief, `"depends_on": [`) || strings.Contains(brief, "CONTEÚDO FALSO") || strings.Contains(brief, `"id": "T01"`) {
+		t.Fatalf("brief não veio do contrato tipado:\n%s", brief)
+	}
+}
+
+func TestRunTaskBriefTypedPlanRejectsUnknownTaskEvenWhenHeadingExists(t *testing.T) {
+	root := t.TempDir()
+	planPath := filepath.Join(root, "P01.md")
+	document, err := frontmatterDocument(roadmapPlan("P01", nil), "# P01\n\n### Task T99\n\nFantasma.\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(planPath, document, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = runTaskBrief([]string{"--plan", planPath, "--task", "T99", "--output", filepath.Join(root, "brief.md")})
+	if err == nil || !strings.Contains(err.Error(), "tarefa T99 não encontrada no contrato tipado") {
+		t.Fatalf("err=%v", err)
 	}
 }
 

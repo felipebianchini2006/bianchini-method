@@ -22,7 +22,7 @@ class CliHelpScenarios(unittest.TestCase):
             check=False,
         )
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertIn("CLI_HELP_OK: 77 paths", checked.stdout)
+        self.assertIn("CLI_HELP_OK: 85 paths", checked.stdout)
 
     def test_asset_covers_root_commands_and_actions(self) -> None:
         asset = json.loads(ASSET.read_text(encoding="utf-8"))

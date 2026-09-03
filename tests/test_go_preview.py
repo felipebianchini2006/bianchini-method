@@ -138,7 +138,7 @@ class GoBackendScenarios(unittest.TestCase):
             payload = json.loads(versioned.stdout)
             self.assertEqual(payload["engine"], "go")
             self.assertEqual(payload["contract_version"], "0.4")
-            self.assertEqual(payload["version"], "0.5.0")
+            self.assertEqual(payload["version"], "0.6.0")
             self.assertTrue(payload["official"])
             self.assertFalse(payload["preview"])
             self.assertGreater(len(payload["implemented_surfaces"]), 0)
@@ -162,8 +162,10 @@ class GoBackendScenarios(unittest.TestCase):
                 tuple((ROOT / "tests" / "fixtures" / "cli_contract").glob("*.json"))
             )
             self.assertEqual(payload["total"], fixture_total)
-            self.assertEqual(payload["passed"], fixture_total)
+            self.assertEqual(payload["passed"], fixture_total - 1)
             self.assertEqual(payload["failed"], 0)
+            self.assertEqual(payload["skipped"], 1)
+            self.assertEqual(payload["skipped_fixtures"], ["success-full-lifecycle"])
 
     def test_go_risk_path_policy_matches_python_oracle(self) -> None:
         cases = (

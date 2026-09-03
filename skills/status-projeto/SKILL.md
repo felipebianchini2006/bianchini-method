@@ -17,7 +17,7 @@ Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.
 4. Ler somente o frontmatter e os ponteiros necessários.
 5. Se `active_work.kind` for `quick`, usar `bm direct status --repo <repo>` e abrir apenas `PROGRESS.md` quando necessário.
 6. Se for `debug`, usar `bm debug status --repo <repo> --id <Dxxx-do-estado>` e não abrir o caso completo sem pedido de detalhe.
-7. Se for `change`, consultar `COHERENCE.md` e o resultado do plano ativo somente para contar findings, impacto e gates.
+7. Se for `change`, executar `bm verify status --repo <repo> --change <Cxxx>` e consultar `COHERENCE.md` e o resultado do plano ativo somente para contar findings, impacto, proofs e gates.
 8. Quando houver unidade ativa, compilar `bm context pack --repo <repo> --unit <identidade>` e resumir somente o pack. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` é reportado sem fallback para leitura integral.
 
 ## Resposta compacta

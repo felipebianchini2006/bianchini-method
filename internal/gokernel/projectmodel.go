@@ -456,18 +456,45 @@ func validateTask(raw any) error {
 	if !ok {
 		return fmt.Errorf("verify exige objeto")
 	}
-	allowedVerification := stringSet([]string{"kind", "run", "proves"})
+	allowedVerification := stringSet([]string{"kind", "run", "argv", "cwd", "timeout_seconds", "proves"})
 	if unknown := unknownMapKeys(verification, allowedVerification); len(unknown) > 0 {
 		return fmt.Errorf("campo desconhecido em verify: %s", unknown[0])
 	}
-	if missing := missingMapKeys(verification, []string{"kind", "run", "proves"}); len(missing) > 0 {
+	if missing := missingMapKeys(verification, []string{"kind", "proves"}); len(missing) > 0 {
 		return fmt.Errorf("campo obrigatório ausente em verify: %s", missing[0])
 	}
 	if !oneOf(stateString(verification["kind"]), "command", "procedure") {
 		return fmt.Errorf("verify.kind exige command ou procedure")
 	}
-	if strings.TrimSpace(stateString(verification["run"])) == "" || strings.TrimSpace(stateString(verification["proves"])) == "" {
-		return fmt.Errorf("verify exige textos não vazios")
+	if strings.TrimSpace(stateString(verification["proves"])) == "" {
+		return fmt.Errorf("verify.proves exige texto não vazio")
+	}
+	run := strings.TrimSpace(stateString(verification["run"]))
+	argv, argvErr := stringValues(verification["argv"], identifier+".verify.argv")
+	if verification["argv"] != nil && argvErr != nil {
+		return argvErr
+	}
+	if stateString(verification["kind"]) == "command" {
+		if (run == "") == (len(argv) == 0) {
+			return fmt.Errorf("%s.verify command exige exatamente um de run ou argv", identifier)
+		}
+		for _, argument := range argv {
+			if argument == "" {
+				return fmt.Errorf("%s.verify.argv não aceita argumento vazio", identifier)
+			}
+		}
+	} else if run == "" || len(argv) > 0 {
+		return fmt.Errorf("%s.verify procedure exige run descritivo e não aceita argv", identifier)
+	}
+	if cwd := strings.TrimSpace(stateString(verification["cwd"])); cwd != "" {
+		if cwd != "." {
+			if err := validateRelativePath(cwd, identifier+".verify.cwd"); err != nil {
+				return fmt.Errorf("%s.verify.cwd inválido", identifier)
+			}
+		}
+	}
+	if timeout := stateInt(verification["timeout_seconds"]); verification["timeout_seconds"] != nil && (timeout < 1 || timeout > 3600) {
+		return fmt.Errorf("%s.verify.timeout_seconds exige inteiro entre 1 e 3600", identifier)
 	}
 	return nil
 }

@@ -1,5 +1,9 @@
 {
   "schema_version": 2,
+  "engines": [
+    "python"
+  ],
+  "engine_scope_reason": "Cenário histórico do oráculo Python; o ciclo schema 2 oficial com provas e revisão é coberto pelos testes nativos Go.",
   "surfaces": [
     "scope.seal",
     "scope.verify",

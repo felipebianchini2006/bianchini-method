@@ -23,8 +23,8 @@ Automação reduz repetição, mas não elimina o passe real. Um E2E pode servir
 ## 1. Rota e pré-condições
 
 1. Ler `.bianchini/STATE.md` e executar `bm model validate --repo <repo>`.
-2. Confirmar mudança, planos e resultados concluídos, além do fingerprint completo do RC: `id`, `revision`, `build`, `checksum`.
-3. Localizar a raiz única do ciclo do RC em `.bianchini/changes/Cxxx-*` ou, após o `cycle-close`, em `.bianchini/archive/Cxxx-*`. Criar ali `results/HOMOLOGATION.md` com frontmatter mínimo `schema_version: 1`, `fingerprint`, `change`, `status: running`, listas vazias de `gates`, `blockers`, `findings` e `required_refs` apontando somente para resultados já existentes do mesmo ciclo. Não sobrescrever uma homologação existente.
+2. Exigir `.bianchini/changes/Cxxx-*/results/RELEASE.md` com `status: reviewed`. Confirmar `candidate.id`, `revision`, `build`, `checksum`, `fingerprint`, `proof_ids` e `review_id`.
+3. Homologar obrigatoriamente antes do `cycle-close`, na raiz única `.bianchini/changes/Cxxx-*`. Criar ali `results/HOMOLOGATION.md` com `schema_version: 1`, o mesmo `fingerprint`, `change`, cópia exata de `candidate` em `rc`, `status: running`, listas vazias de `gates`, `blockers`, `findings` e `manual_proofs`. Não sobrescrever uma homologação existente.
 4. Compilar `bm context pack --repo <repo> --unit RC:<fingerprint>` e usar somente suas referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a homologação; não montar contexto manual.
 5. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
 6. Preparar o ambiente executável, contas por perfil, dados determinísticos e sandboxes necessárias.
@@ -35,8 +35,8 @@ Não homologar árvore fonte quando a entrega é outro artefato. Se uma platafor
 
 No RC atual:
 
-1. executar todos os comandos de `verification.release`, incluindo suíte unitária completa configurada, integração/contratos aplicáveis, regressão completa, E2E das jornadas críticas, build e mutação exigida pela política;
-2. reunir relatórios e logs sanitizados, confirmando que evidência de mutação pertence ao commit/RC atual e ao seam exigido;
+1. confirmar que `bm verify release` já executou todos os comandos tipados no estado final e que a revisão do release aprovou os mesmos `proof_ids`;
+2. reunir relatórios e logs sanitizados já vinculados ao RC, confirmando que evidência de mutação pertence ao commit/RC atual e ao seam exigido;
 3. vincular cada evidência ao mesmo `rc`, `revision`, `build` e `checksum`;
 4. executar `bm proof-map` para identificar o que a automação realmente prova;
 5. corrigir falha de produto antes de avançar.
@@ -51,7 +51,7 @@ Não iniciar novo planejamento, campanha de arquitetura ou redesign durante homo
 
 Ler critérios e jornadas das specs, plataformas/perfis do escopo, contratos dos planos e resultados registrados. Depois, inspecionar a navegação do RC para inventariar telas, menus, rotas e ações expostas.
 
-Completar o `results/HOMOLOGATION.md` inicial na raiz do ciclo já localizada, em `changes` ou `archive`, sem apagar o frontmatter e as evidências anteriores:
+Completar o `results/HOMOLOGATION.md` inicial em `changes`, sem apagar o frontmatter e as evidências anteriores:
 
 ```markdown
 | ID | Plataforma | Perfil | Jornada ou ação | Automação | Execução real | Visual | Resultado | Evidência |
@@ -120,7 +120,7 @@ Após alteração de código, gerar novo RC e repetir:
 3. estados visuais e fluxos vizinhos de risco;
 4. smoke global por plataforma e perfil afetado.
 
-Após duas ondas de homologação sem convergir, declarar `BLOQUEADO`. Com telemetria habilitada, registrar apenas contagem de bugs e falhas de gate.
+Não repetir a mesma homologação no mesmo estado. Falha de produto reabre a tarefa ou plano afetado com `bm plan reopen`, exige novo código, nova prova, novo release e novo fingerprint. Falha externa indispensável ou falha reproduzida sem correção segura declara `BLOQUEADO`. Com telemetria habilitada, registrar apenas contagem de bugs e falhas de gate.
 
 ## 7. Veredito
 
@@ -139,7 +139,7 @@ Após duas ondas de homologação sem convergir, declarar `BLOQUEADO`. Com telem
 
 Caso contrário, `BLOQUEADO` com o próximo requisito verificável. Não inventar “aceito com ressalvas”.
 
-Ao aceitar, registrar `status: accepted`, fingerprint e evidências em `HOMOLOGATION.md`. A sincronização de arquitetura, modelo e specs ocorre somente no `cycle-close`; homologação não edita `.bianchini/current/` nem o digest aprovado.
+Ao aceitar, registrar `status: accepted`, o `rc` exato, ao menos um gate, nenhuma entrada em `blockers`, fingerprint e evidências em `HOMOLOGATION.md`. Para cada `manual_requirement` do release, registrar em `manual_proofs` um objeto com `plan`, `task`, path real em `evidence` e `evidence_sha256`. A sincronização de arquitetura, modelo e specs ocorre somente no `cycle-close`; homologação não edita `.bianchini/current/` nem o digest aprovado.
 
 ## 8. Manual conforme escopo
 

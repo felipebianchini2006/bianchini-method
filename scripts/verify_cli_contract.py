@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -25,6 +26,8 @@ from _cli_contract import (
 
 
 def _test_methods(path: Path) -> set[str]:
+    if path.suffix == ".go":
+        return set(re.findall(r"(?m)^func (Test[A-Za-z0-9_]+)\(", path.read_text(encoding="utf-8")))
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     return {
         node.name
@@ -48,8 +51,8 @@ def verify() -> dict[str, Any]:
     errors: list[str] = []
 
     _error(errors, registry["schema_version"] == 1, "schema_version deve ser 1")
-    _error(errors, len(registry["commands"]) == 31, "registry deve conter 31 comandos")
-    _error(errors, len(surfaces) == 58, "registry deve conter 58 superfícies")
+    _error(errors, len(registry["commands"]) == 32, "registry deve conter 32 comandos")
+    _error(errors, len(surfaces) == 65, "registry deve conter 65 superfícies")
     _error(errors, registry["command_count"] == len(parser), "command_count divergente")
     actual_surface_count = sum(len(value["actions"]) for value in parser.values())
     _error(errors, registry["surface_count"] == actual_surface_count, "surface_count divergente")

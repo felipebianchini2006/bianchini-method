@@ -1,51 +1,25 @@
 ---
 name: executar-plano-codex
-description: Use somente com invocação explícita de $executar-plano-codex para executar planos aprovados com convergência limitada do Codex.
+description: Alias explícito do executor canônico do Bianchini Method para uso no Codex.
 disable-model-invocation: true
 ---
 
 # Executar Plano — Codex
 
-**Anuncie:** "Executando <planos> pelo overlay Codex no modo <grouped|slice|strict>."
+**Anuncie:** "Executando <planos> pelo executor canônico do Bianchini Method no Codex."
 
-Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar o status do projeto. Executar `all` somente quando o pedido atual já for explícito.
+Leia integralmente o `SKILL.md` de `executar-plano` instalado em `../executar-plano/SKILL.md` e siga esse contrato sem criar uma segunda máquina de estados. No checkout fonte deste repositório, o arquivo correspondente está em `../../../skills/executar-plano/SKILL.md`.
 
-## Contratos carregados
+O Codex pode usar suas ferramentas próprias para editar, executar testes e obter uma revisão independente. Isso não cria outro significado para `proof`, `review`, `completed`, `reopen`, release ou homologação. Todos esses estados pertencem ao binário Go empacotado em `../_shared/bin/bm`; não use fallback Python.
 
-Leia integralmente, nesta ordem, somente:
+Regras específicas do host:
 
-1. [`references/EXECUTION_CORE_CODEX.md`](references/EXECUTION_CORE_CODEX.md);
-2. [`references/CODEX_CONVERGENCE.md`](references/CODEX_CONVERGENCE.md);
-3. [`references/plan-reviewer-codex.md`](references/plan-reviewer-codex.md).
-
-Não carregue qualquer outro contrato. `EXECUTION_CORE_CODEX.md` contém somente núcleo de execução reutilizado. `CODEX_CONVERGENCE.md` é autoridade exclusiva para revisão, fix loop, breaker, redesign e regras de parada no Codex.
-
-Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. Nos contratos abaixo, `bm` sempre significa esse binário resolvido.
-
-Não modificar `.bianchini/STATE.md`, schemas do método base ou o oráculo Python para representar convergência. Usar um sidecar JSON por unidade:
-
-```text
-artifacts/bianchini/<planning_version>/codex/convergence/<plan_id>/<unit_id>.json
-```
-
-Resolver `scripts/review_guard.py` dentro desta skill. Operar o sidecar somente pelo guard. Ledger e checkpoint podem registrar o caminho do sidecar, sem copiar seus campos para estado principal.
-
-## Fluxo
-
-1. Cumprir preflight, rota e aprovação definidos no núcleo.
-2. Manter o plano congelado, classificar divergências com `bm change-policy`, implementar cada unidade e criar commit atômico.
-3. Executar evidências pelo comando `proof`; reviewers referenciam somente `proof_id`. Na primeira revisão, congelar no máximo três blockers consolidados por causa raiz e declarar gates pelo comando `freeze`, usando como `unit_identity` o SHA-256 da unidade emitido por `task-brief`.
-4. Após qualquer implementação subsequente, fix ou redesign, usar `submit-delta`. Revisão seguinte só ocorre em `awaiting_review` e cobre blockers congelados abertos e regressões comprovadas do delta.
-5. Seguir `next_action` determinístico do guard. Nunca inventar uma transição.
-6. Registrar gates obrigatórios com proof do `HEAD` atual. Concluir somente sem blocker aberto e com todos os gates obrigatórios aprovados.
-7. Continuar unidades independentes quando uma unidade ficar `parked` ou tiver bloqueio local; nunca encerrar enquanto houver trabalho executável.
-8. Cumprir release, homologação, entrega e `cycle-close` definidos no núcleo.
-
-Decisões técnicas internas são automáticas. Nenhuma ação, saída ou estado pode produzir `ask_user`. Somente as cinco categorias de parada e suas provas estruturadas, definidas no contrato de convergência, podem produzir `stopped`.
-
-## Saída
-
-Além da saída do núcleo, informar sidecars, fases finais, blockers resolvidos ou abertos, fix rounds, redesign, hardening adiado, gates e eventual categoria de parada. Unidade `parked` não está concluída. Unidade `completed` ou `stopped` nunca reabre.
+- não crie worktree apenas por estar no Codex;
+- não espere reviewer, subagente ou ferramenta em loop;
+- uma revisão produz `approved` ou `changes_requested` em uma execução limitada;
+- registre o resultado pelo `bm verify review` do contrato canônico;
+- use `bm plan reopen` quando surgir prova nova contra uma conclusão anterior;
+- o sidecar e `review_guard.py` deste pacote existem somente para retomar execuções legadas; não são autoridade de conclusão para novas execuções.
 
 Uso explícito:
 

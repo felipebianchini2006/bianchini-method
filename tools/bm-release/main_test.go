@@ -28,7 +28,7 @@ func TestReleaseArchiveIsDeterministicAndContainsNativeCLI(t *testing.T) {
 	first := filepath.Join(temporary, "first.tar.gz")
 	second := filepath.Join(temporary, "second.tar.gz")
 	for _, output := range []string{first, second} {
-		if err := createReleaseArchive(root, output, "bianchini-method_0.5.0_darwin-arm64", binary, "bm", epoch); err != nil {
+		if err := createReleaseArchive(root, output, "bianchini-method_0.6.0_darwin-arm64", binary, "bm", epoch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -45,7 +45,7 @@ func TestReleaseArchiveIsDeterministicAndContainsNativeCLI(t *testing.T) {
 	}
 
 	entries := readReleaseArchive(t, first)
-	prefix := "bianchini-method_0.5.0_darwin-arm64/"
+	prefix := "bianchini-method_0.6.0_darwin-arm64/"
 	for _, required := range []string{
 		prefix + "skills/_shared/VERSION",
 		prefix + "skills/_shared/bin/bm",
@@ -89,7 +89,7 @@ func TestReleaseTargetsAreClosedAndDeduplicated(t *testing.T) {
 }
 
 func TestReleaseVersionMustMatchCompiledKernel(t *testing.T) {
-	if err := validateReleaseVersionContract("0.5.0", "0.5.0", "0.5.0"); err != nil {
+	if err := validateReleaseVersionContract("0.6.0", "0.6.0", "0.6.0"); err != nil {
 		t.Fatal(err)
 	}
 	for _, test := range []struct {
@@ -99,8 +99,8 @@ func TestReleaseVersionMustMatchCompiledKernel(t *testing.T) {
 		kernel     string
 		wantDetail string
 	}{
-		{"package diverges", "0.4.9", "0.4.9", "0.5.0", "kernel version 0.5.0"},
-		{"requested diverges", "0.5.0", "0.4.9", "0.5.0", "release 0.4.9"},
+		{"package diverges", "0.4.9", "0.4.9", "0.6.0", "kernel version 0.6.0"},
+		{"requested diverges", "0.6.0", "0.4.9", "0.6.0", "release 0.4.9"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			err := validateReleaseVersionContract(test.packaged, test.requested, test.kernel)
@@ -186,10 +186,10 @@ func TestBuiltReleaseBinaryIdentityIsChecked(t *testing.T) {
 		t.Fatalf("build do CLI: %v\n%s", err, output)
 	}
 	target := runtime.GOOS + "-" + runtime.GOARCH
-	if err := validateBuiltReleaseBinary(binary, target, "0.5.0", commit); err != nil {
+	if err := validateBuiltReleaseBinary(binary, target, "0.6.0", commit); err != nil {
 		t.Fatalf("CLI oficial foi rejeitado: %v", err)
 	}
-	if err := validateBuiltReleaseBinary(binary, target, "0.5.0", strings.Repeat("b", 40)); err == nil {
+	if err := validateBuiltReleaseBinary(binary, target, "0.6.0", strings.Repeat("b", 40)); err == nil {
 		t.Fatal("build_commit divergente foi aceito")
 	}
 }

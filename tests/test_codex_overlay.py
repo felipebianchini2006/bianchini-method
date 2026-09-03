@@ -415,17 +415,13 @@ def stop_evidence(kind: str, proof_id: str) -> dict[str, object]:
 
 
 class CodexOverlayPackageTests(unittest.TestCase):
-    def test_overlay_loads_only_three_allowed_references(self) -> None:
+    def test_overlay_delegates_to_the_single_canonical_executor(self) -> None:
         skill = (OVERLAY / "SKILL.md").read_text(encoding="utf-8")
-        for name in (
-            "EXECUTION_CORE_CODEX.md",
-            "CODEX_CONVERGENCE.md",
-            "plan-reviewer-codex.md",
-        ):
-            self.assertIn(name, skill)
-            self.assertTrue((OVERLAY / "references" / name).is_file())
-        self.assertNotIn("skills/executar-plano/SKILL.md", skill)
-        self.assertNotIn("Leia integralmente o executor base", skill)
+        self.assertIn("../executar-plano/SKILL.md", skill)
+        self.assertIn("sem criar uma segunda máquina de estados", skill)
+        self.assertIn("somente para retomar execuções legadas", skill)
+        for name in ("EXECUTION_CORE_CODEX.md", "CODEX_CONVERGENCE.md", "plan-reviewer-codex.md"):
+            self.assertNotIn(name, skill)
 
     def test_core_excludes_convergence_and_stop_rules(self) -> None:
         core = (OVERLAY / "references/EXECUTION_CORE_CODEX.md").read_text(
@@ -521,7 +517,8 @@ class CodexOverlayPackageTests(unittest.TestCase):
         self.assertIn("material_change", convergence)
         self.assertIn("não autoriza nova decomposição", convergence)
         self.assertIn("mudança material comprovada", reviewer)
-        self.assertIn("cinco categorias de parada", skill)
+        self.assertIn("bm plan reopen", skill)
+        self.assertIn("bm verify review", skill)
 
     def test_overlay_uses_current_native_cli_surfaces(self) -> None:
         skill = (OVERLAY / "SKILL.md").read_text(encoding="utf-8")
@@ -541,7 +538,8 @@ class CodexOverlayPackageTests(unittest.TestCase):
             self.assertNotIn(retired, combined)
         for retired_flag in ("--planning-version", "--state"):
             self.assertNotIn(retired_flag, core)
-        self.assertIn("bm workspace create --repo <repo> --change <change_id>", core)
+        self.assertNotIn("bm workspace create --repo <repo> --change <change_id>", core)
+        self.assertIn("bm workspace resume --repo <repo> --change <change_id>", core)
         self.assertIn("bm review-package --cwd <workspace>", convergence)
         for required in ("--brief <task-brief.md>", "--report <report.md>", "--output <review-package.md>"):
             self.assertIn(required, convergence)
@@ -784,7 +782,7 @@ class ReviewGuardScenarios(unittest.TestCase):
                 freeze(repo, [candidate])
             self.assertIn("assinatura guard-owned inválida", str(raised.exception))
 
-    def test_requirement_binding_and_three_root_cause_limit(self) -> None:
+    def test_requirement_binding_and_root_cause_consolidation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
             init_repo(repo)
@@ -806,7 +804,7 @@ class ReviewGuardScenarios(unittest.TestCase):
             missing["approved_requirement"] = "REQ-DOES-NOT-EXIST"
             findings.append(missing)
             _, frozen = freeze(repo, findings)
-            self.assertEqual(len(frozen["state"]["blockers"]), 3)
+            self.assertEqual(len(frozen["state"]["blockers"]), 4)
             reasons = [
                 item["deferred_reason"]
                 for item in frozen["state"]["deferred_hardening"]
@@ -814,7 +812,7 @@ class ReviewGuardScenarios(unittest.TestCase):
             self.assertTrue(
                 any("causa raiz consolidada" in reason for reason in reasons)
             )
-            self.assertTrue(any("limite de três" in reason for reason in reasons))
+            self.assertFalse(any("limite de três" in reason for reason in reasons))
             self.assertTrue(any("task-brief congelado" in reason for reason in reasons))
 
     def test_delta_uses_real_proofs_and_ignores_no_declared_exit_codes(self) -> None:
@@ -1426,6 +1424,28 @@ class ReviewGuardScenarios(unittest.TestCase):
                 "reabrir",
             )
             self.assertEqual(terminal.returncode, 2)
+
+            previous = git(repo, "rev-parse", "HEAD")
+            current = commit_file(repo, "alpha\nchanged after completion\n", "later regression fix")
+            reopened = result_json(
+                run_guard(
+                    "reopen",
+                    "--sidecar",
+                    str(clean),
+                    "--reason",
+                    "release gate invalidated the prior conclusion",
+                )
+            )
+            self.assertEqual(reopened["phase"], "awaiting_review")
+            self.assertEqual(reopened["state"]["gates"], {})
+            self.assertEqual(reopened["state"]["pending_delta"]["base"], previous)
+            self.assertEqual(reopened["state"]["pending_delta"]["head"], current)
+            self.assertEqual(review(clean, repo, [])["phase"], "review_frozen")
+            record_gate(repo, clean)
+            self.assertEqual(
+                result_json(run_guard("complete", "--sidecar", str(clean)))["phase"],
+                "completed",
+            )
 
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"

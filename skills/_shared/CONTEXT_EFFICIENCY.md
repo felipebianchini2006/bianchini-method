@@ -16,13 +16,13 @@ O `ProjectModel` recompõe `S0 → Sn` de forma determinística. Não copie a na
 
 ## Execução
 
-`workspace create` valida o digest aprovado, dependências, contratos consumidos e status `stale` antes de criar a branch `bm/cxxx-pxx`. Dentro do workspace, carregue o plano, o modelo efetivo e o último resultado necessário; não releia toda a mudança por padrão.
+O checkout primário é suficiente para uso solo. Quando isolamento paralelo for realmente necessário, `workspace create` valida o digest aprovado, dependências, contratos consumidos e status `stale` antes de criar a branch `bm/cxxx-pxx`. No checkout escolhido, carregue o plano, o modelo efetivo e o último resultado necessário; não releia toda a mudança por padrão. Depois da integração, `workspace finish` remove somente worktrees limpos e branches já integradas.
 
 Mapas de repositório e relatórios temporários ficam em `.bianchini/.runtime/`, vinculados ao hash do `HEAD` e ao digest do escopo. Mudança em qualquer um invalida o cache.
 
 ## Resultados e fechamento
 
-Cada plano grava somente seu delta real, verificações e impacto em `results/Pxx.md`. `STATE.md` mantém apenas o índice atual. O fechamento recompõe o modelo pelos resultados, exige equivalência com o `SYSTEM_MODEL.md` final e arquiva o ciclo.
+Cada plano grava somente seu delta real, IDs de prova/revisão e impacto em `results/Pxx.md`. Proofs e reviews detalhados ficam em diretórios próprios. `STATE.md` mantém apenas o índice atual. O fechamento recompõe o modelo pelos resultados, exige release revisado e homologação do mesmo fingerprint, confirma equivalência com o `SYSTEM_MODEL.md` final e arquiva o ciclo.
 
 ## Regras
 

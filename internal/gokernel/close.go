@@ -149,6 +149,13 @@ func closeChange(root, change string) (map[string]any, error) {
 			return nil, workflowError("COHERENCE_ERROR", "auditoria estrutural final encontrou ERROR")
 		}
 	}
+	var release map[string]any
+	if pack.planningContract >= 2 {
+		release, err = validateReleaseClosure(pack, coherence)
+		if err != nil {
+			return nil, err
+		}
+	}
 	archive := filepath.Join(pack.workspace.dir, "archive", filepath.Base(pack.directory))
 	if err := pack.workspace.validateWorkspacePath(archive); err != nil {
 		return nil, err
@@ -166,6 +173,11 @@ func closeChange(root, change string) (map[string]any, error) {
 		for key, value := range specPackage {
 			summary[key] = value
 		}
+	}
+	if release != nil {
+		summary["release_fingerprint"] = release["fingerprint"]
+		summary["release_review"] = release["review_id"]
+		summary["homologation"] = "accepted"
 	}
 	summaryDocument, _ := frontmatterDocument(summary, "# Resumo\n\nMudança "+filepath.Base(pack.directory)+" concluída com "+fmt.Sprintf("%d", len(pack.plans))+" plano(s) verificado(s).", false)
 	if pack.specContract == 1 {

@@ -1013,12 +1013,27 @@ func canonicalPlanMapping(plan planContract) map[string]any {
 
 func canonicalTaskMapping(task map[string]any) map[string]any {
 	verify := stateObject(task["verify"])
+	verification := map[string]any{
+		"kind": stateString(verify["kind"]), "proves": strings.TrimSpace(stateString(verify["proves"])),
+	}
+	if run := strings.TrimSpace(stateString(verify["run"])); run != "" {
+		verification["run"] = run
+	}
+	if argv, err := stringValues(verify["argv"], "verify.argv"); err == nil && len(argv) > 0 {
+		verification["argv"] = argv
+	}
+	if cwd := strings.TrimSpace(stateString(verify["cwd"])); cwd != "" {
+		verification["cwd"] = cwd
+	}
+	if timeout := stateInt(verify["timeout_seconds"]); timeout > 0 {
+		verification["timeout_seconds"] = timeout
+	}
 	return map[string]any{
 		"id": strings.TrimSpace(stateString(task["id"])), "name": strings.TrimSpace(stateString(task["name"])),
 		"result": strings.TrimSpace(stateString(task["result"])), "covers": normalizedTaskStrings(task, "covers"),
 		"depends_on": normalizedTaskStrings(task, "depends_on"), "files": normalizedTaskStrings(task, "files"),
 		"action": strings.TrimSpace(stateString(task["action"])),
-		"verify": map[string]any{"kind": stateString(verify["kind"]), "run": strings.TrimSpace(stateString(verify["run"])), "proves": strings.TrimSpace(stateString(verify["proves"]))},
+		"verify": verification,
 		"done":   strings.TrimSpace(stateString(task["done"])), "risk_seam": strings.TrimSpace(stateString(task["risk_seam"])),
 	}
 }

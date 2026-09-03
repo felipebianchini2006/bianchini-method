@@ -470,3 +470,67 @@ func TestExecutionWorkspaceMetadataIsJSON(t *testing.T) {
 		t.Fatalf("metadata=%#v", metadata)
 	}
 }
+
+func TestExecutionWorkspaceFinishRemovesOnlyCleanMergedWorkspaceAndBranch(t *testing.T) {
+	repo, change := executionWorkspaceRepository(t, executionWorkspacePlanFixture(nil, nil))
+	target := filepath.Join(filepath.Dir(repo), "execution-worktree")
+	if _, err := runExecutionWorkspace([]string{"create", "--repo", repo, "--change", change, "--plan", "P01", "--target", target}); err != nil {
+		t.Fatal(err)
+	}
+	executionWorkspaceGit(t, target, "add", ".bianchini/STATE.md")
+	executionWorkspaceGit(t, target, "commit", "-q", "-m", "record execution state")
+	executionWorkspaceGit(t, repo, "merge", "--ff-only", "bm/c001-p01")
+	result, err := runExecutionWorkspace([]string{"finish", "--repo", repo, "--change", change})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value := executionWorkspaceResult(t, result)
+	if !reflect.DeepEqual(value["removed_worktrees"], []string{target}) || !reflect.DeepEqual(value["removed_branches"], []string{"bm/c001-p01"}) {
+		t.Fatalf("result=%#v", value)
+	}
+	if _, err := os.Lstat(target); !os.IsNotExist(err) {
+		t.Fatalf("worktree residual: %v", err)
+	}
+	branches := executionWorkspaceGit(t, repo, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+	if strings.Contains(branches, "bm/c001-p01") {
+		t.Fatalf("branch residual: %s", branches)
+	}
+	idempotent, err := runExecutionWorkspace([]string{"finish", "--repo", repo, "--change", change})
+	if err != nil || len(executionWorkspaceResult(t, idempotent)["removed_worktrees"].([]string)) != 0 {
+		t.Fatalf("idempotent=%#v err=%v", idempotent, err)
+	}
+}
+
+func TestExecutionWorkspaceFinishPreservesDirtyOrUnmergedWorkspace(t *testing.T) {
+	t.Run("dirty", func(t *testing.T) {
+		repo, change := executionWorkspaceRepository(t, executionWorkspacePlanFixture(nil, nil))
+		target := filepath.Join(filepath.Dir(repo), "execution-worktree")
+		if _, err := runExecutionWorkspace([]string{"create", "--repo", repo, "--change", change, "--plan", "P01", "--target", target}); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(target, "dirty.txt"), []byte("keep\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := runExecutionWorkspace([]string{"finish", "--repo", repo, "--change", change}); err == nil || !strings.Contains(err.Error(), "alterações não integradas") {
+			t.Fatalf("err=%v", err)
+		}
+		if _, err := os.Stat(filepath.Join(target, "dirty.txt")); err != nil {
+			t.Fatalf("arquivo do usuário foi removido: %v", err)
+		}
+	})
+	t.Run("unmerged", func(t *testing.T) {
+		repo, change := executionWorkspaceRepository(t, executionWorkspacePlanFixture(nil, nil))
+		target := filepath.Join(filepath.Dir(repo), "execution-worktree")
+		if _, err := runExecutionWorkspace([]string{"create", "--repo", repo, "--change", change, "--plan", "P01", "--target", target}); err != nil {
+			t.Fatal(err)
+		}
+		executionWorkspaceGit(t, target, "add", ".bianchini/STATE.md")
+		executionWorkspaceGit(t, target, "commit", "-q", "-m", "unmerged execution")
+		if _, err := runExecutionWorkspace([]string{"finish", "--repo", repo, "--change", change}); err == nil || !strings.Contains(err.Error(), "UNMERGED_WORKSPACE") {
+			t.Fatalf("err=%v", err)
+		}
+		if _, err := os.Stat(target); err != nil {
+			t.Fatalf("worktree não deveria ser removido: %v", err)
+		}
+	})
+}

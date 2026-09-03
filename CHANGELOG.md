@@ -2,6 +2,19 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 0.6.0 — Conclusão baseada em evidência
+
+- torna `bm verify task|plan|release|review|status` a autoridade de prova e revisão do backend Go;
+- exige proofs verdes e reviews aprovadas do mesmo fingerprint para concluir tarefas e planos schema 2;
+- executa comandos por `argv` sem shell, registra ambiente, digests, exit code e invalida evidência alterada ou obsoleta;
+- persiste falhas e exige motivo para retry no mesmo estado, evitando loops automáticos;
+- reabre tarefa/plano explicitamente e preserva auditoria da conclusão anterior;
+- exige release final revisado e homologação aceita do RC exato antes do archive;
+- usa checkout primário no trabalho solo e deixa worktree para isolamento real;
+- adiciona limpeza segura de worktrees e branches já integradas;
+- transforma o executor Codex em alias do executor canônico, sem segunda autoridade de `completed`;
+- remove o limite arbitrário de três blockers do guard legado.
+
 ## 0.4.6 — Fases e tarefas tipadas
 
 - adiciona `planning_contract: 2` para mudanças novas, preservando mudanças anteriores no contrato 1;

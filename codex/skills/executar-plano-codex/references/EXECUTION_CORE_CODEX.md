@@ -1,6 +1,8 @@
-# Núcleo de Execução — Codex
+# Núcleo de Execução — Codex (legado)
 
-Este arquivo contém somente preflight, rota, aprovação, worktree, implementação, commits, checkpoints, gates, release, homologação e entrega. Regras de convergência pertencem exclusivamente a `CODEX_CONVERGENCE.md`.
+Compatibilidade para retomadas antigas que ainda possuem sidecar Codex. Novas execuções não carregam este arquivo: a autoridade única é `skills/executar-plano/SKILL.md`.
+
+As regras abaixo não podem substituir o fluxo canônico de prova, revisão, release e homologação.
 
 ## Preflight, rota e aprovação
 
@@ -14,17 +16,16 @@ Este arquivo contém somente preflight, rota, aprovação, worktree, implementa�
 
 Digest divergente invalida aprovação. Não classificar divergência como mudança editorial.
 
-## Worktree isolada
+## Worktree legado já existente
 
-Criar um workspace por plano:
+Retomar somente o workspace que o sidecar legado já registrou:
 
 ```bash
-bm workspace create --repo <repo> --change <change_id> --plan <plan_id>
 bm workspace resume --repo <repo> --change <change_id> --plan <plan_id>
 bm workspace check --repo <workspace>
 ```
 
-Usar a identidade `change_id/plan_id` do estado. Branch: `bm/<change_id>-<plan_id>` normalizada pelo CLI. Entrar no caminho retornado antes de editar. Executar `workspace check` no início e antes de cada commit. Main, master, detached HEAD e worktree primária são proibidos. Não usar branch atual como fallback.
+Não criar worktree nova por causa deste documento legado. Novas execuções seguem a estratégia Git do executor canônico. Para uma retomada antiga, usar a identidade `change_id/plan_id` do estado e executar `workspace check` antes de editar ou commitar.
 
 Aquecer dependências uma vez no workspace com gerenciador e comandos do projeto. Antes de runtime, respeitar `.mise.toml`, `mise.toml` ou configuração equivalente.
 

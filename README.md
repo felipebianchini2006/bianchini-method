@@ -1,8 +1,8 @@
-# Bianchini Method 0.5
+# Bianchini Method 0.6
 
 Método spec-driven para planejar e executar mudanças com visão do sistema completo, coerência entre fases, documentação viva e verificação proporcional ao risco.
 
-O pacote `0.5.0` usa um CLI Go nativo como backend oficial e mantém o contrato público do método `0.4`. O Python permanece no repositório somente como oráculo explícito de compatibilidade; não há fallback automático entre linguagens.
+O pacote `0.6.0` usa um CLI Go nativo como backend oficial e mantém o contrato público do método `0.4`. O Python permanece no repositório somente como oráculo explícito de compatibilidade; não há fallback automático entre linguagens.
 
 O salto do `0.4` é tratar o planejamento como um grafo de contratos:
 
@@ -207,7 +207,7 @@ Regressão é transversal. Não existe tarefa ou agente por camada de teste, met
 - `preparar-escopo`: converte um PDF textual, escaneado ou misto em `SCOPE.md` rastreável, fechado e pronto para o SDD.
 - `design-projeto`: referência visual aprovada antes do planejamento quando necessária.
 - `sdd-planning`: pesquisa, ProjectModel, roadmap, planos e coerência global.
-- `executar-plano`: execução isolada com verificação de contratos e impacto.
+- `executar-plano`: execução canônica com prova fresca, revisão vinculada e isolamento somente quando necessário.
 - `executar-direto`: quick normal/protegido por score; invocação manual.
 - `corrigir-bug`: debug persistente, causa raiz, RED/GREEN e regressão.
 - `status-projeto`: leitura compacta do estado e próximo passo.
@@ -225,10 +225,12 @@ roadmap sync
 coherence check|approve
 impact analyze --plan Pxx [--changed-contract ID]
 plan complete --change Cxxx --plan Pxx --actual-delta <json>
+plan reopen --change Cxxx --plan Pxx [--task Txx] --reason <motivo>
+verify task|plan|release|review|status
 direct classify|start|status|checkpoint|finish
 debug start|list|status|resume|checkpoint|finish
 migrate check|apply
-workspace create|check|locate|resume
+workspace create|check|locate|resume|finish
 cycle-close --change Cxxx
 task-brief  report  review-package  checkpoint
 policy  proof-map  mutation-evidence  telemetry  status  update-bm
@@ -253,18 +255,20 @@ skills/_shared/bin/bm coherence check --repo . --change C001 --structural-only
 skills/_shared/bin/bm coherence check --repo . --change C001 --semantic-report semantic-review.json
 skills/_shared/bin/bm coherence approve --repo . --change C001 --digest <digest> --approved-by "<responsável>"
 skills/_shared/bin/bm impact analyze --repo . --change C001 --plan P02
-skills/_shared/bin/bm workspace create --repo . --change C001 --plan P01
-skills/_shared/bin/bm plan complete --repo . --change C001 --plan P01 --actual-delta actual-delta.json --result "<resultado>" --verification "<evidência>" --completed-task T01
+skills/_shared/bin/bm verify task --repo . --change C001 --plan P01 --task T01 --context-pack .bianchini/.runtime/context/C001-P01-T01.json
+skills/_shared/bin/bm verify review --repo . --change C001 --scope task --plan P01 --task T01 --reviewer reviewer --verdict approved --proof <proof-id>
+skills/_shared/bin/bm plan complete --repo . --change C001 --plan P01 --task T01 --context-pack .bianchini/.runtime/context/C001-P01-T01.json --result "<resultado>" --proof <proof-id> --review <review-id>
+skills/_shared/bin/bm verify release --repo . --change C001 --build <build-id> --checksum <sha256> --delivery ready
 skills/_shared/bin/bm cycle-close --repo . --change C001
 ```
 
 ## Instalação local
 
-Baixe o archive da release `0.5.0` correspondente a `darwin-arm64`, `darwin-amd64`, `linux-arm64`, `linux-amd64` ou `windows-amd64`. Verifique o arquivo com `SHA256SUMS`, extraia e copie o diretório `skills` inteiro:
+Baixe o archive da release `0.6.0` correspondente a `darwin-arm64`, `darwin-amd64`, `linux-arm64`, `linux-amd64` ou `windows-amd64`. Verifique o arquivo com `SHA256SUMS`, extraia e copie o diretório `skills` inteiro:
 
 ```bash
 shasum -a 256 -c SHA256SUMS
-cp -R bianchini-method_0.5.0_<plataforma>/skills/. ~/.codex/skills/
+cp -R bianchini-method_0.6.0_<plataforma>/skills/. ~/.codex/skills/
 # Claude Code: troque ~/.codex por ~/.claude
 ```
 
@@ -277,7 +281,7 @@ Atualização é sempre explícita:
 ~/.codex/skills/_shared/bin/bm update-bm
 ```
 
-A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal. O updater `0.5.0` valida identidade, manifesto, `SHA256SUMS`, tamanho e digest do archive antes da troca transacional com lock, journal e backup.
+A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal. O updater `0.6.0` valida identidade, manifesto, `SHA256SUMS`, tamanho e digest do archive antes da troca transacional com lock, journal e backup.
 
 Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem parte da interface `0.4`. Artefatos anteriores reconhecidos entram somente por `/migrar-bianchini` ou `bm migrate`.
 

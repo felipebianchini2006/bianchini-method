@@ -187,7 +187,8 @@ Cada tarefa `Txx` declara:
 
 ```text
 id, name, result, covers, depends_on, files, action,
-verify.kind, verify.run, verify.proves, done, risk_seam
+verify.kind, verify.argv ou verify.run, verify.cwd,
+verify.timeout_seconds, verify.proves, done, risk_seam
 ```
 
 `covers` aponta para itens `FLW`, `REQ`, `NFR`, `BR`, `DAT`, `INT`, `ERR` ou `RSK` existentes no `SCOPE.md`. A cadeia obrigatória é `SCOPE → fase → tarefa`: todo item rastreável pertence a ao menos uma fase; todo requisito da fase pertence a ao menos uma tarefa. O parser é fail-closed: campos extras, paths inseguros, referência desconhecida, dependência futura ou ciclo bloqueiam.
@@ -242,17 +243,15 @@ Antes de editar código:
 1. validar `STATE.md`, digest e modelo sem reexecutar uma auditoria mutável;
 2. confirmar plano aprovado, não `stale` e dependências concluídas;
 3. reconstruir o modelo atual e confirmar contratos consumidos;
-4. exigir Git limpo e criar o workspace isolado pelo CLI:
+4. exigir Git limpo e escolher a estratégia Git mínima.
+
+No uso solo, o checkout primário e a branch autorizada são o padrão. Worktree entra somente com paralelismo real, pedido explícito ou colisão entre executores:
 
 ```bash
 bm workspace create --repo <repo> --change C001 --plan P01
 ```
 
-O gate exige `COHERENCE.md` em `approved` ou `approved_with_stale`, artefatos do pacote idênticos ao `HEAD` e o plano solicitado fora da lista `stale`. O segundo
-status autoriza somente planos independentes que preservaram aprovação.
-`coherence check` e `impact analyze` atualizam `COHERENCE.md`; não usá-los como
-consultas de preflight. O workspace fica fora de `main`, `master`, detached HEAD e
-worktree primária.
+O gate de criação exige `COHERENCE.md` em `approved` ou `approved_with_stale`, artefatos do pacote idênticos ao `HEAD` e o plano solicitado fora da lista `stale`. O segundo status autoriza somente planos independentes que preservaram aprovação. `coherence check` e `impact analyze` atualizam `COHERENCE.md`; não usá-los como consultas de preflight. Um worktree criado pelo método fica fora de `main`, `master`, detached HEAD e worktree primária. Depois da integração, `bm workspace finish --repo <repo> --change C001` remove somente worktrees limpos e branches já integradas.
 
 O plano aprovado continua congelado. A ordem autônoma é:
 
@@ -268,15 +267,17 @@ Detalhe interno ou ajuste limitado é registrado. Mudança material recalcula o 
 
 Após cada plano, registrar o delta real, comparar `provides/consumes`, aplicar ao modelo, recalcular impacto, repetir integrações afetadas e atualizar `STATE.md`. Existência isolada de endpoint, tabela ou tela não prova integração.
 
+Cada tarefa schema 2 é provada pelo núcleo com `bm verify task`. Comando usa `argv` estruturado e `shell=false`; procedimento exige artefato real. A prova registra revisão Git, fingerprint do código, comando, cwd, timeout, exit code, hashes e digests do pacote/contexto. Falha persiste e não repete no mesmo estado sem `--retry-reason`.
+
+Uma revisão limitada referencia `proof_id` e grava `approved` ou `changes_requested`. A conclusão exige prova verde e revisão aprovada do mesmo estado:
+
 ```bash
-bm plan complete --repo <repo> --change C001 --plan P01 \
-  --actual-delta <delta-real.json> \
-  --result "<resultado entregue>" \
-  --verification "<evidência vigente>" \
-  --completed-task T01 [--completed-task T02 ...]
+bm plan complete --repo <repo> --change C001 --plan P01 --task T01 \
+  --context-pack <pack.json> --result "<resultado entregue>" \
+  --proof <proof-id> --review <review-id>
 ```
 
-O comando exige pacote vigente, dependências concluídas, contratos consumidos presentes, todos os `Txx` na ordem aprovada, delta real equivalente ao aprovado e evidência. Drift material retorna `IMPACT_STALE`; drift documental retorna `STALE_EVIDENCE`. Nenhum dos dois altera silenciosamente o pacote.
+O gate do plano usa `bm verify plan`, uma revisão própria e `plan complete` com `--proof` e `--review`. Resultado narrativo não substitui prova no schema 2. Finding posterior usa `bm plan reopen --reason <motivo>`; o histórico anterior é preservado. Drift material retorna `IMPACT_STALE`; prova obsoleta retorna `STALE_EVIDENCE`.
 
 ## Gates adaptativos
 
@@ -376,7 +377,7 @@ Colisão, formato desconhecido, symlink externo, path traversal, checksum diverg
 
 ## Encerramento e DocViva
 
-Toda tarefa terminal atualiza `STATE.md` atomicamente. O fechamento exige modelo final equivalente, jornadas ponta a ponta, gates de release, homologação e revisão final aplicáveis. Então sincroniza specs/modelo atuais e move a mudança para `archive/`.
+Toda tarefa terminal atualiza `STATE.md` atomicamente. Depois do último plano, `bm verify release` repete todas as verificações no estado final, grava o RC e exige revisão final vinculada aos mesmos proofs. A homologação aceita ocorre em `changes/`, para o fingerprint exato, antes do fechamento. Só então o método sincroniza specs/modelo atuais e move a mudança para `archive/`.
 
 ```bash
 bm cycle-close --repo <repo> --change C001

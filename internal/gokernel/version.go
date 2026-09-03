@@ -5,7 +5,7 @@ package gokernel
 var BuildCommit = "unknown"
 
 const (
-	Version         = "0.5.0"
+	Version         = "0.6.0"
 	ContractVersion = "0.4"
 )
 
@@ -21,6 +21,12 @@ var ImplementedSurfaces = []string{
 	"coherence.approve",
 	"impact.analyze",
 	"plan.complete",
+	"plan.reopen",
+	"verify.task",
+	"verify.plan",
+	"verify.release",
+	"verify.review",
+	"verify.status",
 	"context.pack",
 	"context.verify",
 	"adapter.render",
@@ -51,6 +57,7 @@ var ImplementedSurfaces = []string{
 	"workspace.check",
 	"workspace.locate",
 	"workspace.resume",
+	"workspace.finish",
 	"task-brief",
 	"spec-diff",
 	"mutation-evidence.verify",

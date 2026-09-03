@@ -473,16 +473,24 @@ def main() -> int:
     args = parser.parse_args()
     fixture_paths = sorted(FIXTURES.glob("*.json"))
     failures: dict[str, list[str]] = {}
+    skipped: list[str] = []
     for path in fixture_paths:
+        fixture = json.loads(path.read_text(encoding="utf-8"))
+        engines = fixture.get("engines")
+        if engines is not None and args.engine not in engines:
+            skipped.append(path.stem)
+            continue
         errors = run_fixture(path, args.engine, args.binary)
         if errors:
             failures[path.stem] = errors
     result = {
         "engine": args.engine,
         "total": len(fixture_paths),
-        "passed": len(fixture_paths) - len(failures),
+        "passed": len(fixture_paths) - len(failures) - len(skipped),
         "failed": len(failures),
         "failures": failures,
+        "skipped": len(skipped),
+        "skipped_fixtures": skipped,
     }
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if not failures else 1

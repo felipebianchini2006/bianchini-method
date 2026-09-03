@@ -1,199 +1,193 @@
 ---
 name: executar-plano
-description: Use para executar planos aprovados do Bianchini Method 0.4 com workspace isolado, contratos verificados, impacto seletivo e DocViva atualizada.
+description: Use para executar planos aprovados do Bianchini Method com prova fresca, revisão vinculada ao código e fechamento seguro.
 ---
 
 # Executar Plano
 
-**Anuncie:** "Executando <planos> do Bianchini Method 0.4 no modo <grouped|slice|strict>."
+**Anuncie:** "Executando <planos> do Bianchini Method no modo <grouped|slice|strict>."
 
-Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `/status-projeto`; executar todos somente quando o pedido atual for explícito.
+Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `/status-projeto`. Executar todos somente quando o pedido atual for explícito.
 
-Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows e use [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md) somente no gate aplicável. Ausência bloqueia; não use fallback Python. O CLI e o pack carregam o contrato operacional da unidade.
+Resolva `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia. Não use fallback Python. O backend Go é a única autoridade de estado, prova, revisão e conclusão. Hosts como Codex, Claude ou Grok podem mudar apresentação e distribuição do trabalho, nunca o significado de `completed`.
 
 ## 1. Preflight
 
-1. Ler `.bianchini/STATE.md`; sem ele, bloquear e orientar `/migrar-bianchini` ou `/sdd-planning` conforme o projeto.
-2. Confirmar `status: approved|executing`, digest vigente, `COHERENCE.md` em `approved` e planos solicitados aprovados. Ler `schedule.plan_waves` e `schedule.task_waves` do checkpoint.
-3. Projetar a onda executável com `bm roadmap next-wave --repo <repo> --change C001 --format json`. O host pode paralelizar somente `parallel_units`; o CLI não cria agentes nem escolhe modelo.
-4. Validar o modelo sem reabrir a auditoria aprovada:
+1. Ler `.bianchini/STATE.md`. Sem estado válido, orientar `/migrar-bianchini` ou `/sdd-planning`.
+2. Confirmar pacote aprovado, `COHERENCE.md` atual, planos solicitados aprovados e ausência de `stale_plans` que afetem a onda.
+3. Executar:
 
 ```bash
 bm model validate --repo <repo> --change C001
+bm roadmap next-wave --repo <repo> --change C001 --format json
 ```
 
-5. Bloquear `ERROR`, `WARNING` aberto, plano `stale`, dependência incompleta, consumidor sem provider e divergência do modelo.
-6. Exigir `git status --porcelain` vazio antes de criar ou retomar workspace.
+4. Executar somente unidades retornadas em `parallel_units`. Dependências ficam na ordem declarada.
+5. Não reabrir planejamento por preferência interna. Alteração material de escopo, contrato público, dado, migration, jornada, efeito ou invariante volta para impacto/aprovação.
+6. Executar `git status --porcelain` e preservar toda mudança preexistente. O pacote de planejamento aprovado deve estar em commit local atômico antes da implementação.
 
-Não executar `coherence check` nem `impact analyze` como consulta de preflight: ambos atualizam `COHERENCE.md`. O gate de workspace valida o checkpoint aprovado. Digest alterado exige nova revisão completa e nova aprovação explícita.
+## 2. Estratégia Git simples
 
-## 2. Workspace isolado
+No uso solo, trabalhe no checkout primário e na branch já autorizada pelo repositório. Se a política do projeto usa `main` diretamente, não crie branch ou worktree intermediário.
 
-Criar o workspace por plano somente a partir do repositório fonte limpo:
+Crie worktree somente quando houver isolamento simultâneo real, pedido explícito ou risco de colisão entre executores:
 
 ```bash
 bm workspace create --repo <repo> --change C001 --plan P01
 ```
 
-O comando bloqueia pacote sem `COHERENCE.md` aprovado, plano `stale`, qualquer artefato do manifesto divergente do checkpoint ou do `HEAD`, Git sujo ou ID inválido. Para retomar, use `workspace locate|resume --repo <repo> --change C001 --plan P01`; dentro do workspace, use `workspace check --repo <workspace>`.
-
-Branch esperada: `bm/c001-p01`. `main`, `master`, detached HEAD e worktree primária são proibidos. Não existe fallback para editar na branch principal.
-
-Respeite `mise` e configuração equivalente. Instale/aquela dependência somente quando já estiver aprovada pelo plano.
-
-## 3. Contexto mínimo e retomada
-
-Compile o contexto da tarefa antes de editar:
+Não crie um worktree por fase por padrão. Ao terminar e integrar uma branch legada `bm/c001-p01`, limpe somente worktrees limpos e branches já ancestrais do `HEAD` atual:
 
 ```bash
-bm context pack --repo <workspace> --unit C001/P01/T03
+bm workspace finish --repo <repo> --change C001
 ```
 
-Valide o pack retornado e carregue somente suas fontes e referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a unidade; regenere o pack sem reler o contrato completo ou criar fallback manual.
+O comando recusa workspace sujo ou branch não integrada. Nunca apague trabalho pendente para satisfazer limpeza.
 
-O pack seleciona:
+## 3. Contexto e execução
 
-- índice atual;
-- plano ativo;
-- tarefa ativa e suas dependências `Txx`;
-- partes do `SYSTEM_MODEL.md` tocadas;
-- providers, consumers e restrições futuras do plano;
-- specs e decisões referenciadas;
-- último checkpoint e resultado do plano.
+Antes de editar cada tarefa:
 
-Não releia planos concluídos nem reconstrua estado pela conversa. Gere pelo CLI briefs, relatórios, pacotes de revisão e checkpoints determinísticos quando as interfaces estiverem disponíveis.
+```bash
+bm context pack --repo <repo> --unit C001/P01/T01
+```
 
-## 4. Plano congelado e mudanças
+Valide o pack retornado. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a unidade; regenere o pack sem reler o contrato completo nem criar fallback manual.
 
-Siga esta ordem para decisão interna:
+Execute somente a tarefa tipada do frontmatter do plano. O corpo Markdown é explicação, não autoridade. O `task-brief` também deve vir do contrato tipado; headings soltos não criam tarefa.
+
+As tarefas da mesma onda podem avançar em paralelo apenas sem sobreposição de arquivos, ownership ou efeitos. Não crie paralelismo para cumprir uma quantidade artificial de agentes.
+
+Ordem de decisão interna:
 
 ```text
 decisão aprovada
-→ padrão do repositório
-→ stack/dependência existente
-→ documentação oficial
-→ opção reversível de menor risco
+→ padrão já existente no repositório
+→ stack atual
+→ documentação oficial necessária
+→ menor mudança reversível que atende ao aceite
 ```
 
-- detalhe interno reversível: decidir e registrar;
-- ajuste limitado sem mudança de contrato: registrar no resultado;
-- contrato, ownership, dado, migration, journey, efeito ou invariante alterado: parar a área afetada, registrar os IDs alterados e recalcular impacto;
-- novo custo ou efeito irreversível: pedir autoridade no checkpoint, preservando o plano se o contrato não mudar.
+Não implemente necessidade futura. Não crie camada, serviço, abstração ou framework sem requisito atual ou redução demonstrável de risco. Commits devem ser atômicos.
 
-Não redesenhar por preferência de nome, arquivo, comando equivalente ou solução "mais elegante". Não implementar necessidade futura.
+Quando houver execução realmente paralela, ferramentas disponíveis e autorização do host, use [`../_shared/agents/implementation-worker.md`](../_shared/agents/implementation-worker.md) com ownership sem sobreposição. O worker é opcional; nunca espere sua criação para prosseguir no checkout primário.
 
-## 5. Executar pela política
+## 4. Prova da tarefa
 
-Fix round é hipótese, não entrega. Identifique o `risk_seam` estável; renomear a tarefa não reinicia sua contagem. Passe `--risk-seam` e `--consecutive-seam-findings` à política. Ao atingir o breaker, pare patches locais e redesenhe o seam.
+Cada tarefa schema 2 declara `verify` com:
 
-Execute somente tarefas declaradas no frontmatter do plano. Respeite `task_waves`: tarefas da mesma onda podem avançar separadamente apenas quando não houver sobreposição real de arquivos, ownership ou efeitos. O orquestrador integra os resultados e mantém a ordem determinística dos IDs.
+- `kind: command`: preferir `argv` estruturado, `cwd`, `timeout_seconds` e `proves`;
+- `kind: procedure`: descrever o procedimento e fornecer um artefato real por `--evidence`.
 
-### Grouped
-
-- agrupar unidades baixas do mesmo seam e ownership;
-- um brief e uma revisão no gate do plano;
-- `verification.fast` focal;
-- commit atômico por grupo.
-
-### Slice
-
-- entregar comportamento vertical;
-- teste comportamental no seam público;
-- revisão por slice;
-- commit atômico por slice.
-
-### Strict
-
-- uma unidade crítica por execução;
-- RED pela interface pública, GREEN mínimo e regressão vizinha;
-- revisão independente;
-- commit atômico por tarefa.
-
-Quando subagentes estiverem disponíveis e autorizados, use [`../_shared/agents/implementation-worker.md`](../_shared/agents/implementation-worker.md). O worker recebe somente contrato, brief, modelo necessário e arquivo de resultado. Não criar subagente por camada de teste.
-
-## 6. Verificação e revisão
-
-Na unidade, execute `verification.fast`: unitário, contrato/integração e regressão diretamente relacionados. E2E entra somente quando for a menor prova pública. Não execute E2E completo ou mutação por microtarefa.
-
-No gate do plano, execute `verification.plan`: suítes afetadas, regressão do plano, jornadas críticas e mutação seletiva exigida. No release, execute os comandos completos aprovados.
-
-Revise em dois eixos:
-
-- **Contrato:** entrega, `provides`, `consumes`, model delta, aceite e ausência de escopo extra;
-- **Qualidade:** correção, segurança, simplicidade, compatibilidade e testes.
-
-Use [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) na cadência do modo: `grouped` no gate do plano, `slice` por slice e `strict` por tarefa. Entregue o caminho do arquivo de saída da revisão; nunca revise por microtarefa em `grouped`.
-
-Em risco alto ou crítico envolvendo autenticação/autorização, pagamentos, privacidade, secrets, migração destrutiva ou integridade, execute passagem somente leitura por [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md). Não executá-la em tarefa comum. Entregue o caminho do arquivo de saída do parecer e trate findings no fix loop existente.
-
-Finding estrutural, crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry ambíguo, idempotência concorrente ou recuperação após restart invalida a hipótese. Pare patches e redesenhe o seam com máquina de estados e matriz de falhas.
-
-## 7. Fechar cada plano
-
-No HEAD final:
-
-1. registrar comandos, cwd, horário, resultado e exit code;
-2. registrar `provides/consumes` realmente entregues e o delta real do modelo;
-3. comparar o delta com o prometido;
-4. executar, quando houver mudança material:
+Execute o comando pelo núcleo:
 
 ```bash
-bm impact analyze --repo <repo> --change C001 --plan P01 \
-  --changed-contract <id>
+bm verify task --repo <repo> --change C001 --plan P01 --task T01 \
+  --context-pack .bianchini/.runtime/context/C001-P01-T01.json
 ```
 
-5. marcar somente consumidores realmente atingidos como `stale`;
-6. repetir jornadas e gates apontados pelo impacto;
-7. ao concluir cada tarefa schema 2, registrar o resultado com o context pack
-   verificado usado por ela:
+Para procedimento manual:
+
+```bash
+bm verify task --repo <repo> --change C001 --plan P01 --task T01 \
+  --context-pack .bianchini/.runtime/context/C001-P01-T01.json \
+  --evidence artifacts/evidence/T01.png
+```
+
+O núcleo registra argv, cwd, timeout, exit code, hashes de saída, revisão Git, fingerprint do código, digest do pacote e do context pack. Texto como "testes passaram" não é prova.
+
+Uma falha persiste. Repetir a mesma prova no mesmo estado exige `--retry-reason`; não existe retry automático infinito. Prova verde é reutilizada apenas enquanto código, pacote e contexto continuam idênticos.
+
+Na tarefa, execute a menor prova pública relacionada. Não execute E2E completo ou mutação por microtarefa; essas campanhas pertencem ao gate do plano ou do release quando declaradas.
+
+## 5. Revisão limitada e correção
+
+Revise na cadência do modo:
+
+- `grouped`: uma revisão no gate do plano;
+- `slice`: uma revisão por slice vertical;
+- `strict`: uma revisão por tarefa crítica.
+
+Use [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) como contrato da revisão. O revisor recebe requisito, diff e `proof_id`. Avalia contrato, correção, segurança, simplicidade, compatibilidade e testes. Não redesenha por preferência. Entregue o caminho do arquivo de saída da revisão; em `grouped`, nunca revise por microtarefa.
+
+Em risco alto ou crítico envolvendo autenticação, autorização, pagamentos, privacidade, segredos, migração destrutiva ou integridade, aplique a passagem somente leitura de [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md). Não executá-la em tarefa comum. Entregue o caminho do arquivo de saída do parecer e trate findings no mesmo ciclo limitado.
+
+Registre o veredito:
+
+```bash
+bm verify review --repo <repo> --change C001 --scope task \
+  --plan P01 --task T01 --reviewer <identidade> --verdict approved \
+  --proof <proof-id>
+```
+
+Se houver defeito material, primeiro gere uma prova vermelha reproduzível e use `--verdict changes_requested --proof <proof-vermelho> --finding <descrição>`. Depois corrija o menor delta, gere prova nova e revise novamente. Não espere outro agente por polling. Cada chamada termina com um veredito persistido. O loop continua somente quando existe mudança concreta e encerra em aprovação, alteração material ou bloqueio real.
+
+Fix round é hipótese, não entrega. Identifique o `risk_seam` estável e passe `--risk-seam` e `--consecutive-seam-findings` à política; renomear a tarefa não reinicia a contagem. Repetir correções sem nova evidência aciona o limite do perfil e termina em bloqueio explícito, nunca em loop silencioso.
+
+Finding novo depois de uma conclusão válida reabre explicitamente a unidade:
+
+```bash
+bm plan reopen --repo <repo> --change C001 --plan P01 \
+  --reason "finding posterior ao gate do plano"
+bm plan reopen --repo <repo> --change C001 --plan P01 --task T01 \
+  --reason "defeito reproduzido pela interface pública"
+```
+
+Quando o plano ainda não foi concluído, use apenas a segunda chamada. Dependentes concluídos devem ser reabertos primeiro; o núcleo recusa criar um estado impossível.
+
+Não reescreva histórico para esconder a conclusão anterior. A auditoria de reabertura é preservada.
+
+## 6. Concluir tarefa e plano
+
+Somente após prova verde e revisão aprovada do mesmo fingerprint:
 
 ```bash
 bm plan complete --repo <repo> --change C001 --plan P01 --task T01 \
   --context-pack .bianchini/.runtime/context/C001-P01-T01.json \
-  --result "<resultado da tarefa>" \
-  --verification "<evidência da tarefa>"
+  --result "comportamento entregue" \
+  --proof <proof-id> --review <review-id>
 ```
 
-8. depois de todas as tarefas, materializar o delta real em JSON e executar:
+Depois de todas as tarefas, execute o gate declarado do plano, revise esse gate e conclua:
 
 ```bash
+bm verify plan --repo <repo> --change C001 --plan P01
+bm verify review --repo <repo> --change C001 --scope plan --plan P01 \
+  --reviewer <identidade> --verdict approved --proof <proof-id>
 bm plan complete --repo <repo> --change C001 --plan P01 \
-  --actual-delta <delta-real.json> \
-  --result "<resultado>" \
-  --verification "<evidência>" \
-  --completed-task T01 \
-  --completed-task T02
+  --actual-delta <delta-real.json> --result "plano entregue" \
+  --proof <proof-id> --review <review-id> \
+  --completed-task T01 --completed-task T02
 ```
 
-`--completed-task` permanece aceito para compatibilidade e, quando informado,
-deve listar todos os `Txx` na ordem aprovada. O CLI exige os resultados próprios
-das tarefas, vinculados a `pack_identity`, `pack_digest` e `package_digest`, e
-revalida o pacote completo antes de aceitar a conclusão do plano.
+`--completed-task T01` é compatibilidade explícita e, quando usado, deve listar todas as tarefas na ordem aprovada. Ele nunca substitui resultados, provas ou revisão persistidos.
 
-9. confirmar o resultado em `.bianchini/changes/Cxxx-*/results/` e o `STATE.md` atualizado.
+`completed` significa que o núcleo validou os artefatos, não que o executor declarou sucesso. Evidência narrativa continua permitida apenas no schema legado e deve ser reportada como garantia legada.
 
-`not_run`, flake aberto, evidência obsoleta ou dependência indispensável mantém o plano bloqueado. Uma mudança interna sem contrato/dado/invariante não invalida planos futuros.
+## 7. Release, homologação e fechamento
 
-## 8. Fechar a mudança
+Depois do último plano, rode novamente todas as verificações automatizadas no estado final do código:
 
-Depois do último plano:
+```bash
+bm verify release --repo <repo> --change C001 \
+  --build <build-id> --checksum <sha256> --delivery ready
+bm verify review --repo <repo> --change C001 --scope release \
+  --reviewer <identidade> --verdict approved \
+  --proof <proof-id> [--proof <proof-id> ...]
+```
 
-1. reconstruir `Sn` e executar `model validate`;
-2. exigir equivalência com o `SYSTEM_MODEL.md` final;
-3. executar o check estrutural, a revisão semântica conjunta atualizada e journeys ponta a ponta;
-4. executar `verification.release` e homologação aplicável no RC exato;
-5. revisar o release completo uma vez;
-6. se o digest mudou, obter nova aprovação explícita e gravá-la com `coherence approve`;
-7. sincronizar arquitetura, modelo e specs em `.bianchini/current/`;
-8. mover a mudança concluída para `.bianchini/archive/`;
-9. deixar `STATE.md` compacto em `idle` com `last_completed` e próxima ação.
+O release produz `results/RELEASE.md` com RC, fingerprint e provas. Homologue esse RC enquanto a mudança ainda está em `.bianchini/changes/`. Procedimentos manuais exigem evidência do mesmo RC. Só depois registre `HOMOLOGATION.md` aceita.
 
-Depois dos gates aplicáveis e com Git limpo, execute `bm cycle-close --repo <repo> --change C001`. O CLI recompõe o modelo pelos resultados, promove arquitetura/modelo e arquiva a mudança com rollback de falha intermediária.
+Commite o código e os artefatos finais. Então execute:
 
-Existência isolada de endpoint, tabela, fila ou tela não comprova integração. Diferencie código, testes, sandbox, deploy, efeito externo e homologação humana.
+```bash
+bm cycle-close --repo <repo> --change C001
+```
 
-Não fazer push, merge, deploy ou publicação por inferência. Respeite a autorização atual do usuário e as regras do repositório.
+O fechamento bloqueia se o release não estiver revisado, se a prova estiver stale, se a homologação não pertencer ao RC exato, se houver blocker ou se o candidato não for ancestral do `HEAD` salvo apenas por commits de `.bianchini`.
+
+Projetos antigos não são declarados inválidos em massa. Antes de confiar em resultados legados, execute uma auditoria final de release; preserve o histórico e reabra somente unidades com falha reproduzida.
 
 ## Saída
 
-Informe mudança/plano, modo, workspace, modelo antes/depois, contratos entregues, impact radius, planos `stale`, gates, commits, resultados, DocViva e bloqueios.
+Informe: mudança/plano, tarefas concluídas, provas e revisões, fingerprint do RC, homologação, commits, integração, limpeza de worktrees, bloqueios reais e o que ainda depende de ambiente externo. Nunca misture código validado, deploy e homologação humana.

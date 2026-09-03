@@ -4107,16 +4107,39 @@ def parser() -> argparse.ArgumentParser:
     impact.add_argument("--global-change", action="store_true")
 
     plan_result = commands.add_parser("plan")
-    plan_result.add_argument("action", choices=["complete"])
+    plan_result.add_argument("action", choices=["complete", "reopen"])
     plan_result.add_argument("--repo", type=Path, default=Path.cwd())
     plan_result.add_argument("--change", required=True)
     plan_result.add_argument("--plan", required=True)
     plan_result.add_argument("--task")
     plan_result.add_argument("--context-pack", type=Path)
     plan_result.add_argument("--actual-delta", type=Path)
-    plan_result.add_argument("--result", required=True)
+    plan_result.add_argument("--result")
     plan_result.add_argument("--verification", action="append", default=[])
+    plan_result.add_argument("--proof", action="append", default=[])
+    plan_result.add_argument("--review")
+    plan_result.add_argument("--reason")
     plan_result.add_argument("--completed-task", action="append", default=[])
+
+    verify = commands.add_parser("verify")
+    verify.add_argument(
+        "action", choices=["task", "plan", "release", "review", "status"]
+    )
+    verify.add_argument("--repo", type=Path, default=Path.cwd())
+    verify.add_argument("--change")
+    verify.add_argument("--plan")
+    verify.add_argument("--task")
+    verify.add_argument("--context-pack", type=Path)
+    verify.add_argument("--evidence", type=Path)
+    verify.add_argument("--retry-reason")
+    verify.add_argument("--scope", choices=["task", "plan", "release"])
+    verify.add_argument("--reviewer")
+    verify.add_argument("--verdict", choices=["approved", "changes_requested"])
+    verify.add_argument("--proof", action="append", default=[])
+    verify.add_argument("--finding", action="append", default=[])
+    verify.add_argument("--build")
+    verify.add_argument("--checksum")
+    verify.add_argument("--delivery", choices=["ready", "not_applicable"])
 
     context = commands.add_parser("context")
     context.add_argument("action", choices=["pack", "verify"])
@@ -4270,7 +4293,9 @@ def parser() -> argparse.ArgumentParser:
     decide.add_argument("--consecutive-seam-findings", type=int, default=0)
 
     workspace = commands.add_parser("workspace")
-    workspace.add_argument("action", choices=["create", "check", "locate", "resume"])
+    workspace.add_argument(
+        "action", choices=["create", "check", "locate", "resume", "finish"]
+    )
     workspace.add_argument("--repo", type=Path, default=Path.cwd())
     workspace.add_argument("--plan")
     workspace.add_argument("--change")
@@ -4505,6 +4530,13 @@ def main() -> int:
                 )
             )
         elif args.command == "plan":
+            if args.action == "reopen":
+                v04.require_workspace(args.repo)
+                raise BMError(
+                    "BM_NATIVE_REQUIRED: plan reopen existe somente no backend Go oficial"
+                )
+            if not args.result:
+                raise BMError("plan complete exige --result")
             if args.task:
                 if not args.context_pack:
                     raise BMError("plan complete --task exige --context-pack")
@@ -4539,6 +4571,11 @@ def main() -> int:
                         completed_tasks=args.completed_task,
                     )
                 )
+        elif args.command == "verify":
+            v04.require_workspace(args.repo)
+            raise BMError(
+                "BM_NATIVE_REQUIRED: verify existe somente no backend Go oficial"
+            )
         elif args.command == "context":
             if args.action == "pack":
                 if not args.unit:
@@ -4745,6 +4782,10 @@ def main() -> int:
             )
         elif args.command == "workspace":
             v04.require_workspace(args.repo)
+            if args.action == "finish":
+                raise BMError(
+                    "BM_NATIVE_REQUIRED: workspace finish existe somente no backend Go oficial"
+                )
             if args.action == "create":
                 if not args.plan or not args.change:
                     raise BMError("--change e --plan são obrigatórios para criar workspace 0.4")

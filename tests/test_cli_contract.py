@@ -103,8 +103,8 @@ class CliContractScenarios(unittest.TestCase):
         result = json.loads(verified.stdout)
         self.assertTrue(result["valid"])
         self.assertEqual(result["unregistered_skill_surfaces"], [])
-        self.assertEqual(result["command_count"], 31)
-        self.assertEqual(result["surface_count"], 58)
+        self.assertEqual(result["command_count"], 32)
+        self.assertEqual(result["surface_count"], 65)
         self.assertEqual(result["negative_surface_count"], 4)
 
     def test_generated_document_is_reproducible_byte_for_byte(self) -> None:
@@ -131,6 +131,7 @@ class CliContractScenarios(unittest.TestCase):
         )
         self.assertEqual(result["total"], fixture_count)
         self.assertEqual(result["passed"], fixture_count)
+        self.assertEqual(result["skipped"], 0)
 
     def test_phase0_baseline_metrics_are_measured_not_estimated(self) -> None:
         payload = json.loads(BASELINE.read_text(encoding="utf-8"))

@@ -30,7 +30,7 @@ Use `critical` somente para perda de dados, segurança explorável, indisponibil
 
 Score global de cobertura ou mutação nunca é finding. Um mutante sobrevivente só pode virar blocker quando um `proof_id` demonstra cenário aprovado alcançável de risco alto/crítico cujo comportamento mudou sem o teste falhar; equivalente, inalcançável, duplicado ou sem impacto material permanece hardening. Consolidar survivors da mesma causa em um único finding.
 
-`approved_requirement` deve existir literalmente no `task-brief` congelado. Blocker inicial exige proof vermelho no `HEAD` revisado. O guard consolida causas iguais e congela no máximo três blockers; demais findings viram hardening.
+`approved_requirement` deve existir literalmente no `task-brief` congelado. Blocker inicial exige proof vermelho no `HEAD` revisado. O guard consolida causas iguais. Todo defeito material comprovado permanece blocker, sem limite arbitrário de quantidade.
 
 Blocker estrutural exige `structural: true`, `structural_evidence` contendo `proof_id` vermelho e `structural_class` em `architecture_boundary`, `data_model`, `public_contract`, `state_machine` ou `cross_cutting_invariant`. Não inferir estrutura apenas pela extensão do patch.
 
@@ -41,7 +41,7 @@ Revise somente:
 - blocker congelado aberto, com `source: frozen` e mesmo `id`, contrato e evidências congeladas;
 - regressão causada pelo delta atual, com `source: delta_regression`.
 
-Não criar finding sobre código inalterado. Não reclassificar hardening. Não reabrir blocker resolvido, unidade ou tarefa concluída.
+Não criar finding sobre código inalterado. Não reclassificar hardening. Uma conclusão só reabre por comando explícito e prova nova posterior ao review anterior.
 
 Para `delta_regression`, inclua:
 

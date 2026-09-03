@@ -1,6 +1,6 @@
-# Convergência Codex
+# Convergência Codex — compatibilidade legada
 
-Contrato exclusivo para revisão, fix loop, breaker, redesign e parada. Estado vive em sidecar por unidade; nunca em `PROJECT_STATE` ou schema do método base.
+Contrato mantido somente para retomar sidecars criados antes do executor canônico. Execuções novas usam `bm verify`, `bm plan complete` e `bm plan reopen`. Este documento não define conclusão fora do núcleo Go.
 
 De `bm policy`, preservar modo, cadência e garantia. Ignorar somente limites de fix rounds e breaker do método base. Quando correção de bug ou homologação acionarem revisão, fix loop, breaker, redesign ou decisão de parada, este contrato prevalece.
 
@@ -42,13 +42,14 @@ Tabela fechada:
 | `awaiting_review` | `review` | `review_frozen` | revisão aceita; próximo passo ainda executável ou aprovação disponível |
 | `awaiting_review` | `review` | `parked` | blocker aberto sem fix ou redesign disponível |
 | `review_frozen` | `complete` | `completed` | zero blockers abertos; gates obrigatórios registrados e aprovados |
+| `completed` | `reopen` | `awaiting_review` | `HEAD` posterior ao último review e motivo não vazio |
 | qualquer não terminal | `stop` | `stopped` | categoria permitida com evidência completa |
 
-`completed` e `stopped` são terminais. Qualquer comando mutável nessas fases falha. Qualquer transição ausente da tabela falha. `parked` não significa concluída; trabalho independente continua.
+`stopped` é terminal. `completed` aceita somente `reopen`; outros comandos mutáveis falham. Qualquer transição ausente da tabela falha. `parked` não significa concluída; trabalho independente continua.
 
 A parada é isolada por unidade. `parked`, bloqueio local ou `stopped` de uma unidade não interrompem outras unidades sem dependência. A execução global só termina após entrega concluída ou quando todo trabalho restante estiver terminal ou estacionado sem ação segura disponível.
 
-`gate` e `decision` registram dados sem mudar fase e são aceitos somente enquanto unidade não for terminal. `status` e `migrate` preservam fase; podem validar estado terminal.
+`gate` e `decision` registram dados sem mudar fase e são aceitos somente enquanto a unidade está executável. `status` e `migrate` preservam fase; podem validar estado terminal.
 
 `freeze` cria sidecar e primeira revisão atomicamente. `review` só executa em `awaiting_review`. Fix ou redesign só executam em `review_frozen`. Dois fixes consecutivos sem `submit-delta --kind fix` e `review` intermediários são inválidos. Renomear unidade ou seam não cria nova identidade nem reseta contador.
 
@@ -67,7 +68,7 @@ Primeira revisão congela blockers. Blocker exige:
 - `risk_seam`;
 - metadados estruturais.
 
-O guard consolida findings pela causa raiz e congela no máximo três blockers iniciais. Duplicatas da mesma causa e findings além desse limite viram `deferred_hardening`. Requisito ausente do `task-brief` também vira hardening.
+O guard consolida findings pela causa raiz. Todo defeito material comprovado contra requisito aprovado permanece blocker; quantidade não muda sua classificação. Duplicatas da mesma causa e requisito ausente do `task-brief` viram `deferred_hardening`.
 
 Forma não estrutural:
 
@@ -90,7 +91,7 @@ Blocker estrutural usa `structural: true`, `structural_evidence` com `proof_id` 
 
 Classe livre, evidência textual vaga ou combinação inconsistente é inválida.
 
-Finding não crítico vira `deferred_hardening`. Blocker aberto nunca vira hardening silenciosamente. Revisão seguinte cobre somente blockers congelados abertos e regressões causadas pelo delta atual. Tarefa concluída nunca reabre.
+Finding não crítico vira `deferred_hardening`. Blocker aberto nunca vira hardening silenciosamente. Revisão seguinte cobre somente blockers congelados abertos e regressões causadas pelo delta atual. Evidência nova posterior à conclusão exige `reopen`, preservando o histórico anterior.
 
 ## Regressão do delta
 
@@ -188,6 +189,7 @@ python3 <review_guard.py> gate --sidecar <sidecar.json> --gate <gate> --proof-id
 python3 <review_guard.py> decision --sidecar <sidecar.json> --kind <internal|local_block> --summary <summary>
 python3 <review_guard.py> stop --sidecar <sidecar.json> --kind <categoria> --evidence <evidence.json>
 python3 <review_guard.py> complete --sidecar <sidecar.json>
+python3 <review_guard.py> reopen --sidecar <sidecar.json> --head <commit-posterior> --reason <motivo>
 python3 <review_guard.py> status --sidecar <sidecar.json>
 python3 <review_guard.py> migrate --sidecar <sidecar.json>
 ```
@@ -202,6 +204,7 @@ fix -> submit-delta -> review
 fix -> submit-delta -> review
 redesign -> submit-delta -> review
 gate -> complete
+reopen -> review
 ```
 
 Comandos mutáveis validam fase antes de escrever. `status` valida ou recupera sidecar sem alterar fase. Nenhum comando, resultado ou estado contém `ask_user`.
