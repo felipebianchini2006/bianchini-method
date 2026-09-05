@@ -1,5 +1,7 @@
 # Validação do candidato 1.0
 
+Continuação: [correção e verificação da compatibilidade no CI](ci-followup.md).
+
 Data: 2026-09-05. Repositório: `felipebianchini2006/bianchini-method`.
 Branch: `feat/v1.0-autonomous-verified-workflow`, criada a partir de `main`.
 Commit inicial: `930ee8fd01ebba62bdd60c30cd8a2daab321effe`.
