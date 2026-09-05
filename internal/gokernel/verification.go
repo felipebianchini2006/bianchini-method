@@ -28,6 +28,7 @@ type verificationSpec struct {
 	proves     string
 	legacyRun  string
 	legacyMode bool
+	cache      string
 }
 
 func runVerify(args []string) (any, error) {
@@ -42,7 +43,7 @@ func runVerify(args []string) (any, error) {
 		"--repo": true, "--change": true, "--plan": true, "--task": true,
 		"--context-pack": true, "--evidence": true, "--retry-reason": true,
 		"--scope": true, "--reviewer": true, "--verdict": true, "--proof": true,
-		"--finding": true, "--build": true, "--checksum": true, "--delivery": true,
+		"--resolves-review": true, "--artifact-kind": true, "--finding": true, "--build": true, "--checksum": true, "--delivery": true,
 	}, map[string]bool{})
 	if err != nil {
 		return nil, err
@@ -159,9 +160,25 @@ func verifyRelease(pack coherencePackage, coherence map[string]any, flags parsed
 	}
 	build, checksum := strings.TrimSpace(lastValue(flags, "--build")), strings.TrimSpace(lastValue(flags, "--checksum"))
 	delivery := strings.TrimSpace(lastValue(flags, "--delivery"))
-	if build == "" || !waveDigest.MatchString(checksum) || !oneOf(delivery, "ready", "not_applicable") {
-		return nil, userError("verify release exige --build, --checksum e --delivery ready|not_applicable")
+	if build == "" || (checksum != "" && !waveDigest.MatchString(checksum)) || !oneOf(delivery, "ready", "not_applicable") {
+		return nil, userError("verify release exige --build e --delivery ready|not_applicable; --checksum opcional deve ser SHA-256")
 	}
+	kind := lastValue(flags, "--artifact-kind")
+	if kind == "" {
+		kind = "file"
+	}
+	build = canonicalArtifactBuild(pack.workspace.root, kind, build)
+	checksum, err := releaseArtifactIdentity(pack.workspace.root, kind, build, checksum)
+	if err != nil {
+		return nil, err
+	}
+	head, err := verificationGitHead(pack.workspace.root)
+	if err != nil {
+		return nil, err
+	}
+	candidate := map[string]any{"revision": head, "kind": kind, "build": build, "checksum": checksum}
+	fingerprint := waveStableDigest(candidate)
+	candidate["id"] = "RC-" + fingerprint[:12]
 	results, err := planResultPayloads(pack.workspace, pack.directory)
 	if err != nil {
 		return nil, err
@@ -186,16 +203,6 @@ func verifyRelease(pack coherencePackage, coherence map[string]any, flags parsed
 				manual = append(manual, map[string]any{"plan": plan.id, "task": stateString(task["id"]), "procedure": spec.legacyRun, "proves": spec.proves})
 				continue
 			}
-			proof, proofErr := executeVerification(verificationRequest{
-				pack: pack, scope: "release", plan: plan.id, task: stateString(task["id"]),
-				unit: plan.id + "/" + stateString(task["id"]), packageDigest: stateString(coherence["digest"]),
-				seam:        stateString(task["risk_seam"]),
-				retryReason: lastValue(flags, "--retry-reason"),
-			}, spec)
-			if proofErr != nil {
-				return nil, proofErr
-			}
-			proofs = append(proofs, stateString(proof["proof_id"]))
 		}
 		for index, raw := range normalizedPlanStrings(plan, "verifications") {
 			spec, specErr := legacyVerificationSpec(raw, "gate de release")
@@ -204,7 +211,7 @@ func verifyRelease(pack coherencePackage, coherence map[string]any, flags parsed
 			}
 			proof, proofErr := executeVerification(verificationRequest{
 				pack: pack, scope: "release", plan: plan.id, unit: fmt.Sprintf("%s/gate-%02d", plan.id, index+1),
-				seam:          "plan-gate",
+				seam: "plan-gate", candidateDigest: fingerprint, candidate: candidate,
 				packageDigest: stateString(coherence["digest"]), retryReason: lastValue(flags, "--retry-reason"),
 			}, spec)
 			if proofErr != nil {
@@ -213,17 +220,13 @@ func verifyRelease(pack coherencePackage, coherence map[string]any, flags parsed
 			proofs = append(proofs, stateString(proof["proof_id"]))
 		}
 	}
-	head, err := verificationGitHead(pack.workspace.root)
-	if err != nil {
-		return nil, err
-	}
 	sourceFingerprint, err := verificationSourceFingerprint(pack.workspace.root)
 	if err != nil {
 		return nil, err
 	}
-	candidate := map[string]any{"revision": head, "build": build, "checksum": checksum}
-	fingerprint := waveStableDigest(candidate)
-	candidate["id"] = "RC-" + fingerprint[:12]
+	if err := validateCandidateArtifact(pack, candidate); err != nil {
+		return nil, err
+	}
 	payload := map[string]any{
 		"schema_version": 1, "change": filepath.Base(pack.directory), "status": "verified",
 		"candidate": candidate, "fingerprint": fingerprint, "source_fingerprint": sourceFingerprint,
@@ -257,6 +260,7 @@ func taskVerificationSpec(task map[string]any) (verificationSpec, error) {
 		kind: kind, cwd: strings.TrimSpace(stateString(verify["cwd"])),
 		timeout: stateInt(verify["timeout_seconds"]), proves: strings.TrimSpace(stateString(verify["proves"])),
 		legacyRun: strings.TrimSpace(stateString(verify["run"])),
+		cache:     stateString(verify["cache"]),
 	}
 	if spec.cwd == "" {
 		spec.cwd = "."
@@ -347,16 +351,18 @@ func splitVerificationCommand(raw string) ([]string, error) {
 }
 
 type verificationRequest struct {
-	pack          coherencePackage
-	scope         string
-	plan          string
-	task          string
-	unit          string
-	seam          string
-	packageDigest string
-	packDigest    string
-	retryReason   string
-	evidence      string
+	pack            coherencePackage
+	scope           string
+	plan            string
+	task            string
+	unit            string
+	seam            string
+	packageDigest   string
+	packDigest      string
+	retryReason     string
+	evidence        string
+	candidateDigest string
+	candidate       map[string]any
 }
 
 func executeVerification(request verificationRequest, spec verificationSpec) (map[string]any, error) {
@@ -369,7 +375,11 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 	}
 	head, err := verificationGitHead(request.pack.workspace.root)
 	if err != nil {
-		return nil, err
+		if oneOf(request.scope, "quick", "debug") {
+			head = "UNBORN"
+		} else {
+			return nil, err
+		}
 	}
 	evidencePath, evidenceDigest := any(nil), any(nil)
 	if spec.kind == "procedure" {
@@ -388,10 +398,11 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 		evidencePath, evidenceDigest = filepath.ToSlash(relative), sha256Bytes(content)
 	}
 	base := map[string]any{
+		"candidate_fingerprint": request.candidateDigest, "candidate": request.candidate,
 		"scope": request.scope, "change": filepath.Base(request.pack.directory), "plan": request.plan,
 		"task": nullableString(request.task), "unit": request.unit, "kind": spec.kind,
-		"risk_seam": request.seam,
-		"argv":      stringSliceAny(spec.argv), "cwd": spec.cwd, "timeout_seconds": spec.timeout,
+		"risk_seam":    request.seam,
+		"cache_policy": spec.cache, "argv": stringSliceAny(spec.argv), "cwd": spec.cwd, "timeout_seconds": spec.timeout,
 		"proves": spec.proves, "legacy_command": spec.legacyMode, "source_revision": head,
 		"source_fingerprint": fingerprint, "package_digest": request.packageDigest,
 		"context_pack_digest":     nullableString(request.packDigest),
@@ -404,17 +415,23 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 	if err != nil {
 		return nil, err
 	}
-	for _, proof := range existing {
-		if stateString(proof["status"]) == "passed" {
+	if len(existing) > 0 {
+		proof := existing[len(existing)-1]
+		if spec.cache == "deterministic" && stateString(proof["status"]) == "passed" {
 			return map[string]any{"proof_id": proof["proof_id"], "status": "passed", "reused": true, "proof": proof}, nil
 		}
 	}
-	if len(existing) > 0 && strings.TrimSpace(request.retryReason) == "" {
+	if len(existing) > 0 && stateString(existing[len(existing)-1]["status"]) == "failed" && strings.TrimSpace(request.retryReason) == "" {
 		return nil, workflowError("VERIFICATION_RETRY_REQUIRED", "a mesma verificação já falhou neste estado; informe --retry-reason para repetir")
+	}
+	policy, sequence, err := verificationAttemptPolicy(request, fingerprint)
+	if err != nil {
+		return nil, err
 	}
 	attempt := len(existing) + 1
 	started := utcNow()
 	exitCode, timedOut, spawnError := 0, false, false
+	outputTruncated := false
 	stdout, stderr := []byte{}, []byte{}
 	if spec.kind != "procedure" {
 		cwd, cwdErr := verificationCWD(request.pack.workspace.root, spec.cwd)
@@ -424,11 +441,15 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(spec.timeout)*time.Second)
 		command := exec.CommandContext(ctx, spec.argv[0], spec.argv[1:]...)
 		command.Dir = cwd
-		var stdoutBuffer, stderrBuffer bytes.Buffer
+		if request.candidate != nil {
+			command.Env = append(os.Environ(), "BM_CANDIDATE_BUILD="+stateString(request.candidate["build"]), "BM_CANDIDATE_CHECKSUM="+stateString(request.candidate["checksum"]))
+		}
+		var stdoutBuffer, stderrBuffer verificationOutput
 		command.Stdout, command.Stderr = &stdoutBuffer, &stderrBuffer
 		runErr := command.Run()
 		cancel()
 		stdout, stderr = stdoutBuffer.Bytes(), stderrBuffer.Bytes()
+		outputTruncated = stdoutBuffer.truncated || stderrBuffer.truncated
 		if ctx.Err() == context.DeadlineExceeded {
 			timedOut = true
 		}
@@ -449,14 +470,20 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 	record["schema_version"] = 1
 	record["execution_key"] = executionKey
 	record["attempt"] = attempt
+	record["execution_sequence"] = sequence
+	record["policy"] = policy
+	record["fix_round"] = policy["fix_round"]
 	record["retry_reason"] = nullableString(strings.TrimSpace(request.retryReason))
 	record["exit_code"] = exitCode
 	record["timed_out"] = timedOut
 	record["spawn_error"] = spawnError
+	record["output_truncated"] = outputTruncated
 	record["stdout_sha256"] = sha256Bytes(stdout)
 	record["stderr_sha256"] = sha256Bytes(stderr)
 	record["evidence_path"] = evidencePath
 	record["evidence_sha256"] = evidenceDigest
+	record["stdout_summary"] = sanitizeVerificationOutput(stdout)
+	record["stderr_summary"] = sanitizeVerificationOutput(stderr)
 	record["status"] = status
 	record["started_at"] = started
 	record["finished_at"] = utcNow()
@@ -465,6 +492,22 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 	delete(idMaterial, "finished_at")
 	proofID := "proof-" + waveStableDigest(idMaterial)[:32]
 	record["proof_id"] = proofID
+	logPath := filepath.Join(request.pack.directory, "results", "logs", proofID+".log")
+	logText := stateString(record["stdout_summary"]) + "\n" + stateString(record["stderr_summary"])
+	if outputTruncated {
+		logText += "\n[output truncated at 256 KiB per stream]\n"
+	}
+	if err := request.pack.workspace.atomicWrite(logPath, []byte(logText)); err != nil {
+		return nil, err
+	}
+	relativeLog, _ := filepath.Rel(request.pack.workspace.root, logPath)
+	record["log_path"], record["log_sha256"] = filepath.ToSlash(relativeLog), sha256Bytes([]byte(logText))
+	for _, key := range []string{"stdout_summary", "stderr_summary"} {
+		text := stateString(record[key])
+		if len(text) > 4096 {
+			record[key] = text[:4096] + "\n[output truncated; see log]"
+		}
+	}
 	record["record_digest"] = verificationRecordDigest(record)
 	path := filepath.Join(request.pack.directory, "results", "proofs", proofID+".json")
 	encoded, _ := json.MarshalIndent(record, "", "  ")
@@ -472,7 +515,7 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 		return nil, err
 	}
 	if status != "passed" {
-		return nil, workflowError("VERIFICATION_FAILED", fmt.Sprintf("%s falhou com exit code %d; proof_id %s", request.unit, exitCode, proofID))
+		return map[string]any{"proof_id": proofID, "status": status, "reused": false, "proof": record}, workflowError("VERIFICATION_FAILED", fmt.Sprintf("%s falhou com exit code %d; proof_id %s", request.unit, exitCode, proofID))
 	}
 	return map[string]any{"proof_id": proofID, "status": status, "reused": false, "proof": record}, nil
 }
@@ -593,6 +636,11 @@ func validateProofSet(pack coherencePackage, identifiers []string, scope, plan, 
 		if proof == nil || stateString(proof["status"]) != "passed" || stateString(proof["scope"]) != scope || stateString(proof["change"]) != filepath.Base(pack.directory) || stateString(proof["package_digest"]) != stateString(pack.contract["digest"]) || scope != "release" && stateString(proof["plan"]) != plan {
 			return nil, workflowError("STALE_EVIDENCE", "proof_id incompatível: "+identifier)
 		}
+		for _, newer := range proofs {
+			if stateString(newer["scope"]) == scope && stateString(newer["unit"]) == stateString(proof["unit"]) && stateString(newer["source_fingerprint"]) == stateString(proof["source_fingerprint"]) && stateInt(newer["execution_sequence"]) > stateInt(proof["execution_sequence"]) && stateString(newer["status"]) != "passed" {
+				return nil, workflowError("STALE_EVIDENCE", "execução posterior do gate falhou")
+			}
+		}
 		if task != "" && stateString(proof["task"]) != task {
 			return nil, workflowError("STALE_EVIDENCE", "proof_id pertence a outra tarefa: "+identifier)
 		}
@@ -602,6 +650,9 @@ func validateProofSet(pack coherencePackage, identifiers []string, scope, plan, 
 		if requireCurrent && !verificationProofEnvironmentCurrent(pack.workspace.root, proof) {
 			return nil, workflowError("STALE_EVIDENCE", "proof_id não pertence ao ambiente ou evidência atual: "+identifier)
 		}
+	}
+	if err := validateGateCoverage(pack, proofs, ids, scope, plan, task); err != nil {
+		return nil, err
 	}
 	return ids, nil
 }
@@ -642,18 +693,29 @@ func recordVerificationReview(pack coherencePackage, flags parsedFlags) (map[str
 		return nil, userError("verify review exige identidade completa do escopo")
 	}
 	proofIDs := nonemptyUnique(flags.values["--proof"])
-	if len(proofIDs) == 0 {
-		return nil, workflowError("STALE_EVIDENCE", "review exige ao menos um --proof")
-	}
-	if err := validateReviewProofs(pack, proofIDs, scope, planID, taskID, verdict); err != nil {
+	findings, err := structuredReviewFindings(pack.workspace.root, flags.values["--finding"])
+	if err != nil {
 		return nil, err
 	}
-	findings := nonemptyUnique(flags.values["--finding"])
-	if verdict == "approved" && len(findings) > 0 {
-		return nil, workflowError("REVIEW_BLOCKED", "review approved não aceita finding aberto")
-	}
-	if verdict == "changes_requested" && len(findings) == 0 {
-		return nil, workflowError("REVIEW_BLOCKED", "changes_requested exige ao menos um --finding")
+	if verdict == "approved" {
+		if len(findings) > 0 {
+			return nil, workflowError("REVIEW_BLOCKED", "approved não aceita finding aberto")
+		}
+		if err := validateReviewProofs(pack, proofIDs, scope, planID, taskID, verdict); err != nil {
+			return nil, err
+		}
+		if err := unresolvedVerificationReviews(pack, scope, planID, taskID, flags.values["--resolves-review"]); err != nil {
+			return nil, err
+		}
+	} else {
+		if len(findings) == 0 {
+			return nil, workflowError("REVIEW_BLOCKED", "changes_requested exige finding estruturado")
+		}
+		if len(proofIDs) > 0 {
+			if err := validateReviewProofs(pack, proofIDs, scope, planID, taskID, verdict); err != nil {
+				return nil, err
+			}
+		}
 	}
 	fingerprint, err := verificationSourceFingerprint(pack.workspace.root)
 	if err != nil {
@@ -662,7 +724,7 @@ func recordVerificationReview(pack coherencePackage, flags parsedFlags) (map[str
 	payload := map[string]any{
 		"schema_version": 1, "change": filepath.Base(pack.directory), "scope": scope,
 		"plan": nullableString(planID), "task": nullableString(taskID), "reviewer": reviewer,
-		"verdict": verdict, "proof_ids": stringSliceAny(proofIDs), "findings": stringSliceAny(findings),
+		"verdict": verdict, "proof_ids": stringSliceAny(proofIDs), "findings": findings, "resolves_reviews": stringSliceAny(flags.values["--resolves-review"]),
 		"source_fingerprint": fingerprint, "reviewed_at": utcNow(),
 	}
 	idMaterial := cloneMap(payload)
@@ -696,18 +758,11 @@ func validateReviewProofs(pack coherencePackage, identifiers []string, scope, pl
 	if err != nil {
 		return err
 	}
-	hasFailure := false
 	for _, identifier := range identifiers {
 		proof := proofs[identifier]
 		if proof == nil || stateString(proof["scope"]) != scope || stateString(proof["change"]) != filepath.Base(pack.directory) || stateString(proof["package_digest"]) != stateString(pack.contract["digest"]) || (scope != "release" && stateString(proof["plan"]) != plan) || (task != "" && stateString(proof["task"]) != task) || stateString(proof["source_fingerprint"]) != current || !verificationProofEnvironmentCurrent(pack.workspace.root, proof) {
 			return workflowError("STALE_EVIDENCE", "proof_id incompatível: "+identifier)
 		}
-		if stateString(proof["status"]) == "failed" {
-			hasFailure = true
-		}
-	}
-	if !hasFailure {
-		return workflowError("REVIEW_BLOCKED", "changes_requested exige ao menos um proof vermelho no estado atual")
 	}
 	return nil
 }
@@ -728,6 +783,9 @@ func attachReleaseReview(pack coherencePackage, reviewID string, proofIDs []stri
 }
 
 func validateVerificationReview(pack coherencePackage, identifier, scope, plan, task string, proofIDs []string, requireCurrent bool) error {
+	if err := unresolvedVerificationReviews(pack, scope, plan, task, nil); err != nil {
+		return err
+	}
 	if !verificationReviewID.MatchString(identifier) {
 		return workflowError("REVIEW_REQUIRED", "conclusão exige review_id gerado por bm verify review")
 	}
@@ -824,6 +882,16 @@ func verificationSourceFingerprint(root string) (string, error) {
 }
 
 func validateReleaseClosure(pack coherencePackage, coherence map[string]any) (map[string]any, error) {
+	for _, plan := range pack.plans {
+		if err := unresolvedVerificationReviews(pack, "plan", plan.id, "", nil); err != nil {
+			return nil, err
+		}
+		for _, task := range planTasks(plan) {
+			if err := unresolvedVerificationReviews(pack, "task", plan.id, stateString(task["id"]), nil); err != nil {
+				return nil, err
+			}
+		}
+	}
 	releasePath := filepath.Join(pack.directory, "results", "RELEASE.md")
 	release, err := readStructuredFrontmatter(releasePath)
 	if err != nil {
@@ -860,6 +928,18 @@ func validateReleaseClosure(pack coherencePackage, coherence map[string]any) (ma
 	if stateString(release["fingerprint"]) != fingerprint || stateString(candidate["id"]) != "RC-"+fingerprint[:12] {
 		return nil, workflowError("RELEASE_REQUIRED", "fingerprint do RC diverge")
 	}
+	if err := validateCandidateArtifact(pack, candidate); err != nil {
+		return nil, err
+	}
+	storedProofs, err := loadVerificationProofs(pack)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range proofIDs {
+		if stateString(storedProofs[id]["candidate_fingerprint"]) != fingerprint {
+			return nil, workflowError("STALE_EVIDENCE", "prova pertence a outro candidato")
+		}
+	}
 	if err := verificationOnlyMethodChangesSince(pack.workspace.root, stateString(candidate["revision"])); err != nil {
 		return nil, err
 	}
@@ -875,6 +955,9 @@ func validateReleaseClosure(pack coherencePackage, coherence map[string]any) (ma
 	}
 	if stateInt(homologation["schema_version"]) != 1 || stateString(homologation["change"]) != filepath.Base(pack.directory) || stateString(homologation["status"]) != "accepted" || stateString(homologation["fingerprint"]) != fingerprint || !mapsEqual(stateObject(rc), candidate) || !blockersOK || len(blockers) > 0 || !gatesOK || len(gates) == 0 {
 		return nil, workflowError("HOMOLOGATION_REQUIRED", "homologação aceita do RC exato está ausente ou incompleta")
+	}
+	if err := validateHomologationGates(pack.workspace.root, homologation, proofIDs); err != nil {
+		return nil, err
 	}
 	manualRequirements := stateArray(release["manual_requirements"])
 	if len(manualRequirements) > 0 {

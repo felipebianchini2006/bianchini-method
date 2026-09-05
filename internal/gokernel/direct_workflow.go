@@ -256,7 +256,12 @@ func directWorkflowCheckpoint(repo string, flags parsedFlags) (map[string]any, e
 	if err != nil {
 		return nil, err
 	}
+	proofIDs, err := verifyQuickCommands(workspace, directory, brief, flags.values["--command"], lastValue(flags, "--retry-reason"))
+	if err != nil {
+		return nil, err
+	}
 	event := map[string]any{
+		"proof_ids":     proofIDs,
 		"summary":       strings.TrimSpace(lastValue(flags, "--checkpoint")),
 		"changed_files": uniqueSorted(flags.values["--changed-file"]), "commands": flags.values["--command"],
 		"evidence": flags.values["--evidence"], "blockers": flags.values["--blocker"],
@@ -384,6 +389,12 @@ func directWorkflowFinish(repo string, flags parsedFlags) (map[string]any, error
 		}
 		if stateString(last["fingerprint"]) != fingerprint {
 			return nil, workflowError("STALE_EVIDENCE", "código mudou após o último checkpoint")
+		}
+		if len(flags.values["--blocker"]) > 0 || len(stringsFromAny(last["blockers"])) > 0 {
+			return nil, workflowError("VERIFICATION_FAILED", "quick contém blockers")
+		}
+		if _, err := validateQuickProofs(workspace, directory, brief, events); err != nil {
+			return nil, err
 		}
 		var missing []string
 		finalRisk, missing, err = directFinalRisk(repo, brief, events)

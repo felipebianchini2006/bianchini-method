@@ -2,7 +2,7 @@
 
 Os gates provam a entrega na stack real e alimentam `verification.fast`, `verification.plan` e `verification.release`.
 
-Antes da execução, `READINESS.md`, `planning-audit`, `planning-check` e `snapshot verify` provam que decisões, suposições, pitfalls, ações externas, design e specs de domínio chegaram ao pacote. Esses gates de planejamento não são repetidos por tarefa.
+No fluxo atual, model validate, roadmap sync e coherence check validam o pacote e suas specs. READINESS.md, planning-audit, planning-check e snapshot pertencem à compatibilidade legada; não acrescentá-los ao fluxo atual. A revisão do pacote não se repete por tarefa.
 
 Quando a telemetria estiver habilitada, registrar após o gate apenas duração, tokens informados pelo host, fix rounds e contador de falhas. A evidência detalhada continua no ledger/relatório sanitizado.
 

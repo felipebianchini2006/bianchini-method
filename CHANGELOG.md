@@ -2,6 +2,20 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 1.0.0 — Candidato, sem tag definitiva
+
+- exige cobertura exata dos gates obrigatórios, prova atual e rejeita passe anterior a falha posterior;
+- executa provas reais no quick e no RED/GREEN do debug, rejeitando narrativa e falhas de carregamento;
+- usa execução fresca por padrão; cache determinístico depende de identidade equivalente;
+- calcula a identidade de arquivo, imagem ou deployment e vincula gates ao candidato;
+- deriva elegibilidade da homologação dos gates e findings, preservando o estado em falhas;
+- aplica revisão no plano em `grouped`, por tarefa em `strict` e por tarefa vertical em `slice`;
+- aceita findings de inspeção com evidência e resolução explícita, sem RED fabricado;
+- persiste orçamento por risco, mantém diagnóstico limitado e sanitizado;
+- automatiza manifesto/diff de specs, distingue decisão técnica de aprovação humana e mantém stack proporcional;
+- exercita a jornada pública em Go e a aplicação local de solicitações com PDF, quick, debug e falhas controladas;
+- mantém o oráculo Python e contratos legados; migração em `docs/workflow-v1.md`.
+
 ## 0.6.0 — Conclusão baseada em evidência
 
 - torna `bm verify task|plan|release|review|status` a autoridade de prova e revisão do backend Go;

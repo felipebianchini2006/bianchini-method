@@ -42,7 +42,7 @@ func TestDirectLifecycleMatchesFrozenSuccess(t *testing.T) {
 		"--objective", "Renomear variável interna",
 		"--scope", "Refactor sem efeito observável",
 		"--acceptance", "Testes existentes continuam verdes",
-		"--verification", "python3 -m unittest",
+		"--verification", "go version",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestDirectLifecycleMatchesFrozenSuccess(t *testing.T) {
 
 	checkpointValue, err := runDirectLifecycle("checkpoint", []string{
 		"--repo", repo, "--slug", id, "--checkpoint", "Refactor verificado",
-		"--next-action", "Finalizar", "--command", "python3 -m unittest", "--evidence", "suíte verde",
+		"--next-action", "Finalizar", "--command", "go version", "--evidence", "suíte verde",
 	})
 	if err != nil {
 		t.Fatal(err)

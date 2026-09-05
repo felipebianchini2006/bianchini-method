@@ -97,7 +97,7 @@ Se verdadeira, <experimento> produz <resultado>; senão, <contraprova>.
 
 Teste uma hipótese por vez e preserve hipóteses eliminadas. Instrumentação é mínima, sanitizada e removida antes do commit.
 
-Uma crash window, partial commit, TOCTOU, efeito externo antes de persistência, retry após timeout, idempotência concorrente ou recuperação após restart são achados estruturais: interrompa patches e escale para redesenho do seam.
+Para crash window, partial commit, TOCTOU, retry ou recuperação após restart, identifique primeiro o invariante quebrado. Escolha correção local ou mudança arquitetural proporcional. Não escale automaticamente por categoria.
 
 O seam representa o risco estável: renomear a tarefa não zera o seam nem suas tentativas consecutivas.
 
@@ -113,7 +113,7 @@ Crie a menor prova que:
 
 Use unitário para lógica isolada, integração/contrato para fronteira, E2E focado para jornada e evidência visual comparável para apresentação. Corrida usa relógio/sincronização controlados, não sleep arbitrário.
 
-Execute e grave o RED pelo checkpoint antes do fix.
+Execute RED pelo checkpoint com `--command <comando> --test-file <arquivo-da-regressão> --failure-pattern <assinatura-do-defeito>`. O executor exige exit 1, assinatura observada e ausência de timeout/spawn error. Outros códigos de saída precisam de um harness que distinga falha do contrato de infraestrutura, sem mascará-la.
 
 ## 6. Fix mínimo e GREEN
 
@@ -128,7 +128,7 @@ Depois:
 5. remover instrumentação;
 6. provar sensibilidade do teste quando viável.
 
-Qualquer alteração após a evidência invalida GREEN e regressão anteriores. Reexecute no fingerprint final.
+GREEN e regression_checked também exigem `--command`. GREEN usa o mesmo comando e arquivo de teste imutável do RED. Qualquer alteração posterior invalida as provas; repita checkpoint green no mesmo Dxxx e depois regression_checked/documented. A retomada preserva o RED histórico.
 
 ## 7. Revisar e decidir impacto
 

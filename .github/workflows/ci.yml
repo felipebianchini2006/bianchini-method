@@ -47,20 +47,26 @@ jobs:
             tests/test_context_efficiency_review.py \
             tests/test_self_update.py
 
-      - name: Run complete sharded suite
-        run: python3 scripts/run_test_shards.py
-
       - name: Validate native backend
         run: |
           go test ./...
           go vet ./...
           go build -trimpath -o /tmp/bm ./cmd/bm
 
+      - name: Run Python compatibility and public Go journeys
+        env:
+          BM_FULL_JOURNEY_BACKEND: go
+          BM_FULL_JOURNEY_GO_BINARY: /tmp/bm
+          BM_GO_SUITE_ALREADY_RUN: "1"
+        run: python3 scripts/run_test_shards.py
+
+      - name: Exercise service requests through the official Go CLI
+        run: python3 scripts/run_service_example.py --binary /tmp/bm --protocol-test
+
       - name: Validate CLI entrypoints
         run: |
           /tmp/bm version --json | python3 -c 'import json, sys; assert json.load(sys.stdin)["official"] is True'
-          python3 scripts/run_cli_contract_fixtures.py --engine go --binary /tmp/bm
-          test "$(cat skills/_shared/VERSION)" = "0.6.0"
+          test "$(cat skills/_shared/VERSION)" = "1.0.0"
 
   windows-portability:
     runs-on: windows-latest

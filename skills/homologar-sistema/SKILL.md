@@ -1,6 +1,6 @@
 ---
 name: homologar-sistema
-description: Use para homologar explicitamente o release candidate ligado a uma mudança do Bianchini Method 0.4, combinando gates automatizados, jornadas reais e varredura visual.
+description: Use para homologar explicitamente o release candidate ligado a uma mudança do Bianchini Method 1.0, combinando gates automatizados, jornadas reais e varredura visual.
 ---
 
 # Homologar Sistema
@@ -23,7 +23,7 @@ Automação reduz repetição, mas não elimina o passe real. Um E2E pode servir
 ## 1. Rota e pré-condições
 
 1. Ler `.bianchini/STATE.md` e executar `bm model validate --repo <repo>`.
-2. Exigir `.bianchini/changes/Cxxx-*/results/RELEASE.md` com `status: reviewed`. Confirmar `candidate.id`, `revision`, `build`, `checksum`, `fingerprint`, `proof_ids` e `review_id`.
+2. Exigir `.bianchini/changes/Cxxx-*/results/RELEASE.md` com `status: reviewed`. Confirmar `candidate.id`, `candidate.kind`, `revision`, `build`, `checksum`, `fingerprint`, `proof_ids` e `review_id`.
 3. Homologar obrigatoriamente antes do `cycle-close`, na raiz única `.bianchini/changes/Cxxx-*`. Criar ali `results/HOMOLOGATION.md` com `schema_version: 1`, o mesmo `fingerprint`, `change`, cópia exata de `candidate` em `rc`, `status: running`, listas vazias de `gates`, `blockers`, `findings` e `manual_proofs`. Não sobrescrever uma homologação existente.
 4. Compilar `bm context pack --repo <repo> --unit RC:<fingerprint>` e usar somente suas referências. `PACK_INCOMPLETE`, `PACK_TOO_LARGE` ou `STALE_EVIDENCE` bloqueia a homologação; não montar contexto manual.
 5. Confirmar plataformas, perfis, integrações, journeys do `SYSTEM_MODEL.md` e critérios de aceite do escopo aprovado.
@@ -35,7 +35,7 @@ Não homologar árvore fonte quando a entrega é outro artefato. Se uma platafor
 
 No RC atual:
 
-1. confirmar que `bm verify release` já executou todos os comandos tipados no estado final e que a revisão do release aprovou os mesmos `proof_ids`;
+1. confirmar que `bm verify release` já executou todos os gates integrados obrigatórios no candidato final e que a revisão do release aprovou os mesmos `proof_ids`;
 2. reunir relatórios e logs sanitizados já vinculados ao RC, confirmando que evidência de mutação pertence ao commit/RC atual e ao seam exigido;
 3. vincular cada evidência ao mesmo `rc`, `revision`, `build` e `checksum`;
 4. executar `bm proof-map` para identificar o que a automação realmente prova;
@@ -107,7 +107,7 @@ Capturar screenshot de cada estado visual distinto necessário para provar o res
 
 Para cada falha, registrar plataforma, perfil, jornada, passo, esperado, real, severidade, classificação e evidência.
 
-- produto `critical` ou `important`: executar `corrigir-bug` no mesmo workspace;
+- produto `critical` ou `high`: executar `corrigir-bug` no mesmo workspace;
 - divergência de escopo, contrato público ou design aprovado: classificar com `change-policy`; `material_change` bloqueia apenas a área afetada e não vira fix loop;
 - ambiente: reparar o harness e repetir;
 - externo: validar contrato/degradação e bloquear quando indispensável;
@@ -126,20 +126,22 @@ Não repetir a mesma homologação no mesmo estado. Falha de produto reabre a ta
 
 `ACEITO` exige:
 
-- `verification.release: passed` ou exceção de escopo explícita;
+- todos os gates obrigatórios do release com resultado `passed`;
 - unitários, integração/contratos, regressão e E2E crítico do `verification.release` aprovados;
 - evidência de mutação vigente quando `bm policy` marcar `selective` ou `required_selective`;
 - todas as plataformas e perfis obrigatórios executados no RC real;
 - todos os fluxos críticos e ações primárias da matriz com execução real `passed`;
 - varredura visual concluída para toda interface aplicável;
-- nenhuma falha `critical` ou `important`;
+- nenhuma falha `critical` ou `high` aberta, nem finding com `blocking: true` pendente;
 - integrações indispensáveis validadas em ambiente real ou sandbox oficial;
 - nenhuma linha obrigatória como `not_run`;
 - evidências vinculadas ao fingerprint do RC final.
 
 Caso contrário, `BLOQUEADO` com o próximo requisito verificável. Não inventar “aceito com ressalvas”.
 
-Ao aceitar, registrar `status: accepted`, o `rc` exato, ao menos um gate, nenhuma entrada em `blockers`, fingerprint e evidências em `HOMOLOGATION.md`. Para cada `manual_requirement` do release, registrar em `manual_proofs` um objeto com `plan`, `task`, path real em `evidence` e `evidence_sha256`. A sincronização de arquitetura, modelo e specs ocorre somente no `cycle-close`; homologação não edita `.bianchini/current/` nem o digest aprovado.
+Ao aceitar, registrar `status: accepted`, o `rc` exato, a lista completa de `gates`, cada entrada com `proof_id` do release e `result: passed`, nenhuma entrada em `blockers`, fingerprint e evidências em `HOMOLOGATION.md`. Para cada `manual_requirement` do release, registrar em `manual_proofs` um objeto com `plan`, `task`, path real em `evidence` e `evidence_sha256`. A sincronização de arquitetura, modelo e specs ocorre somente no `cycle-close`; homologação não edita `.bianchini/current/` nem o digest aprovado.
+
+Uma linha não aplicável pertence à matriz explicativa, com justificativa de escopo; não substitui um gate obrigatório em `gates`. `findings` é lista explícita; severidades válidas são `critical`, `high`, `medium`, `low` e `info`. Estados: `open`, `resolved`, `accepted`. Aceitar risco baixo não resolve finding bloqueante. Resolução exige `resolution_evidence` com caminho de arquivo real e `resolution_sha256` dos bytes atuais.
 
 ## 8. Manual conforme escopo
 

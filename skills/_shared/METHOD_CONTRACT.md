@@ -146,17 +146,17 @@ O revisor semântico normaliza um relatório; não grava raciocínio interno. Se
 bm coherence check --repo <repo> --change C001 --structural-only
 bm coherence check --repo <repo> --change C001 --semantic-report <relatorio.json>
 bm coherence approve --repo <repo> --change C001 \
-  --digest <digest> --approved-by "<responsável>"
+  --digest <digest> --decided-by "<agente>"
 ```
 
-O check estrutural limpo retorna `structurally_valid`; ele não aprova. O check completo com revisão semântica disponível, sem `ERROR` ou `WARNING` aberto, retorna `ready_for_approval` e coloca `STATE.md` em `pending_approval`. Somente `coherence approve`, após autoridade humana explícita, pode gravar o checkpoint e mudar o estado para `approved`. O comando revalida o digest e registra responsável e horário; não executar em nome do responsável.
+O check estrutural limpo retorna `structurally_valid`; ele não aprova. O check completo com revisão semântica disponível, sem `ERROR` ou `WARNING` aberto, retorna `ready_for_approval` e coloca `STATE.md` em `pending_approval`. `coherence approve --decided-by` registra a decisão técnica autônoma e habilita a execução. `--approved-by` é exclusivo de aprovação humana que ocorreu. Nenhum desses registros substitui o escopo comercial contratado.
 
 Cada finding contém código, severidade, origem, planos/contratos afetados, evidência, correção esperada e status.
 
 | Severidade | Efeito |
 |---|---|
 | `ERROR` | bloqueia planejamento, snapshot ou execução |
-| `WARNING` | exige correção ou justificativa humana incluída no digest |
+| `WARNING` | exige correção ou justificativa técnica verificável incluída no digest |
 | `INFO` | observação sem ação obrigatória |
 
 Status válidos: `open`, `resolved`, `accepted_with_justification`. `WARNING` aberto impede aprovação.
@@ -227,9 +227,9 @@ Classificação:
 
 O resultado fica na seção `Impact Radius` de `COHERENCE.md`. Antes da aprovação,
 ele é somente uma prévia e não grava planos `stale`. Depois da aprovação, planos
-atingidos ficam `stale`, o status passa a `approved_with_stale` e o digest humano
-original é preservado. Planos independentes continuam executáveis. Nova auditoria
-e nova aprovação produzem o próximo digest global.
+atingidos ficam `stale`, o status passa a `approved_with_stale` e o digest
+original é preservado. Planos independentes continuam executáveis. Nova validação
+e decisão técnica produzem o próximo digest global.
 
 ```bash
 bm impact analyze --repo <repo> --change C001 --plan P03 \
@@ -269,7 +269,7 @@ Após cada plano, registrar o delta real, comparar `provides/consumes`, aplicar 
 
 Cada tarefa schema 2 é provada pelo núcleo com `bm verify task`. Comando usa `argv` estruturado e `shell=false`; procedimento exige artefato real. A prova registra revisão Git, fingerprint do código, comando, cwd, timeout, exit code, hashes e digests do pacote/contexto. Falha persiste e não repete no mesmo estado sem `--retry-reason`.
 
-Uma revisão limitada referencia `proof_id` e grava `approved` ou `changes_requested`. A conclusão exige prova verde e revisão aprovada do mesmo estado:
+Uma revisão limitada referencia `proof_id` e grava `approved` ou `changes_requested`. A tarefa grouped exige prova verde; strict e slice também exigem revisão da tarefa. Em slice, cada Txx representa uma slice vertical inteira, nunca um grupo textual implícito. No exemplo abaixo, omita `--review` em grouped:
 
 ```bash
 bm plan complete --repo <repo> --change C001 --plan P01 --task T01 \
@@ -277,7 +277,7 @@ bm plan complete --repo <repo> --change C001 --plan P01 --task T01 \
   --proof <proof-id> --review <review-id>
 ```
 
-O gate do plano usa `bm verify plan`, uma revisão própria e `plan complete` com `--proof` e `--review`. Resultado narrativo não substitui prova no schema 2. Finding posterior usa `bm plan reopen --reason <motivo>`; o histórico anterior é preservado. Drift material retorna `IMPACT_STALE`; prova obsoleta retorna `STALE_EVIDENCE`.
+O gate do plano usa `bm verify plan` e cobertura completa dos comandos declarados. grouped exige revisão integrada. strict/slice preservam suas revisões focais; uma revisão integrada adicional só é necessária em grouped ou se explicitamente fornecida. Resultado narrativo não substitui prova no schema 2. Finding posterior usa `bm plan reopen --reason <motivo>`; o histórico anterior é preservado. Drift material retorna `IMPACT_STALE`; prova obsoleta retorna `STALE_EVIDENCE`.
 
 ## Gates adaptativos
 
@@ -291,9 +291,9 @@ O gate do plano usa `bm verify plan`, uma revisão própria e `plan complete` co
 - `verification.plan`: suítes afetadas, regressão do plano, E2E crítico e mutação seletiva exigida;
 - `verification.release`: comandos completos aprovados, contratos, regressão, E2E, build e evidência de mutação vigente.
 
-Regressão é transversal. Não criar tarefa ou agente por camada de teste. Não perseguir coverage ou mutation score global. Finding estrutural, crash window, partial commit, TOCTOU, retry ambíguo, idempotência concorrente ou recuperação após restart invalida a hipótese e exige redesenho do seam antes de novo patch.
+Regressão é transversal. Não criar tarefa ou agente por camada de teste. Não perseguir coverage ou mutation score global. Retry, concorrência ou reinício exigem localizar o invariante quebrado antes de escolher correção local ou mudança arquitetural proporcional.
 
-O breaker epistêmico é contado por `risk_seam`, não pelo nome da tarefa: renomear, dividir ou reordenar a tarefa não zera a contagem do mesmo seam. Dois findings estruturais consecutivos no mesmo seam exigem parar o fix loop e redesenhar o contrato. Para concorrência, persistência ou integração externa, revise explicitamente máquina de estados, matriz de falhas e a janela entre inspeção e ação. Um patch menor que mantém crash window, TOCTOU ou perda silenciosa não é mudança mínima aceitável.
+O executor persiste política e fix rounds por `risk_seam` no proof store. Mudança do código após falha conta como tentativa de correção; reexecutar o mesmo código é verificação. Renomear a tarefa não zera o seam. Ao atingir o limite, `FIX_LIMIT_REACHED` bloqueia outra tentativa; registrar diagnóstico e replanejar o problema sem apagar provas ou reiniciar contagem. Não marcar sucesso por falta de orçamento.
 
 ### Contratos internos
 
@@ -356,7 +356,7 @@ Consultas e retomadas são somente leitura e exigem um `STATE.md` 0.4 válido.
 
 Cada `Dxxx` registra esperado/real, ambiente, reprodução, hipóteses e contraprovas, causa, RED, GREEN, regressões vizinhas, risco residual e referência opcional comprovada a `Cxxx/Pxx` com relação `caused_by`, `detected_in` ou `regression_of`.
 
-GREEN antes de RED é inválido. Quando automação não for possível, usar procedimento manual determinístico. Evidência anterior ao último patch fica obsoleta. Debug resolvido vai para `debug/resolved/`; somente padrões causais reutilizáveis vão para `KNOWLEDGE.md`.
+GREEN antes de RED é inválido. RED exige comando real, arquivo do teste e assinatura esperada da falha; GREEN deve executar o mesmo teste. Procedimentos manuais podem documentar a investigação, mas não substituem essas provas no fechamento automático. Evidência anterior ao último patch fica obsoleta. Debug resolvido vai para `debug/resolved/`; somente padrões causais reutilizáveis vão para `KNOWLEDGE.md`.
 
 Bug que restaura contrato aceito não muda spec. Contrato errado exige decisão e impact radius.
 
@@ -377,7 +377,7 @@ Colisão, formato desconhecido, symlink externo, path traversal, checksum diverg
 
 ## Encerramento e DocViva
 
-Toda tarefa terminal atualiza `STATE.md` atomicamente. Depois do último plano, `bm verify release` repete todas as verificações no estado final, grava o RC e exige revisão final vinculada aos mesmos proofs. A homologação aceita ocorre em `changes/`, para o fingerprint exato, antes do fechamento. Só então o método sincroniza specs/modelo atuais e move a mudança para `archive/`.
+Toda tarefa terminal atualiza `STATE.md` atomicamente. Depois do último plano, `bm verify release` repete os gates integrados declarados em verifications dos planos no estado final, grava o RC e exige revisão final vinculada aos mesmos proofs. A homologação aceita ocorre em `changes/`, para o fingerprint exato, antes do fechamento. Só então o método sincroniza specs/modelo atuais e move a mudança para `archive/`.
 
 ```bash
 bm cycle-close --repo <repo> --change C001
@@ -390,3 +390,19 @@ Relatar separadamente: código/commit, testes, sandbox, deploy, efeito em produ�
 `/update-bm` permanece manual. A transição para `0.4.0` usa o manifesto oficial de mudança de linhagem uma única vez; depois retorna à comparação semântica normal.
 
 Sem autorização explícita, não cobrar, publicar, enviar mensagem real, apagar dados, executar migração destrutiva, alterar produção de forma arriscada ou expor segredo/dado pessoal. Nunca versionar credenciais, payloads sensíveis, logs grandes ou artefatos temporários.
+
+## Contrato de prova e entrega 1.0
+
+O núcleo deriva todos os gates obrigatórios do estágio. Gate ausente, falho, obsoleto ou de outro comando/unidade impede conclusão mesmo com revisão aprovada. Provas de tarefas permanecem históricas; gates de plano/release provam a integração atual.
+
+Cache é `fresh` por padrão. `verify.cache: deterministic` só vale para entradas controladas e identidade inalterada. Serviços, banco mutável, deployment e configuração externa exigem execução fresca. Seleção da política é técnica, sem pergunta rotineira ao usuário. O núcleo não deduplica comandos apenas por texto.
+
+`direct checkpoint --command` executa os comandos declarados no brief e guarda proofs. Checkpoint narrativo não comprova o aceite. `direct finish` cobra cobertura vigente de todos os comandos.
+
+`verify release --build <arquivo> --delivery ready` calcula SHA-256 real; `--checksum` opcional confere a expectativa. `--artifact-kind container` inspeciona a imagem local via Docker. `--artifact-kind deployment` consulta o endpoint de saúde indicado em build e exige HTTP 200 com JSON `{"version":"<SHA-256 em execução>"}`. Gates recebem BM_CANDIDATE_BUILD e BM_CANDIDATE_CHECKSUM para operar o alvo correto. Artefato e candidato são revalidados no fechamento.
+
+HOMOLOGATION.md contém gates `{proof_id, result: passed}` cobrindo todos os proofs do RC. not_run/failed/N/A não dispensam gates obrigatórios. Exclusões só pertencem ao planejamento quando fora do escopo; procedimentos exigem manual_proofs reais. Finding critical/high ou blocking não resolvido impede aceite independentemente de blockers.
+
+Finding material em `verify review --verdict changes_requested` usa `--finding` com JSON: target, observed, requirement, severity, evidence (arquivo real), expected_fix. Não exige RED artificial. Após corrigir, revisão aprovada usa provas atuais e `--resolves-review <id>`. Sugestões opcionais ficam fora dos findings bloqueantes.
+
+Logs sanitizados e limitados ficam em results/logs; a prova registra caminho, digest e resumo. Não colocar credenciais nos argumentos; usar variáveis de ambiente. Logs completos acima do limite são truncados explicitamente, sem reexecução automática.

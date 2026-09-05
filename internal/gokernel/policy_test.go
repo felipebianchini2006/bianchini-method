@@ -37,7 +37,7 @@ func TestPolicyVerticalParity(t *testing.T) {
 				"max_fix_rounds": float64(5), "risk_seam": nil, "breaker_scope": "unit",
 				"effective_fix_round":    float64(1),
 				"structural_findings":    []any{"crash_window", "toctou"},
-				"hypothesis_invalidated": true, "redesign_required": true, "breaker": true,
+				"hypothesis_invalidated": true, "redesign_required": false, "breaker": true,
 				"architecture_audit_required": false, "architecture_audit_mode": "manual_report_only",
 				"manual_required": false, "manual_level": "none", "visual_validation": "behavioral_seam",
 			},

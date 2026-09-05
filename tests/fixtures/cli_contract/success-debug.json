@@ -432,5 +432,9 @@
         }
       }
     }
-  ]
+  ],
+  "engines": [
+    "python"
+  ],
+  "compatibility_note": "Fixture histórica narrativa. Go 1.0 exige execução real; cobertura substituta em direct_proof_test.go/debug_workflow_test.go e run_service_example.py."
 }

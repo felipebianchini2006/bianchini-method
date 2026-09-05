@@ -109,6 +109,8 @@ class GoBackendScenarios(unittest.TestCase):
         self.assertIn("Redistribution and use in source and binary forms", notices)
 
     def test_go_unit_suite_is_green(self) -> None:
+        if os.environ.get("BM_GO_SUITE_ALREADY_RUN") == "1":
+            self.skipTest("núcleo Go executado separadamente antes desta suíte")
         completed = run("go", "test", "./...")
         self.assertEqual(
             completed.returncode,
@@ -138,7 +140,7 @@ class GoBackendScenarios(unittest.TestCase):
             payload = json.loads(versioned.stdout)
             self.assertEqual(payload["engine"], "go")
             self.assertEqual(payload["contract_version"], "0.4")
-            self.assertEqual(payload["version"], "0.6.0")
+            self.assertEqual(payload["version"], "1.0.0")
             self.assertTrue(payload["official"])
             self.assertFalse(payload["preview"])
             self.assertGreater(len(payload["implemented_surfaces"]), 0)
@@ -162,10 +164,10 @@ class GoBackendScenarios(unittest.TestCase):
                 tuple((ROOT / "tests" / "fixtures" / "cli_contract").glob("*.json"))
             )
             self.assertEqual(payload["total"], fixture_total)
-            self.assertEqual(payload["passed"], fixture_total - 1)
+            self.assertEqual(payload["passed"], fixture_total - 3)
             self.assertEqual(payload["failed"], 0)
-            self.assertEqual(payload["skipped"], 1)
-            self.assertEqual(payload["skipped_fixtures"], ["success-full-lifecycle"])
+            self.assertEqual(payload["skipped"], 3)
+            self.assertEqual(payload["skipped_fixtures"], ["success-debug", "success-direct", "success-full-lifecycle"])
 
     def test_go_risk_path_policy_matches_python_oracle(self) -> None:
         cases = (

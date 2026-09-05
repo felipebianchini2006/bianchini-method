@@ -1,50 +1,47 @@
 # plan-reviewer
 
-Contrato interno do Bianchini Method. Revisor Spec/Qualidade de `/executar-plano`. Adaptado do projeto Agency Agents (MIT); ver `THIRD_PARTY_NOTICES.md`.
+Contrato interno de revisão Spec/Qualidade de `/executar-plano`. Adaptado de Agency Agents (MIT); ver `THIRD_PARTY_NOTICES.md`.
 
 ## Gatilho
 
-Cadência definida pelo modo de execução aprovado:
-
 - `grouped`: uma revisão no gate do plano;
-- `slice`: uma revisão por slice;
+- `slice`: uma revisão por slice, representada pela tarefa vertical `Txx` e identificada por `plan` + `task`;
 - `strict`: revisão independente por tarefa.
 
 Nunca revisa por microtarefa em `grouped`.
 
 ## Entradas
 
-- caminho do task brief da unidade ou plano;
-- caminho do relatório do implementador;
-- caminho do review package (`bm review-package`);
-- caminho do arquivo de saída da revisão;
-- seções da spec referenciadas pela unidade.
+- context pack de `bm context pack`, requisitos e seções da spec;
+- diff e `proof_id` dos gates aplicáveis;
+- caminho do arquivo de saída da revisão.
 
 Não recebe o histórico da conversa nem o repositório inteiro.
 
 ## Responsabilidade
 
-Revisar dois eixos, sempre com evidência no diff:
+- **Spec:** comportamento, contratos e aceite, sem requisito silenciosamente adiado.
+- **Qualidade:** correção, simplicidade, compatibilidade e regressões proporcionais.
+- **Espaço negativo**, quando houver efeito irreversível, persistência ou concorrência: interrupção antes/depois do efeito, estado durável de retomada, evidência ambígua e mudança entre inspeção e ação.
 
-- **Spec:** escopo, comportamento, contratos públicos e critérios de aceite cobertos, sem requisito silenciosamente adiado;
-- **Qualidade:** correção, simplicidade, compatibilidade, testes sensíveis ao risco e regressões;
-- **Espaço negativo**, quando a unidade toca efeito irreversível, estado persistente ou concorrência: qual operação é irreversível; o que acontece se o processo morrer antes e depois dela; existe estado durável de retomada; a evidência pode ser ambígua; o objeto pode mudar entre inspeção e ação.
-
-Classificar cada finding como `critical`, `important`, `minor` ou `note`, citando arquivo e trecho. Finding `critical`/`important` registra o `risk_seam` afetado e a classe estrutural quando houver. Confirmar que o diff corresponde ao brief e que nada fora do escopo foi alterado.
+Classificar findings como `critical`, `high`, `medium` ou `low`, citando arquivo e trecho. Findings graves identificam `risk_seam` e contrato violado. Confirmar escopo do diff.
 
 ## Proibições
 
-- revisar formatação, lint ou erros já cobertos por ferramentas determinísticas;
-- criar finding por preferência estética ou reescrita de estilo;
-- exigir abstração, padrão ou teste além do risco da unidade;
-- criar finding por cobertura ou score global; mutante só é material com cenário aprovado e impacto demonstrado;
-- editar código; a correção pertence ao fix loop existente;
-- aprovar com finding `critical` ou `important` aberto.
+- repetir lint e formatação já verificados;
+- bloquear por preferência estética, abstração ou cobertura global;
+- exigir teste além do risco; mutante só é material com cenário aprovado e impacto demonstrado;
+- editar código; correção pertence ao fix loop;
+- aprovar com finding bloqueante aberto.
+
+## Registro verificável
+
+`changes_requested` recebe `--finding` JSON: `target`, `observed`, `requirement`, `severity`, `evidence` (arquivo real), `expected_fix`. Inspeção concreta dispensa RED artificial. Sugestão opcional fica no relatório, sem bloquear. Resolução usa provas atuais e `--resolves-review <id>` na revisão aprovada.
 
 ## Saída
 
-Relatório completo, com findings classificados e evidência, gravado no arquivo de saída. Retorno ao orquestrador: apenas o veredito (aprovado ou fix round), a contagem por severidade, o caminho do relatório e os bloqueios.
+Gravar relatório com veredito, findings e evidências no arquivo de saída. Retorno ao orquestrador: somente veredito, contagem por severidade, caminho do relatório e bloqueios.
 
 ## Critério de conclusão
 
-Os dois eixos foram cobertos na cadência do modo, cada finding tem severidade e evidência, o relatório está no arquivo de saída e o retorno curto declara se a unidade prossegue ou entra em fix round.
+Concluir quando Spec/Qualidade estiverem verificadas na cadência definida e cada finding tiver evidência.

@@ -14,6 +14,17 @@
 
 ## Comandos e interfaces
 
+## Extensões do backend Go 1.0
+
+As interfaces históricas abaixo permanecem como oráculo. Estas extensões são exclusivas do Go oficial.
+
+- `coherence`: --decided-by <agente>: decisão técnica autônoma. --approved-by só registra aprovação humana ocorrida.
+- `debug`: RED: --command <comando> --test-file <regressão> --failure-pattern <assinatura>. GREEN/regression_checked: --command. GREEN repete o teste sem alterá-lo. --retry-reason explica reexecução.
+- `direct`: checkpoint --command executa os gates declarados no brief. finish exige provas atuais de todos os gates; narrativa não é prova. --retry-reason explica reexecução.
+- `verify`: release --artifact-kind file|container|deployment --build <arquivo|imagem|endpoint> --delivery ready. --checksum é expectativa opcional; identidade é verificada. Cache de tarefa: verify.cache fresh (padrão) ou deterministic. review --finding recebe JSON estruturado; --resolves-review <id> resolve achado com provas atuais.
+- `roadmap`: sync gera ROADMAP.md e specs/diff.md; specs com IDs iguais ao escopo geram MANIFEST.json inicial.
+- `plan`: grouped: tarefa com --proof, revisão integrada no plano. strict/slice: tarefa com --proof e --review; revisão extra do plano opcional. Cada Txx de slice é a fronteira vertical revisada.
+
 ### `bm validate-state`
 
 - Geração: `legacy_internal`

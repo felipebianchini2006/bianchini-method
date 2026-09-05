@@ -1,0 +1,749 @@
+{
+  "status": "passed",
+  "repository": "<validation-temp>/service-actual.IyJyhb/service-requests",
+  "change": "C001-solicitacoes-de-servico",
+  "quick": "Q001-melhorar-ajuda",
+  "debug": "D001-rejeitar-descricao-em-branco",
+  "reviewer": "agent:critical_review",
+  "negative_rejections": [
+    "STALE_EVIDENCE",
+    "VERIFICATION_FAILED",
+    "VERIFICATION_FAILED",
+    "GATE_COVERAGE",
+    "REVIEW_REQUIRED",
+    "HOMOLOGATION_",
+    "HOMOLOGATION_",
+    "HOMOLOGATION_",
+    "ARTIFACT_MISMATCH"
+  ],
+  "public_calls": [
+    {
+      "argv": [
+        "model",
+        "init",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "model",
+        "init",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "Solicitações de serviço"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "scope",
+        "seal",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--source",
+        "<validation-temp>/escopo-servicos.pdf",
+        "--draft",
+        "<checkout>/tests/fixtures/service_requests/scope.md",
+        "--pages",
+        "1",
+        "--extraction",
+        "native"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "scope",
+        "verify",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--source",
+        "<validation-temp>/escopo-servicos.pdf"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "roadmap",
+        "sync",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "model",
+        "validate",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "coherence",
+        "check",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--structural-only"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "coherence",
+        "check",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--semantic-report",
+        "<validation-temp>/service-actual.IyJyhb/semantic.json"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "coherence",
+        "approve",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--digest",
+        "870930b495276c43fd49ceab9ec97fb5bff67fe9aa829b7860d2b5b780fdadc1",
+        "--decided-by",
+        "agent:example"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "model",
+        "validate",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "roadmap",
+        "next-wave",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "context",
+        "pack",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--unit",
+        "C001/P01/T01"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "verify",
+        "task",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--task",
+        "T01",
+        "--context-pack",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/context/C001-P01-T01.json"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "plan",
+        "complete",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--task",
+        "T01",
+        "--context-pack",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/context/C001-P01-T01.json",
+        "--result",
+        "invalid",
+        "--proof",
+        "proof-3c64000c6b5353e36cadafdcb40d102c"
+      ],
+      "exit_code": 3,
+      "stderr": "STALE_EVIDENCE: proof_id não pertence ao estado atual do código: proof-3c64000c6b5353e36cadafdcb40d102c"
+    },
+    {
+      "argv": [
+        "verify",
+        "task",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--task",
+        "T01",
+        "--context-pack",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/context/C001-P01-T01.json"
+      ],
+      "exit_code": 3,
+      "stderr": "VERIFICATION_FAILED: C001/P01/T01 falhou com exit code 1; proof_id proof-09fd38f397410f1cbb92e1757620d942"
+    },
+    {
+      "argv": [
+        "verify",
+        "task",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--task",
+        "T01",
+        "--context-pack",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/context/C001-P01-T01.json",
+        "--retry-reason",
+        "restore isolated permission after negative test"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "plan",
+        "complete",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--task",
+        "T01",
+        "--context-pack",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/context/C001-P01-T01.json",
+        "--result",
+        "Solicitações isoladas",
+        "--proof",
+        "proof-21c0787a41f052430bed49e13abdc197"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "verify",
+        "plan",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "verify",
+        "plan",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01"
+      ],
+      "exit_code": 3,
+      "stderr": "VERIFICATION_FAILED: P01/gate-02 falhou com exit code 1; proof_id proof-3ff8fa2e8420996cf33c81d1376761dc"
+    },
+    {
+      "argv": [
+        "plan",
+        "complete",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--actual-delta",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/actual-delta.json",
+        "--result",
+        "invalid",
+        "--proof",
+        "proof-284ee67d4c2675e50e3ea2bfe51adf89"
+      ],
+      "exit_code": 3,
+      "stderr": "GATE_COVERAGE: gate obrigatório sem prova válida: P01/gate-02"
+    },
+    {
+      "argv": [
+        "verify",
+        "plan",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--retry-reason",
+        "restore controlled external fixture"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "plan",
+        "complete",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--actual-delta",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/actual-delta.json",
+        "--result",
+        "invalid",
+        "--proof",
+        "proof-572179fd1b5e5157300ec8082bf37d44",
+        "--proof",
+        "proof-87e9d62258587e2c3f5005e7cbb8d670"
+      ],
+      "exit_code": 3,
+      "stderr": "REVIEW_REQUIRED: conclusão exige review_id gerado por bm verify review"
+    },
+    {
+      "argv": [
+        "verify",
+        "review",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--scope",
+        "plan",
+        "--reviewer",
+        "agent:critical_review",
+        "--verdict",
+        "approved",
+        "--proof",
+        "proof-572179fd1b5e5157300ec8082bf37d44",
+        "--proof",
+        "proof-87e9d62258587e2c3f5005e7cbb8d670"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "plan",
+        "complete",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--plan",
+        "P01",
+        "--actual-delta",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/actual-delta.json",
+        "--result",
+        "Todos os aceites verificados",
+        "--proof",
+        "proof-572179fd1b5e5157300ec8082bf37d44",
+        "--proof",
+        "proof-87e9d62258587e2c3f5005e7cbb8d670",
+        "--review",
+        "review-a1c0a2c2fd824405108d8e91037a39fd"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "verify",
+        "release",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--build",
+        "<validation-temp>/service-actual.IyJyhb/service-requests/.bianchini/.runtime/service.pyz",
+        "--delivery",
+        "ready"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "verify",
+        "review",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico",
+        "--scope",
+        "release",
+        "--reviewer",
+        "agent:critical_review",
+        "--verdict",
+        "approved",
+        "--proof",
+        "proof-cfbdc874cf38a4b282632a1fe1a84c3a",
+        "--proof",
+        "proof-90051c05a6cd9b2555ad4bb31466c4e3"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "cycle-close",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 3,
+      "stderr": "HOMOLOGATION_REQUIRED: gate obrigatório exige resultado passed e prova do RC; N/A não dispensa obrigação"
+    },
+    {
+      "argv": [
+        "cycle-close",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 3,
+      "stderr": "HOMOLOGATION_BLOCKED: finding bloqueante não resolvido"
+    },
+    {
+      "argv": [
+        "cycle-close",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 3,
+      "stderr": "HOMOLOGATION_BLOCKED: finding bloqueante não resolvido"
+    },
+    {
+      "argv": [
+        "cycle-close",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 3,
+      "stderr": "ARTIFACT_MISMATCH: identidade observada difere do checksum declarado"
+    },
+    {
+      "argv": [
+        "cycle-close",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--change",
+        "C001-solicitacoes-de-servico"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "direct",
+        "start",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--objective",
+        "Melhorar ajuda",
+        "--scope",
+        "texto de ajuda",
+        "--acceptance",
+        "CLI e testes preservados",
+        "--verification",
+        "python3 -B test_service.py"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "direct",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--slug",
+        "Q001-melhorar-ajuda",
+        "--checkpoint",
+        "ajuda ajustada",
+        "--command",
+        "python3 -B test_service.py",
+        "--next-action",
+        "concluir"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "direct",
+        "finish",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--slug",
+        "Q001-melhorar-ajuda",
+        "--status",
+        "completed",
+        "--verification",
+        "proof no checkpoint",
+        "--next-action",
+        "idle",
+        "--docviva-kind",
+        "internal",
+        "--docviva-outcome",
+        "not_applicable",
+        "--docviva-justification",
+        "somente descrição da ajuda"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "start",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--objective",
+        "Rejeitar descrição em branco",
+        "--expected",
+        "entrada vazia rejeitada",
+        "--actual",
+        "espaços aceitos",
+        "--environment",
+        "local fixture"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--event",
+        "reproduced",
+        "--evidence",
+        "entrada composta por espaços aceita"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--event",
+        "diagnosed",
+        "--evidence",
+        "validação antes da normalização",
+        "--root-cause",
+        "strip removido"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--event",
+        "red",
+        "--evidence",
+        "regressão real",
+        "--command",
+        "python3 -B regression.py Regression.test_blank",
+        "--test-file",
+        "regression.py",
+        "--failure-pattern",
+        "AssertionError"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--event",
+        "fixing",
+        "--evidence",
+        "restaurar normalização"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "resume",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--event",
+        "green",
+        "--evidence",
+        "mesmo teste passa",
+        "--command",
+        "python3 -B regression.py Regression.test_blank"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--event",
+        "regression_checked",
+        "--evidence",
+        "suíte pública passa",
+        "--command",
+        "python3 -B test_service.py",
+        "--neighbor-regression",
+        "permissão e persistência"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "checkpoint",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--event",
+        "documented",
+        "--evidence",
+        "contrato restaurado",
+        "--residual-risk",
+        "somente ambiente demonstrado"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "debug",
+        "finish",
+        "--repo",
+        "<validation-temp>/service-actual.IyJyhb/service-requests",
+        "--id",
+        "D001-rejeitar-descricao-em-branco",
+        "--docviva-kind",
+        "internal",
+        "--docviva-outcome",
+        "not_applicable",
+        "--docviva-justification",
+        "restaura validação contratada, sem mudar comportamento aceito"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "candidate": {
+    "build": ".bianchini/.runtime/service.pyz",
+    "checksum": "a989d2cdafdd748c21375e621ee297fd2214c4dfe182d78a49102257d119112f",
+    "id": "RC-a69ded4889a6",
+    "kind": "file",
+    "revision": "d17913ca4d6774246c1e22a48b8b9d1ea4becd50"
+  },
+  "scope_pdf_sha256": "c12d3a30a7812727a9b18457dd5974bfc82eb4ec9a3e09b334549262043afd45"
+}

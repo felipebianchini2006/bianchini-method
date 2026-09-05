@@ -17,7 +17,7 @@ var (
 		"regression_checked": "documented",
 	}
 	debugValueFlags = map[string]bool{
-		"--repo": true, "--id": true, "--objective": true, "--expected": true,
+		"--command": true, "--test-file": true, "--failure-pattern": true, "--retry-reason": true, "--repo": true, "--id": true, "--objective": true, "--expected": true,
 		"--actual": true, "--environment": true, "--origin-ref": true,
 		"--origin-evidence": true, "--relation": true, "--event": true,
 		"--evidence": true, "--hypothesis": true, "--experiment": true,
@@ -158,7 +158,7 @@ func debugCheckpoint(repo string, flags parsedFlags) (map[string]any, error) {
 	}
 	event := lastValue(flags, "--event")
 	expected := debugTransitions[stateString(value["stage"])]
-	if event != expected {
+	if event != expected && !(event == "green" && oneOf(stateString(value["stage"]), "green", "regression_checked", "documented")) {
 		return nil, workflowError("ORDER_VIOLATION", fmt.Sprintf("após %s o próximo evento é %s", stateString(value["stage"]), expected))
 	}
 	evidence := strings.TrimSpace(lastValue(flags, "--evidence"))
@@ -205,6 +205,13 @@ func debugCheckpoint(repo string, flags parsedFlags) (map[string]any, error) {
 			return nil, workflowError("STALE_EVIDENCE", "documentação exige --residual-risk")
 		}
 	}
+	proofID := ""
+	if oneOf(event, "red", "green", "regression_checked") {
+		proofID, err = executeDebugProof(workspace, value, event, flags)
+		if err != nil {
+			return nil, err
+		}
+	}
 	appendStringValues(value, "hypotheses", nonBlank(flags.values["--hypothesis"]))
 	appendStringValues(value, "experiments", nonBlank(flags.values["--experiment"]))
 	appendStringValues(value, "eliminated_hypotheses", nonBlank(flags.values["--eliminated-hypothesis"]))
@@ -224,7 +231,7 @@ func debugCheckpoint(repo string, flags parsedFlags) (map[string]any, error) {
 	}
 	value["stage"] = event
 	value["updated_at"] = utcNow()
-	events = append(events, map[string]any{"event": event, "evidence": evidence, "fingerprint": fingerprint, "at": utcNow()})
+	events = append(events, map[string]any{"event": event, "proof_id": proofID, "evidence": evidence, "fingerprint": fingerprint, "at": utcNow()})
 	value["events"] = events
 	document, _ := frontmatterDocument(value, "# Debug "+id+"\n\n"+stateString(value["objective"]), false)
 	if err := workspace.atomicWrite(path, document); err != nil {
@@ -319,6 +326,9 @@ func debugFinish(repo string, flags parsedFlags) (map[string]any, error) {
 		}
 		if stateString(stateObject(events[len(events)-1])["fingerprint"]) != fingerprint {
 			return nil, workflowError("STALE_EVIDENCE", "alteração posterior à documentação exige repetir os gates")
+		}
+		if err := validateDebugProofs(workspace, value); err != nil {
+			return nil, err
 		}
 		missing := make([]string, 0)
 		for _, key := range []string{"root_cause", "red", "green", "neighboring_regressions", "residual_risk"} {

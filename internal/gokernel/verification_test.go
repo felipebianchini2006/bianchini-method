@@ -16,6 +16,7 @@ func verificationPlan(argv []string) map[string]any {
 	verify["argv"] = stringSliceAny(argv)
 	verify["cwd"] = "."
 	verify["timeout_seconds"] = 30
+	verify["cache"] = "deterministic"
 	task["verify"] = verify
 	plan["tasks"] = []any{task}
 	plan["verifications"] = []any{"go version"}
@@ -148,7 +149,7 @@ func TestVerifyTaskFailedProofCannotLoopWithoutReason(t *testing.T) {
 	for identifier := range proofs {
 		failedProof = identifier
 	}
-	if _, err := runVerify([]string{"review", "--repo", repo, "--change", change, "--scope", "task", "--plan", "P01", "--task", "T01", "--reviewer", "independent", "--verdict", "changes_requested", "--proof", failedProof, "--finding", "comportamento aprovado falhou"}); err != nil {
+	if _, err := runVerify([]string{"review", "--repo", repo, "--change", change, "--scope", "task", "--plan", "P01", "--task", "T01", "--reviewer", "independent", "--verdict", "changes_requested", "--proof", failedProof, "--finding", `{"target":"task", "observed":"command failed", "requirement":"REQ-001", "severity":"high", "evidence":".bianchini/changes/` + change + `/results/proofs/` + failedProof + `.json", "expected_fix":"command passes"}`}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := runVerify(arguments); err == nil || !strings.Contains(err.Error(), "VERIFICATION_RETRY_REQUIRED") {
@@ -322,7 +323,21 @@ func TestTypedLifecycleRequiresProofReviewReleaseAndHomologation(t *testing.T) {
 	if _, err := closeChange(repo, change); err == nil || !strings.Contains(err.Error(), "RELEASE_REQUIRED") {
 		t.Fatalf("close without release err=%v", err)
 	}
-	releaseValue, err := runVerify([]string{"release", "--repo", repo, "--change", change, "--build", "test-build", "--checksum", strings.Repeat("a", 64), "--delivery", "not_applicable"})
+	artifact := filepath.Join(repo, ".bianchini", ".runtime", "candidate.txt")
+	for _, args := range [][]string{
+		{"--build", artifact, "--checksum", strings.Repeat("a", 64)},
+	} {
+		if _, err := runVerify(append([]string{"release", "--repo", repo, "--change", change, "--delivery", "ready"}, args...)); err == nil {
+			t.Error("nonexistent artifact accepted")
+		}
+	}
+	if err := os.WriteFile(artifact, []byte("delivery bytes"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runVerify([]string{"release", "--repo", repo, "--change", change, "--build", artifact, "--checksum", strings.Repeat("a", 64), "--delivery", "ready"}); err == nil {
+		t.Error("arbitrary checksum accepted")
+	}
+	releaseValue, err := runVerify([]string{"release", "--repo", repo, "--change", change, "--build", artifact, "--checksum", sha256Bytes([]byte("delivery bytes")), "--delivery", "ready"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,8 +357,50 @@ func TestTypedLifecycleRequiresProofReviewReleaseAndHomologation(t *testing.T) {
 	}
 	homologation := map[string]any{
 		"schema_version": 1, "fingerprint": release["fingerprint"], "rc": release["candidate"],
-		"change": change, "status": "accepted", "gates": []any{"real public journey"},
+		"change": change, "status": "accepted", "gates": []any{map[string]any{"proof_id": releaseProofs[0], "result": "passed"}},
 		"blockers": []any{}, "findings": []any{}, "required_refs": []any{"results/RELEASE.md"},
+	}
+	for _, bad := range []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{"not_run", func(h map[string]any) {
+			h["gates"] = []any{map[string]any{"proof_id": releaseProofs[0], "result": "not_run"}}
+		}},
+		{"failed", func(h map[string]any) {
+			h["gates"] = []any{map[string]any{"proof_id": releaseProofs[0], "result": "failed"}}
+		}},
+		{"missing", func(h map[string]any) { h["gates"] = []any{} }},
+		{"critical", func(h map[string]any) {
+			h["findings"] = []any{map[string]any{"severity": "critical", "status": "open"}}
+		}},
+		{"high", func(h map[string]any) { h["findings"] = []any{map[string]any{"severity": "high", "status": "open"}} }},
+		{"blocking", func(h map[string]any) {
+			h["findings"] = []any{map[string]any{"severity": "medium", "status": "open", "blocking": true}}
+		}},
+		{"wrong proof", func(h map[string]any) {
+			h["gates"] = []any{map[string]any{"proof_id": planProofs[0], "result": "passed"}}
+		}},
+		{"wrong candidate", func(h map[string]any) { h["fingerprint"] = strings.Repeat("b", 64) }},
+		{"not applicable", func(h map[string]any) {
+			h["gates"] = []any{map[string]any{"proof_id": releaseProofs[0], "result": "not_applicable", "reason": "skip"}}
+		}},
+	} {
+		t.Run(bad.name, func(t *testing.T) {
+			h := cloneMap(homologation)
+			bad.mutate(h)
+			doc, _ := frontmatterDocument(h, "# Homologação", false)
+			if err := os.WriteFile(filepath.Join(repo, ".bianchini", "changes", change, "results", "HOMOLOGATION.md"), doc, 0600); err != nil {
+				t.Fatal(err)
+			}
+			p, c, err := approvedPlanPackage(repo, change)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := validateReleaseClosure(p, c); err == nil {
+				t.Fatal("invalid homologation accepted")
+			}
+		})
 	}
 	document, err := frontmatterDocument(homologation, "# Homologação\n\nJornada pública executada.", false)
 	if err != nil {
@@ -354,6 +411,19 @@ func TestTypedLifecycleRequiresProofReviewReleaseAndHomologation(t *testing.T) {
 	}
 	executionWorkspaceGit(t, repo, "add", ".bianchini")
 	executionWorkspaceGit(t, repo, "commit", "-q", "-m", "accept homologation")
+	if err := os.WriteFile(artifact, []byte("modified candidate"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p, c, err := approvedPlanPackage(repo, change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateReleaseClosure(p, c); err == nil {
+		t.Error("modified artifact accepted")
+	}
+	if err := os.WriteFile(artifact, []byte("delivery bytes"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	closed, err := closeChange(repo, change)
 	if err != nil {
 		t.Fatal(err)

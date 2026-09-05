@@ -186,10 +186,10 @@ func TestBuiltReleaseBinaryIdentityIsChecked(t *testing.T) {
 		t.Fatalf("build do CLI: %v\n%s", err, output)
 	}
 	target := runtime.GOOS + "-" + runtime.GOARCH
-	if err := validateBuiltReleaseBinary(binary, target, "0.6.0", commit); err != nil {
+	if err := validateBuiltReleaseBinary(binary, target, "1.0.0", commit); err != nil {
 		t.Fatalf("CLI oficial foi rejeitado: %v", err)
 	}
-	if err := validateBuiltReleaseBinary(binary, target, "0.6.0", strings.Repeat("b", 40)); err == nil {
+	if err := validateBuiltReleaseBinary(binary, target, "1.0.0", strings.Repeat("b", 40)); err == nil {
 		t.Fatal("build_commit divergente foi aceito")
 	}
 }

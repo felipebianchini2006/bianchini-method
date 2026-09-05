@@ -31,3 +31,5 @@ Cada plano grava somente seu delta real, IDs de prova/revisão e impacto em `res
 - Evidência anterior ao fingerprint vigente é obsoleta.
 - Resumos nunca podem transformar `not_run`, sandbox ou leitura de código em prova de produção.
 - Compressão de contexto não remove requisito, guard, finding ou bloqueio.
+
+Provas históricas de tarefas não são reexecutadas indiscriminadamente. Os comandos integrados obrigatórios ficam em verifications do plano. O cache só compartilha execução com identidade de comando, diretório, alvo, ambiente, pacote e cobertura equivalentes; entradas desconhecidas exigem fresh. Logs resumidos entram no contexto; o arquivo sanitizado permanece acessível.

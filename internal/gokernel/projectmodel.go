@@ -456,7 +456,10 @@ func validateTask(raw any) error {
 	if !ok {
 		return fmt.Errorf("verify exige objeto")
 	}
-	allowedVerification := stringSet([]string{"kind", "run", "argv", "cwd", "timeout_seconds", "proves"})
+	allowedVerification := stringSet([]string{"kind", "run", "argv", "cwd", "timeout_seconds", "proves", "cache"})
+	if cache := stateString(verification["cache"]); cache != "" && !oneOf(cache, "fresh", "deterministic") {
+		return fmt.Errorf("%s.verify.cache exige fresh ou deterministic", identifier)
+	}
 	if unknown := unknownMapKeys(verification, allowedVerification); len(unknown) > 0 {
 		return fmt.Errorf("campo desconhecido em verify: %s", unknown[0])
 	}

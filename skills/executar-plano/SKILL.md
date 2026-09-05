@@ -96,7 +96,7 @@ bm verify task --repo <repo> --change C001 --plan P01 --task T01 \
 
 O núcleo registra argv, cwd, timeout, exit code, hashes de saída, revisão Git, fingerprint do código, digest do pacote e do context pack. Texto como "testes passaram" não é prova.
 
-Uma falha persiste. Repetir a mesma prova no mesmo estado exige `--retry-reason`; não existe retry automático infinito. Prova verde é reutilizada apenas enquanto código, pacote e contexto continuam idênticos.
+Uma falha persiste. Repetir a mesma prova no mesmo estado exige `--retry-reason`; não existe retry automático infinito. Prova verde só é reutilizada com `verify.cache: deterministic` e entradas controladas. O padrão fresh executa novamente para ambiente vivo ou desconhecido.
 
 Na tarefa, execute a menor prova pública relacionada. Não execute E2E completo ou mutação por microtarefa; essas campanhas pertencem ao gate do plano ou do release quando declaradas.
 
@@ -105,7 +105,7 @@ Na tarefa, execute a menor prova pública relacionada. Não execute E2E completo
 Revise na cadência do modo:
 
 - `grouped`: uma revisão no gate do plano;
-- `slice`: uma revisão por slice vertical;
+- `slice`: cada tarefa Txx representa uma slice vertical; revisão por Txx;
 - `strict`: uma revisão por tarefa crítica.
 
 Use [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) como contrato da revisão. O revisor recebe requisito, diff e `proof_id`. Avalia contrato, correção, segurança, simplicidade, compatibilidade e testes. Não redesenha por preferência. Entregue o caminho do arquivo de saída da revisão; em `grouped`, nunca revise por microtarefa.
@@ -120,7 +120,7 @@ bm verify review --repo <repo> --change C001 --scope task \
   --proof <proof-id>
 ```
 
-Se houver defeito material, primeiro gere uma prova vermelha reproduzível e use `--verdict changes_requested --proof <proof-vermelho> --finding <descrição>`. Depois corrija o menor delta, gere prova nova e revise novamente. Não espere outro agente por polling. Cada chamada termina com um veredito persistido. O loop continua somente quando existe mudança concreta e encerra em aprovação, alteração material ou bloqueio real.
+Se houver defeito material, use `--verdict changes_requested --finding <JSON>` com target, observed, requirement, severity, evidence (arquivo real) e expected_fix. RED não é obrigatório para inspeção concreta ou evidência visual. Após corrigir, gere provas apropriadas e aprove com `--resolves-review <id>`. Não espere outro agente por polling. Cada chamada termina com um veredito persistido. O loop continua somente quando existe mudança concreta e encerra em aprovação, alteração material ou bloqueio real.
 
 Fix round é hipótese, não entrega. Identifique o `risk_seam` estável e passe `--risk-seam` e `--consecutive-seam-findings` à política; renomear a tarefa não reinicia a contagem. Repetir correções sem nova evidência aciona o limite do perfil e termina em bloqueio explícito, nunca em loop silencioso.
 
@@ -139,7 +139,7 @@ Não reescreva histórico para esconder a conclusão anterior. A auditoria de re
 
 ## 6. Concluir tarefa e plano
 
-Somente após prova verde e revisão aprovada do mesmo fingerprint:
+Após prova verde vigente, conclua. Em grouped, omita `--review`; em strict/slice, forneça a revisão correspondente ao mesmo fingerprint:
 
 ```bash
 bm plan complete --repo <repo> --change C001 --plan P01 --task T01 \
@@ -148,7 +148,7 @@ bm plan complete --repo <repo> --change C001 --plan P01 --task T01 \
   --proof <proof-id> --review <review-id>
 ```
 
-Depois de todas as tarefas, execute o gate declarado do plano, revise esse gate e conclua:
+Depois das tarefas, execute todos os gates do plano. grouped exige a revisão integrada abaixo. strict/slice já possuem revisão focal e não exigem outra revisão do plano:
 
 ```bash
 bm verify plan --repo <repo> --change C001 --plan P01
@@ -166,11 +166,11 @@ bm plan complete --repo <repo> --change C001 --plan P01 \
 
 ## 7. Release, homologação e fechamento
 
-Depois do último plano, rode novamente todas as verificações automatizadas no estado final do código:
+Depois do último plano, execute os gates integrados dos planos sobre o candidato final, preservando as provas históricas das tarefas:
 
 ```bash
 bm verify release --repo <repo> --change C001 \
-  --build <build-id> --checksum <sha256> --delivery ready
+  --build <arquivo-real> --checksum <sha256-esperado> --delivery ready
 bm verify review --repo <repo> --change C001 --scope release \
   --reviewer <identidade> --verdict approved \
   --proof <proof-id> [--proof <proof-id> ...]

@@ -55,6 +55,8 @@ Resumo humano curto e coerente com o frontmatter. Não adicionar ledger, histór
 - O corpo Markdown é opcional e curto.
 - São proibidos no estado: `history`, `ledger`, `events`, `results`, logs, hipóteses, comandos completos, diffs e evidências extensas.
 
+A versão 1.0 do executável preserva `method: "0.4"` como linhagem de esquema. `pending_approval` pode aguardar decisão técnica do agente; `COHERENCE.md` distingue `technical_decision` de aprovação humana. O estado só reflete conclusão depois que o núcleo valida cobertura, atualidade e candidato. Nunca editar `STATE.md` para substituir gates.
+
 ## Estado ocioso
 
 ```json

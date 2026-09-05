@@ -41,12 +41,17 @@ Use [`references/stack-research.md`](references/stack-research.md) e grave `.bia
 
 Pesquisa web usa fontes primárias oficiais. Registre somente decisões aplicadas, versões, riscos e alternativas rejeitadas. Pesquisa não autoriza upgrade nem expansão de escopo.
 
+Decida stack e arquitetura autonomamente dentro do escopo contratado. Considere código existente, bibliotecas, integrações, operação, segurança, concorrência e crescimento plausível. Ruby, Python, TypeScript, Go, Java e C# são opções válidas. Monólito ou microserviços dependem de isolamento e operação concretos. Redis, filas, workers e serviços separados exigem uma necessidade identificada; não elimine componentes necessários para reduzir a contagem de tecnologias. Sem demanda de escala explícita, registre premissas proporcionais e um caminho de evolução. Justificativa curta em ARCHITECTURE.md basta.
+
 ## 3. Modelar o sistema completo
 
 Crie, nesta ordem. Quando houver `SCOPE.md` selado pelo `/preparar-escopo`, preserve-o sem reescrever:
 
 ```text
 SCOPE.md         resultados, limites, aceite e ações externas; criar somente sem intake selado
+specs/expected/*.md  comportamento observável com IDs estáveis
+specs/MANIFEST.json  mapeamento SCOPE → spec (gerado para IDs iguais)
+specs/diff.md    projeção gerada pelo roadmap sync
 ARCHITECTURE.md  decisões, stack, seams, trade-offs e alternativas
 SYSTEM_MODEL.md  módulos, contratos, ownership, dados, integrações e journeys
 plans/Pxx.md ou plans/Pxx-*.md   fases e tarefas tipadas
@@ -54,6 +59,8 @@ ROADMAP.md       visão derivada de todas as fases e suas relações
 ```
 
 `SYSTEM_MODEL.md` usa o frontmatter descrito em [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md). Ele descreve o estado final esperado, não o histórico de decisões.
+
+Para specs compactas, use headings `## REQ-001: comportamento` com os mesmos IDs do SCOPE. `roadmap sync` gera MANIFEST.json inicial e diff.md. Se usar outros IDs, escreva o mapeamento explícito antes do sync; não duplique o texto do escopo. Specs descrevem comportamento, arquitetura descreve contratos estruturais e planos descrevem sequência e provas.
 
 Não use a LLM para decidir ordem topológica, cobertura ou referências válidas. O CLI deriva e valida esses dados depois que os planos estiverem materializados.
 
@@ -98,6 +105,7 @@ tasks:
       argv: [<executável>, <arg1>, <arg2>]
       cwd: .
       timeout_seconds: 300
+      cache: fresh  # deterministic somente com entradas controladas
       proves: <o que a evidência demonstra>
     done: <condição objetiva de conclusão>
     risk_seam: <fronteira estável de risco>
@@ -107,7 +115,7 @@ Cada `Txx` é uma unidade executável e verificável, não uma nota em prosa. A 
 
 Para `kind: command`, use exatamente um de `argv` ou `run`; `argv` é preferido e não passa por shell. Para `kind: procedure`, use `run` como descrição determinística, não declare `argv` e planeje o artefato real que será entregue como evidência. `cwd` é relativo ao repositório e `timeout_seconds` fica entre 1 e 3600.
 
-O modo define a granularidade obrigatória: `grouped → plan_gate`, `slice → per_slice`, `strict → per_task`. O CLI rejeita combinações incompatíveis, campos extras, IDs duplicados, dependência futura/cíclica, requisito sem tarefa e referência de módulo/interface/dado ausente no modelo.
+O modo define a granularidade obrigatória: `grouped → plan_gate`, `slice → per_slice` (cada Txx é a slice vertical identificável), `strict → per_task`. O CLI rejeita combinações incompatíveis, campos extras, IDs duplicados, dependência futura/cíclica, requisito sem tarefa e referência de módulo/interface/dado ausente no modelo.
 
 No corpo, registre apenas contexto complementar, estados de erro/recuperação e decisões úteis. Não usar `TBD`, "tratar erros" ou abstração para consumidor futuro inexistente.
 
@@ -188,34 +196,26 @@ bm coherence check --repo <repo> --change C001 \
 
 `inputs` deve ser exatamente o `review_input_digest` retornado pelo check estrutural. Ele vincula o parecer aos hashes atuais de `SCOPE`, `RESEARCH`, `ARCHITECTURE`, `SYSTEM_MODEL`, `ROADMAP` e todos os planos. Qualquer alteração torna o parecer obsoleto.
 
-`ERROR` estrutural bloqueia. `WARNING` exige correção ou justificativa humana `accepted_with_justification` incluída no digest. `INFO` é observação. A revisão semântica indisponível não pode ser marcada como executada nem virar passe automático.
+`ERROR` estrutural bloqueia. `WARNING` exige correção ou justificativa técnica verificável `accepted_with_justification` incluída no digest. `INFO` é observação. A revisão semântica indisponível não pode ser marcada como executada nem virar passe automático.
 
 Um pacote completo sem `ERROR` ou `WARNING` aberto retorna `ready_for_approval` e o digest exato a aprovar. Isso ainda não é aprovação.
 
-## 7. Garantia, aprovação e estado
+## 7. Garantia, decisão técnica e estado
 
-Escolha `lean`, `standard` ou `full` pelo maior risco real. Distribua verificações em `fast`, `plan` e `release`; não crie tarefa por camada nem use score global de coverage/mutação.
+Escolha `lean`, `standard` ou `full` pelo risco real. Não há quantidade fixa de fases ou tarefas. Distribua provas focais nas tarefas e gates integrados em `verifications` do plano; a release repete esses gates sobre o candidato atual, sem repetir todos os comandos históricos das tarefas.
 
-Antes da aprovação:
-
-1. reexecutar modelo e coerência;
-2. confirmar zero `ERROR` e zero `WARNING` aberto;
-3. incluir justificativas aceitas no pacote;
-4. confirmar que o check completo retornou `ready_for_approval`;
-5. apresentar o digest global e todos os planos ao responsável;
-6. pedir uma aprovação única e explícita desse digest.
-
-Somente depois da aprovação humana, grave o checkpoint:
+Após revisão semântica disponível e zero ERROR/WARNING aberto, registre a decisão técnica do pacote:
 
 ```bash
 bm coherence approve --repo <repo> --change C001 \
-  --digest <digest-retornado-pelo-check> \
-  --approved-by "<responsável>"
+  --digest <digest-retornado-pelo-check> --decided-by "<agente>"
 ```
 
-O CLI revalida o manifesto completo, exige revisão semântica disponível e grava `approved_by`, horário e digest em `COHERENCE.md`; somente então `STATE.md` passa a `approved`. Mudança posterior em qualquer artefato bloqueia workspace, conclusão e fechamento até nova revisão e aprovação.
+O estado `approved` significa pacote habilitado para execução. `approval.kind: technical_decision` distingue a decisão autônoma da aprovação comercial do escopo. `--approved-by` permanece para aprovação humana que realmente ocorreu. Nunca registrar aprovação humana por inferência.
 
-Não inventar autoridade nem executar `coherence approve` antes de uma aprovação humana explícita. Depois do checkpoint, criar commit local atômico do pacote; não implementar, fazer push ou deploy nesta skill.
+Mudança material no produto contratado, novo custo recorrente, ação irreversível ou informação de negócio indispensável pode exigir intervenção. Arquivos, nomes, biblioteca equivalente dentro das restrições, correção comprovada de teste e organização de tarefas são decisões técnicas autônomas. Se afetarem o pacote, sincronize e revalide o digest sem pedir aprovação rotineira.
+
+Crie commit local atômico do pacote. Esta skill entrega o planejamento; prossiga à implementação quando o pedido atual também autorizar executar.
 
 ## Saída
 

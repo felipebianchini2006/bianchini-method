@@ -1673,7 +1673,7 @@ class AdaptivePolicyScenarios(unittest.TestCase):
         )
         self.assertTrue(value["breaker"])
         self.assertTrue(value["hypothesis_invalidated"])
-        self.assertTrue(value["redesign_required"])
+        self.assertFalse(value["redesign_required"])
         self.assertEqual(value["structural_findings"], ["crash_window", "toctou"])
 
     def test_two_consecutive_seam_findings_trip_early_breaker(self) -> None:
@@ -1682,7 +1682,7 @@ class AdaptivePolicyScenarios(unittest.TestCase):
             "--risk-seam", "payments-ledger", "--consecutive-seam-findings", "2",
         )
         self.assertTrue(tripped["breaker"])
-        self.assertTrue(tripped["redesign_required"])
+        self.assertFalse(tripped["redesign_required"])
         single = self.policy(
             "--profile", "standard", "--risk", "medium", "--round", "1",
             "--risk-seam", "payments-ledger", "--consecutive-seam-findings", "1",
@@ -1699,12 +1699,12 @@ class AdaptivePolicyScenarios(unittest.TestCase):
         contract = read(ROOT / "skills/_shared/METHOD_CONTRACT.md")
         for text in (
             "risk_seam",
-            "não zera a contagem do mesmo seam",
-            "crash window",
-            "TOCTOU",
-            "máquina de estados",
-            "matriz de falhas",
-            "não é mudança mínima",
+            "Renomear a tarefa não zera o seam",
+            "FIX_LIMIT_REACHED",
+            "reexecutar o mesmo código é verificação",
+            "invariante quebrado",
+            "mudança arquitetural proporcional",
+            "Não marcar sucesso por falta de orçamento",
         ):
             self.assertIn(text, contract)
         executor = read(SKILLS["executar-plano"])

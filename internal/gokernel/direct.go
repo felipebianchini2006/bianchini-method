@@ -10,7 +10,7 @@ import (
 )
 
 var directValueFlags = map[string]bool{
-	"--repo": true, "--slug": true, "--objective": true, "--scope": true,
+	"--retry-reason": true, "--repo": true, "--slug": true, "--objective": true, "--scope": true,
 	"--acceptance": true, "--verification": true, "--checkpoint": true,
 	"--changed-file": true, "--command": true, "--blocker": true,
 	"--next-action": true, "--status": true, "--behavior": true,
