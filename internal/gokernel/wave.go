@@ -375,7 +375,7 @@ func waveValidateApproval(coherence map[string]any) (string, map[string]bool, er
 	if !ok || stateString(approval["digest"]) != digest {
 		return "", nil, waveError("WAVE_INCOMPLETE", "COHERENCE.md não vincula aprovação ao pacote")
 	}
-	if !waveNonemptyText(approval["approved_by"]) || !waveNonemptyText(approval["approved_at"]) {
+	if !(waveNonemptyText(approval["approved_by"]) && waveNonemptyText(approval["approved_at"])) && !(stateString(approval["kind"]) == "technical_decision" && waveNonemptyText(approval["decided_by"]) && waveNonemptyText(approval["decided_at"])) {
 		return "", nil, waveError("WAVE_INCOMPLETE", "COHERENCE.md possui aprovação incompleta")
 	}
 	staleValues, ok := coherence["stale_plans"].([]any)

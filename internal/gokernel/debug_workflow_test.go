@@ -32,13 +32,20 @@ func TestDebugLifecycleMatchesFrozenSuccess(t *testing.T) {
 		t.Fatalf("listed=%#v", listedValue)
 	}
 
+	if err := os.WriteFile(filepath.Join(repo, "fix.py"), []byte("def process(events):\n    return events\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	regression := "from fix import process\nassert process(['event', 'event']) == ['event'], 'duplicate event processed twice'\n"
+	if err := os.WriteFile(filepath.Join(repo, "regression.py"), []byte(regression), 0600); err != nil {
+		t.Fatal(err)
+	}
 	steps := []struct {
 		event string
 		extra []string
 	}{
 		{"reproduced", nil},
 		{"diagnosed", []string{"--root-cause", "provider_event_id não era persistido como chave única"}},
-		{"red", nil},
+		{"red", []string{"--command", "python3 -B regression.py", "--test-file", "regression.py", "--failure-pattern", "duplicate event processed twice"}},
 		{"fixing", nil},
 	}
 	for _, step := range steps {
@@ -48,12 +55,15 @@ func TestDebugLifecycleMatchesFrozenSuccess(t *testing.T) {
 			t.Fatalf("%s: %v", step.event, err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(repo, "fix.py"), []byte("DEDUPLICATION = True\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, "fix.py"), []byte("def process(events):\n    return list(dict.fromkeys(events))\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := runDebug([]string{"checkpoint", "--repo", repo, "--id", id, "--event", "green", "--evidence", "tests passed"}); err == nil {
+		t.Fatal("GREEN narrativo sem execução aceito")
+	}
 	for _, args := range [][]string{
-		{"checkpoint", "--repo", repo, "--id", id, "--event", "green", "--evidence", "regressão focal passou no patch"},
-		{"checkpoint", "--repo", repo, "--id", id, "--event", "regression_checked", "--evidence", "fluxos vizinhos passaram", "--neighbor-regression", "webhook válido continua atualizando o pedido"},
+		{"checkpoint", "--repo", repo, "--id", id, "--event", "green", "--command", "python3 -B regression.py", "--evidence", "regressão focal passou no patch"},
+		{"checkpoint", "--repo", repo, "--id", id, "--event", "regression_checked", "--command", "python3 -B regression.py", "--evidence", "fluxos vizinhos passaram", "--neighbor-regression", "webhook válido continua atualizando o pedido"},
 		{"checkpoint", "--repo", repo, "--id", id, "--event", "documented", "--evidence", "causa e contrato registrados", "--residual-risk", "nenhum risco conhecido no escopo testado"},
 	} {
 		if _, err := runDebug(args); err != nil {

@@ -59,52 +59,52 @@
         "unit": "C001/P01/T01",
         "before_bytes": 35309,
         "before_files": 3,
-        "skill_bytes_after": 10156,
+        "skill_bytes_after": 10542,
         "pack_bytes": 5924,
-        "after_bytes": 16080,
+        "after_bytes": 16466,
         "after_files": 2,
         "pack_sources": 15,
-        "reduction_bytes": 19229,
-        "reduction_percent": 54.46
+        "reduction_bytes": 18843,
+        "reduction_percent": 53.37
       },
       {
         "skill": "executar-direto",
         "unit": "Q012",
         "before_bytes": 28559,
         "before_files": 2,
-        "skill_bytes_after": 8919,
+        "skill_bytes_after": 9063,
         "pack_bytes": 1679,
-        "after_bytes": 10598,
+        "after_bytes": 10742,
         "after_files": 2,
         "pack_sources": 4,
-        "reduction_bytes": 17961,
-        "reduction_percent": 62.89
+        "reduction_bytes": 17817,
+        "reduction_percent": 62.39
       },
       {
         "skill": "corrigir-bug",
         "unit": "D004",
         "before_bytes": 27042,
         "before_files": 2,
-        "skill_bytes_after": 7221,
+        "skill_bytes_after": 7668,
         "pack_bytes": 1479,
-        "after_bytes": 8700,
+        "after_bytes": 9147,
         "after_files": 2,
         "pack_sources": 2,
-        "reduction_bytes": 18342,
-        "reduction_percent": 67.83
+        "reduction_bytes": 17895,
+        "reduction_percent": 66.17
       },
       {
         "skill": "homologar-sistema",
         "unit": "RC:build-a",
         "before_bytes": 30528,
         "before_files": 2,
-        "skill_bytes_after": 11082,
+        "skill_bytes_after": 11667,
         "pack_bytes": 1985,
-        "after_bytes": 13067,
+        "after_bytes": 13652,
         "after_files": 2,
         "pack_sources": 3,
-        "reduction_bytes": 17461,
-        "reduction_percent": 57.2
+        "reduction_bytes": 16876,
+        "reduction_percent": 55.28
       },
       {
         "skill": "status-projeto",

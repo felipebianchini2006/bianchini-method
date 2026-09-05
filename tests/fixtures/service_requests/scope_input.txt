@@ -1,0 +1,21 @@
+Escopo de demonstracao: solicitacoes de servico
+
+Produto: CLI local para criar e acompanhar solicitacoes.
+Usar dados sinteticos. Usuario e operador sao perfis distintos.
+
+1. Usuario cria uma solicitacao com descricao de 1 a 200 caracteres.
+   A criacao retorna um identificador e estado open.
+2. Operador autorizado consulta todas as solicitacoes e altera o estado.
+   Estados: open, in_progress e done.
+3. Usuario consulta sua solicitacao e acompanha o estado atual.
+4. Outro usuario nao pode consultar nem alterar a solicitacao alheia.
+   Somente o operador pode listar todas e atualizar estados.
+5. Identificador, dono, descricao e estado permanecem apos reiniciar.
+6. Descricao vazia, identidade desconhecida e operacao invalida sao
+   rejeitadas com erro, sem criar ou alterar registros.
+7. Avaliar falhas de gravacao e preservar transacoes confirmadas.
+
+Fora do escopo: contas reais, autenticacao de producao, pagamentos,
+servicos pagos, mensagens, historico de estados e interface visual.
+Identidades sinteticas publicas servem apenas a esta demonstracao.
+A linguagem e o armazenamento serao decididos no planejamento.

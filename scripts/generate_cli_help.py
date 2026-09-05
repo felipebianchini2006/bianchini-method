@@ -76,6 +76,11 @@ def generated_bytes() -> bytes:
             for field in interface.split(" | ")
             if field.startswith("--") and "action=store_true" not in field
         )
+    for command, extension in contract.get("native_extensions", {}).items():
+        value_flags[command] = sorted(set(value_flags[command]) | set(extension["value_flags"]))
+        for path in help_by_path:
+            if path.split(" ")[0] == command:
+                help_by_path[path] += "\nContrato nativo 1.0:\n  " + extension["help"] + "\n"
     document = {
         "schema_version": 1,
         "command_choices": list(contract["commands"]),

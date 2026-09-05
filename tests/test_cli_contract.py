@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -122,7 +124,10 @@ class CliContractScenarios(unittest.TestCase):
         completed = run_script(
             "run_cli_contract_fixtures.py", "--engine", "python"
         )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.returncode, 0,
+            f"Relatório das fixtures:\n{completed.stdout}\n{completed.stderr}",
+        )
         result = json.loads(completed.stdout)
         self.assertEqual(result["engine"], "python")
         self.assertEqual(result["failed"], 0)
@@ -132,6 +137,25 @@ class CliContractScenarios(unittest.TestCase):
         self.assertEqual(result["total"], fixture_count)
         self.assertEqual(result["passed"], fixture_count)
         self.assertEqual(result["skipped"], 0)
+
+    def test_fixture_git_discovery_does_not_escape_its_temporary_root(self) -> None:
+        with mock.patch.object(sys, "path", [str(ROOT / "scripts"), *sys.path]):
+            import run_cli_contract_fixtures as fixture_runner
+        with tempfile.TemporaryDirectory() as temp:
+            enclosing_repo = Path(temp) / "unrelated-repository"
+            enclosing_repo.mkdir()
+            subprocess.run(
+                ["git", "init", "-q", "-b", "main", str(enclosing_repo)],
+                check=True, capture_output=True,
+            )
+            sentinel = enclosing_repo / "keep.txt"
+            sentinel.write_text("outside the fixture\n", encoding="utf-8")
+            with mock.patch.object(tempfile, "tempdir", str(enclosing_repo)):
+                errors = fixture_runner.run_fixture(
+                    fixture_runner.FIXTURES / "review-package.json", "python", None
+                )
+            self.assertEqual(errors, [], "fixture discovered an unrelated parent Git repository")
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "outside the fixture\n")
 
     def test_phase0_baseline_metrics_are_measured_not_estimated(self) -> None:
         payload = json.loads(BASELINE.read_text(encoding="utf-8"))

@@ -433,6 +433,8 @@ def run_fixture(path: Path, engine: str, binary: Path | None) -> list[str]:
                     **os.environ,
                     **FIXED_GIT_ENV,
                     "COLUMNS": "200",
+                    # Never discover the caller's Git repo or a mount boundary.
+                    "GIT_CEILING_DIRECTORIES": str(temp.resolve()),
                     "PYTHONDONTWRITEBYTECODE": "1",
                 },
             )

@@ -170,5 +170,43 @@
     {"id":"legacy-transition.retired","argv":["legacy-transition","--repo","{repo}"],"status":"retired","generation":"legacy_internal","behavior":"negative_argparse","exit_code":2,"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public"],"fixtures":["retired-legacy-transition"]},
     {"id":"repo-hygiene.retired","argv":["repo-hygiene","check","--repo","{repo}"],"status":"retired","generation":"legacy_internal","behavior":"negative_argparse","exit_code":2,"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public"],"fixtures":["retired-repo-hygiene"]},
     {"id":"workspace.companion-v2-flags","argv":["workspace","create","--repo","{repo}","--plan","P01","--planning-version","v2","--state","{repo}/legacy-state.json"],"status":"known_incompatibility","generation":"companion","behavior":"negative_argparse","exit_code":2,"rejected_flags":["--planning-version","--state"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_fallback_arguments_are_not_public_in_v04"],"fixtures":["workspace-old-companion-flags"]}
-  ]
+  ],
+  "native_extensions": {
+    "coherence": {
+      "value_flags": [
+        "--decided-by"
+      ],
+      "help": "--decided-by <agente>: decisão técnica autônoma. --approved-by só registra aprovação humana ocorrida."
+    },
+    "debug": {
+      "value_flags": [
+        "--command",
+        "--test-file",
+        "--failure-pattern",
+        "--retry-reason"
+      ],
+      "help": "RED: --command <comando> --test-file <regressão> --failure-pattern <assinatura>. GREEN/regression_checked: --command. GREEN repete o teste sem alterá-lo. --retry-reason explica reexecução."
+    },
+    "direct": {
+      "value_flags": [
+        "--retry-reason"
+      ],
+      "help": "checkpoint --command executa os gates declarados no brief. finish exige provas atuais de todos os gates; narrativa não é prova. --retry-reason explica reexecução."
+    },
+    "verify": {
+      "value_flags": [
+        "--artifact-kind",
+        "--resolves-review"
+      ],
+      "help": "release --artifact-kind file|container|deployment --build <arquivo|imagem|endpoint> --delivery ready. --checksum é expectativa opcional; identidade é verificada. Cache de tarefa: verify.cache fresh (padrão) ou deterministic. review --finding recebe JSON estruturado; --resolves-review <id> resolve achado com provas atuais."
+    },
+    "roadmap": {
+      "value_flags": [],
+      "help": "sync gera ROADMAP.md e specs/diff.md; specs com IDs iguais ao escopo geram MANIFEST.json inicial."
+    },
+    "plan": {
+      "value_flags": [],
+      "help": "grouped: tarefa com --proof, revisão integrada no plano. strict/slice: tarefa com --proof e --review; revisão extra do plano opcional. Cada Txx de slice é a fronteira vertical revisada."
+    }
+  }
 }

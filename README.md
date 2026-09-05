@@ -1,10 +1,12 @@
-# Bianchini Method 0.6
+# Bianchini Method 1.0 — candidato
 
 Método spec-driven para planejar e executar mudanças com visão do sistema completo, coerência entre fases, documentação viva e verificação proporcional ao risco.
 
-O pacote `0.6.0` usa um CLI Go nativo como backend oficial e mantém o contrato público do método `0.4`. O Python permanece no repositório somente como oráculo explícito de compatibilidade; não há fallback automático entre linguagens.
+O candidato `1.0.0` usa um CLI Go nativo como backend oficial e mantém o contrato público do método `0.4`. O Python permanece no repositório somente como oráculo explícito de compatibilidade; não há fallback automático entre linguagens.
 
-O salto do `0.4` é tratar o planejamento como um grafo de contratos:
+A versão 1.0 exige provas completas dos gates, valida o artefato de entrega e distingue decisão técnica de aprovação humana. É um candidato em branch; não há tag ou release definitiva publicada. Consulte [migração e reprodução](docs/workflow-v1.md).
+
+O planejamento representa um grafo de contratos:
 
 ```text
 sistema atual
@@ -81,7 +83,7 @@ PDF de escopo → SCOPE.md selado
 → impact radius
 → revisão semântica conjunta
 → pacote pronto para aprovação
-→ checkpoint humano do digest global
+→ decisão técnica registrada no digest global
 ```
 
 Cada plano declara `depends_on`, `provides`, `consumes`, ownership, interfaces, dados, migrações, efeitos, rollback, model delta, verificação e restrições futuras. Cada tarefa `Txx` declara resultado, requisitos cobertos, dependências, arquivos, ação, prova, done condition e `risk_seam`.
@@ -125,7 +127,7 @@ contrato
 Antes da aprovação, a análise é apenas uma prévia e não grava `stale`. Depois da
 aprovação, planos atingidos ficam `stale`, o pacote entra em
 `approved_with_stale` e planos independentes continuam executáveis com o digest
-humano original. Uma nova auditoria gera o próximo digest aprovado.
+da decisão original. Uma nova auditoria gera o próximo digest aprovado.
 
 O primeiro quick ou debug de um projeto novo inicializa `.bianchini`
 automaticamente. Se houver documentação anterior reconhecida, a execução bloqueia
@@ -232,11 +234,12 @@ debug start|list|status|resume|checkpoint|finish
 migrate check|apply
 workspace create|check|locate|resume|finish
 cycle-close --change Cxxx
-task-brief  report  review-package  checkpoint
 policy  proof-map  mutation-evidence  telemetry  status  update-bm
 ```
 
-Erros públicos do fluxo 0.4 incluem `MODEL_MISMATCH`, `COHERENCE_ERROR`,
+Os comandos `task-brief`, `report`, `review-package` e `checkpoint` são compatibilidade legada; o fluxo atual usa `context pack` e `verify`.
+
+Erros públicos do fluxo atual incluem `MODEL_MISMATCH`, `COHERENCE_ERROR`,
 `WARNING_UNRESOLVED`, `IMPACT_STALE`, `MISSING_PROVIDER`,
 `OWNERSHIP_CONFLICT`, `MIGRATION_ORDER_INVALID`, `MISSING_GUARD`,
 `STALE_EVIDENCE`, `EXTERNAL_AUTHORITY_REQUIRED`, `DOCVIVA_INCOMPLETE` e
@@ -253,12 +256,12 @@ skills/_shared/bin/bm roadmap sync --repo . --change C001
 skills/_shared/bin/bm model validate --repo . --change C001
 skills/_shared/bin/bm coherence check --repo . --change C001 --structural-only
 skills/_shared/bin/bm coherence check --repo . --change C001 --semantic-report semantic-review.json
-skills/_shared/bin/bm coherence approve --repo . --change C001 --digest <digest> --approved-by "<responsável>"
+skills/_shared/bin/bm coherence approve --repo . --change C001 --digest <digest> --decided-by "agent:planner"
 skills/_shared/bin/bm impact analyze --repo . --change C001 --plan P02
 skills/_shared/bin/bm verify task --repo . --change C001 --plan P01 --task T01 --context-pack .bianchini/.runtime/context/C001-P01-T01.json
 skills/_shared/bin/bm verify review --repo . --change C001 --scope task --plan P01 --task T01 --reviewer reviewer --verdict approved --proof <proof-id>
 skills/_shared/bin/bm plan complete --repo . --change C001 --plan P01 --task T01 --context-pack .bianchini/.runtime/context/C001-P01-T01.json --result "<resultado>" --proof <proof-id> --review <review-id>
-skills/_shared/bin/bm verify release --repo . --change C001 --build <build-id> --checksum <sha256> --delivery ready
+skills/_shared/bin/bm verify release --repo . --change C001 --artifact-kind file --build dist/app --checksum <sha256> --delivery ready
 skills/_shared/bin/bm cycle-close --repo . --change C001
 ```
 

@@ -48,7 +48,7 @@ func TestVersionJSONIdentifiesOfficialBackend(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Engine != "go" || result.ContractVersion != "0.4" || !result.Official || result.Preview || result.Version != "0.6.0" {
+	if result.Engine != "go" || result.ContractVersion != "0.4" || !result.Official || result.Preview || result.Version != Version {
 		t.Fatalf("unexpected version identity: %+v", result)
 	}
 	if result.BuildCommit == "" || len(result.ImplementedSurfaces) != 65 {

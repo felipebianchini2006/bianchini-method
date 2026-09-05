@@ -1,0 +1,45 @@
+{
+  "reviewer": "agent:critical_review",
+  "reviewed_at": "2026-09-05T11:38:09.831371+00:00",
+  "scope": "Revisão independente do produto de demonstração, escopo PDF/canônico e roteiro público. Não certifica o núcleo do método nem produção.",
+  "sources": [
+    "<checkout>/tests/fixtures/service_requests/app.py",
+    "<checkout>/tests/fixtures/service_requests/test_service.py",
+    "<checkout>/tests/fixtures/service_requests/scope.md",
+    "<checkout>/tests/fixtures/service_requests/external_gate.py",
+    "<checkout>/scripts/run_service_example.py",
+    "<validation-temp>/escopo-servicos.pdf",
+    "<checkout>/internal/gokernel/verification.go"
+  ],
+  "findings": [],
+  "fixture_sha256": {
+    "app.py": "a184eb796cbad6af21d95c0f1d38d8c4b5f7a09625758da3aff9fa1f26574c6b",
+    "test_service.py": "36685b9fca660b2d733cf3862798f1bc0d1f7399ddd30c784fa98fa702cae663",
+    "scope.md": "05e6522a2f1415dc5b9c651e5ad2ae7652fbf00f740ce80d5a38644acc7e31c2"
+  },
+  "scope_pdf_sha256": "c12d3a30a7812727a9b18457dd5974bfc82eb4ec9a3e09b334549262043afd45",
+  "checks": [
+    "PDF extraído integralmente e página renderizada inspecionada: conteúdo legível, sem corte; requisitos mínimos correspondem ao scope.md.",
+    "5 testes no app.py passaram: criação, persistência por novo processo, operador, isolamento, entradas e identidade.",
+    "5 testes no artefato service.pyz passaram usando BM_CANDIDATE_BUILD.",
+    "5 testes no mesmo pyz passaram após desabilitar app.py na cópia: comprova execução do artefato, não do fonte.",
+    "Sondagens adicionais no pyz passaram: estados open/in_progress/done, descrição de 200 caracteres, rejeição de espaços e 201 caracteres, leitura/escrita alheia, lista por usuário, identidade inválida e ausência de mutação ao rejeitar.",
+    "Falha SQLite injetada por trigger abortou atualização e leitura em novo processo preservou estado anterior.",
+    "Runner inspecionado: comandos públicos, release injeta BM_CANDIDATE_BUILD nos gates; verificação aponta para pyz."
+  ],
+  "commands": [
+    "pdftotext escopo-servicos.pdf -",
+    "pdftoppm -scale-to 1600 -png -singlefile escopo-servicos.pdf <temp>/scope",
+    "python3 -B test_service.py -v",
+    "python3 -B -c <zipfile: app.py para service.pyz/__main__.py>",
+    "BM_CANDIDATE_BUILD=<temp>/service.pyz python3 -B test_service.py -v",
+    "python3 -B <sondagens subprocess/SQLite e repetição da suíte no pyz com app.py desabilitado>"
+  ],
+  "limitations": [
+    "CLI local com tokens sintéticos públicos; não implementa autenticação de produção e não foi exposta à rede.",
+    "SQLite e Python do ambiente local; concorrência alta, perda abrupta de energia e indisponibilidade de disco não foram certificadas.",
+    "Falha inesperada de SQLite retorna traceback; preservação transacional foi verificada, sem promessa de UX de produção para infraestrutura.",
+    "Este agente não executou a jornada completa do método. Inspecionou o runner e executou os testes do produto/artefato; execução integral cabe ao agente principal.",
+    "Parecer cobre somente os bytes identificados por hashes; alterações posteriores exigem nova revisão."
+  ]
+}

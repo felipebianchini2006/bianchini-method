@@ -124,7 +124,7 @@ Trabalhe continuamente, com o menor diff correto:
 
 Quando houver trabalho independente, despache em paralelo pesquisa localizada, implementação com ownership separado ou revisão especializada. Não terceirize a decisão de aceite, a integração do diff, os checkpoints nem a conclusão do quick.
 
-Use `bm direct checkpoint` para registrar arquivo alterado, comando, resultado e evidência estruturada. Evidência de comando `passed` exige `exit_code: 0`; browser, screenshot ou manual exige referência reproduzível. Toda evidência fica vinculada ao digest do brief e ao fingerprint da árvore.
+Use `bm direct checkpoint --command "<comando declarado no brief>"` para executar o comando e registrar a prova real. `--command` pode se repetir para todos os gates do brief. Checkpoint sem comando registra progresso, mas não autoriza conclusão. Evidência de comando `passed` exige `exit_code: 0`; browser, screenshot ou manual exige referência reproduzível. Toda evidência fica vinculada ao digest do brief e ao fingerprint da árvore.
 
 O checkpoint reavalia os paths declarados. Registre guards adicionais com `--guard`. No `finish`, o CLI compara também o diff real; piso maior exige os guards novos e nunca redireciona para `/sdd-planning`.
 

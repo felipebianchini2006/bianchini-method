@@ -45,7 +45,7 @@ class PublicCli:
     """Executa um backend escolhido explicitamente, sem imports do kernel."""
 
     def __init__(self) -> None:
-        backend = os.environ.get("BM_FULL_JOURNEY_BACKEND", "python")
+        backend = os.environ.get("BM_FULL_JOURNEY_BACKEND", "go")
         if backend == "python":
             self.name = "python"
             self.command = (sys.executable, str(PYTHON_CLI))
@@ -104,6 +104,21 @@ def run_candidate(repo: Path) -> dict[str, object]:
 
 
 class FullJourneyScenarios(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.binary_temp = None
+        if os.environ.get("BM_FULL_JOURNEY_BACKEND", "go") == "go" and not os.environ.get("BM_FULL_JOURNEY_GO_BINARY"):
+            cls.binary_temp = tempfile.TemporaryDirectory(prefix="bm-public-journey-", dir=ROOT.parent)
+            binary = Path(cls.binary_temp.name) / ("bm.exe" if os.name == "nt" else "bm")
+            subprocess.run(["go", "build", "-o", str(binary), "./cmd/bm"], cwd=ROOT, check=True)
+            os.environ["BM_FULL_JOURNEY_GO_BINARY"] = str(binary)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.binary_temp:
+            os.environ.pop("BM_FULL_JOURNEY_GO_BINARY", None)
+            cls.binary_temp.cleanup()
+
     def setUp(self) -> None:
         self.cli = PublicCli()
 
@@ -361,6 +376,8 @@ class FullJourneyScenarios(unittest.TestCase):
                 provides=["health_checked"],
                 model_delta=delta,
             )
+            plan["verifications"] = ["python3 app.py --health"]
+            plan["execution"], plan["review"] = "grouped", "plan_gate"
             self.write_managed_specs(repo, change_root, *TRACEABLE_SCOPE_IDS)
 
         (change_root / "plans/P01-health-journey.md").write_text(
@@ -425,8 +442,8 @@ class FullJourneyScenarios(unittest.TestCase):
             change,
             "--digest",
             str(coherent["digest"]),
-            "--approved-by",
-            "human:full-journey",
+            "--decided-by" if self.cli.name == "go" else "--approved-by",
+            "fixture:protocol-test",
         )
         self.assertEqual(approved["status"], "approved")
         return delta
@@ -486,6 +503,12 @@ print(json.dumps({\"status\": \"ok\", \"surface\": \"public-cli\"}, sort_keys=Tr
             encoding="utf-8",
         )
         self.assertEqual(run_candidate(target), {"status": "ok", "surface": "public-cli"})
+        task_evidence = ["--verification", "python3 app.py --health => status ok"]
+        plan_evidence = list(task_evidence)
+        if not legacy_schema and self.cli.name == "go":
+            proof = self.cli.json("verify", "task", "--repo", str(target), "--change", change,
+                                  "--plan", "P01", "--task", "T01", "--context-pack", str(target / str(packed["path"])))
+            task_evidence = ["--proof", str(proof["proof_id"])]
         if not legacy_schema:
             task = self.cli.json(
                 "plan",
@@ -502,12 +525,17 @@ print(json.dumps({\"status\": \"ok\", \"surface\": \"public-cli\"}, sort_keys=Tr
                 str(target / str(packed["path"])),
                 "--result",
                 "health check implementado",
-                "--verification",
-                "python3 app.py --health => status ok",
+                *task_evidence,
             )
             self.assertEqual(task["status"], "completed")
         actual_delta = base / f"actual-delta-{'v1' if legacy_schema else 'v2'}.json"
         actual_delta.write_text(json.dumps(delta), encoding="utf-8")
+        if not legacy_schema and self.cli.name == "go":
+            proof = self.cli.json("verify", "plan", "--repo", str(target), "--change", change, "--plan", "P01")
+            plan_evidence = [arg for p in proof["proof_ids"] for arg in ("--proof", str(p))]
+            review = self.cli.json("verify", "review", "--repo", str(target), "--change", change, "--scope", "plan",
+                                   "--plan", "P01", "--reviewer", "fixture:protocol-test", "--verdict", "approved", *plan_evidence)
+            plan_evidence += ["--review", str(review["review_id"])]
         completed = self.cli.json(
             "plan",
             "complete",
@@ -521,8 +549,7 @@ print(json.dumps({\"status\": \"ok\", \"surface\": \"public-cli\"}, sort_keys=Tr
             str(actual_delta),
             "--result",
             "release candidate executável entregue",
-            "--verification",
-            "python3 app.py --health => status ok",
+            *plan_evidence,
         )
         self.assertEqual(completed["status"], "completed")
         git(target, "add", ".")
@@ -541,6 +568,24 @@ print(json.dumps({\"status\": \"ok\", \"surface\": \"public-cli\"}, sort_keys=Tr
         *,
         managed_specs: bool,
     ) -> None:
+        if managed_specs and self.cli.name == "go":
+            release = self.cli.json("verify", "release", "--repo", str(repo), "--change", change,
+                                    "--build", "app.py", "--delivery", "ready")
+            proofs = [arg for p in release["proof_ids"] for arg in ("--proof", str(p))]
+            self.cli.json("verify", "review", "--repo", str(repo), "--change", change, "--scope", "release",
+                          "--reviewer", "fixture:protocol-test", "--verdict", "approved", *proofs)
+            payload = {"schema_version": 1, "change": change, "status": "accepted", "rc": release["candidate"],
+                       "fingerprint": release["fingerprint"], "blockers": [], "findings": [],
+                       "gates": [{"proof_id": p, "result": "passed"} for p in release["proof_ids"]]}
+            (repo / ".bianchini/changes" / change / "results/HOMOLOGATION.md").write_text(markdown_document(payload, "Homologação da fixture"))
+            git(repo, "add", ".")
+            git(repo, "commit", "-m", "accept verified native candidate")
+            closed = self.cli.json("cycle-close", "--repo", str(repo), "--change", change)
+            self.assertEqual(closed["status"], "completed")
+            self.assertTrue(closed["specs_promoted"])
+            self.assertEqual((repo / ".planning/foreign-owner.txt").read_bytes(), planning_before)
+            self.assertEqual(run_candidate(repo), {"status": "ok", "surface": "public-cli"})
+            return
         closed = self.cli.json("cycle-close", "--repo", str(repo), "--change", change)
         self.assertEqual(closed["status"], "completed")
         if managed_specs:

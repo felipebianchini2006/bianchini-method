@@ -170,15 +170,14 @@ var actionCommandSpecs = map[string]actionCommandSpec{
 		actions: []string{"render", "install"}, valueFlags: flagSet("--host", "--repo"), booleanFlags: flagSet("--overwrite"),
 	},
 	"coherence": {
-		actions: []string{"check", "approve"}, valueFlags: flagSet("--repo", "--change", "--semantic-report", "--digest", "--approved-by"), booleanFlags: flagSet("--structural-only"),
+		actions: []string{"check", "approve"}, valueFlags: flagSet("--repo", "--change", "--semantic-report", "--digest", "--approved-by", "--decided-by"), booleanFlags: flagSet("--structural-only"),
 	},
 	"context": {
 		actions: []string{"pack", "verify"}, valueFlags: flagSet("--repo", "--unit", "--output", "--max-bytes", "--path"), booleanFlags: flagSet(),
 	},
 	"debug": {
-		actions:      []string{"start", "list", "status", "resume", "checkpoint", "finish"},
-		valueFlags:   flagSet("--repo", "--id", "--objective", "--expected", "--actual", "--environment", "--origin-ref", "--origin-evidence", "--relation", "--event", "--evidence", "--hypothesis", "--experiment", "--eliminated-hypothesis", "--root-cause", "--neighbor-regression", "--residual-risk", "--status", "--reason", "--docviva-kind", "--docviva-outcome", "--docviva-artifact", "--docviva-justification", "--learning-classification", "--learning-statement", "--learning-tag", "--learning-validity", "--learning-conflict"),
-		booleanFlags: flagSet(),
+		actions:    []string{"start", "list", "status", "resume", "checkpoint", "finish"},
+		valueFlags: debugValueFlags, booleanFlags: flagSet(),
 	},
 	"design-audit": {
 		actions: []string{"seal", "verify"}, valueFlags: flagSet("--root", "--scope", "--manifest"), booleanFlags: flagSet(),
@@ -224,7 +223,7 @@ var actionCommandSpecs = map[string]actionCommandSpec{
 	},
 	"verify": {
 		actions:      []string{"task", "plan", "release", "review", "status"},
-		valueFlags:   flagSet("--repo", "--change", "--plan", "--task", "--context-pack", "--evidence", "--retry-reason", "--scope", "--reviewer", "--verdict", "--proof", "--finding", "--build", "--checksum", "--delivery"),
+		valueFlags:   flagSet("--repo", "--change", "--plan", "--task", "--context-pack", "--evidence", "--retry-reason", "--scope", "--reviewer", "--verdict", "--proof", "--finding", "--resolves-review", "--artifact-kind", "--build", "--checksum", "--delivery"),
 		booleanFlags: flagSet(),
 	},
 }

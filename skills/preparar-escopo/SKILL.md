@@ -9,6 +9,8 @@ description: Use para transformar PDF de escopo, briefing, proposta ou RFP em SC
 
 Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e [`references/scope-contract.md`](references/scope-contract.md). Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows uma vez. Ausência bloqueia; não use fallback Python.
 
+O escopo define o produto contratado e suas restrições. Stack, arquitetura, sequência técnica e organização de arquivos pertencem ao planejamento e à execução; não transformar escolhas técnicas reversíveis em perguntas ao usuário.
+
 Esta skill interpreta o pedido. O CLI valida, calcula digests, sela `SCOPE.md` e atualiza o estado. Não criar arquitetura, roadmap, fases, plano de implementação ou código de produção.
 
 ## 1. Inspecionar a fonte

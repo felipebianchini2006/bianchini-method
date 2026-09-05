@@ -24,7 +24,7 @@ func runCoherence(args []string) (any, error) {
 	}
 	flags, err := parseFlags(args[1:], map[string]bool{
 		"--repo": true, "--change": true, "--semantic-report": true,
-		"--digest": true, "--approved-by": true,
+		"--digest": true, "--approved-by": true, "--decided-by": true,
 	}, map[string]bool{"--structural-only": true})
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func runCoherence(args []string) (any, error) {
 	if change == "" {
 		return nil, argparseError("the following arguments are required: --change")
 	}
-	if action == "approve" && (lastValue(flags, "--digest") == "" || lastValue(flags, "--approved-by") == "") {
+	if action == "approve" && (lastValue(flags, "--digest") == "" || (lastValue(flags, "--approved-by") == "" && lastValue(flags, "--decided-by") == "")) {
 		return nil, fmt.Errorf("coherence approve exige --digest e --approved-by")
 	}
 	repo := lastValue(flags, "--repo")
@@ -44,6 +44,12 @@ func runCoherence(args []string) (any, error) {
 		}
 	}
 	if action == "approve" {
+		if lastValue(flags, "--decided-by") != "" {
+			if lastValue(flags, "--approved-by") != "" {
+				return nil, userError("escolha decided-by ou approved-by")
+			}
+			return coherenceApprove(repo, change, lastValue(flags, "--digest"), lastValue(flags, "--decided-by"), "technical_decision")
+		}
 		return coherenceApprove(repo, change, lastValue(flags, "--digest"), lastValue(flags, "--approved-by"))
 	}
 	return coherenceCheck(repo, change, flags.booleans["--structural-only"], lastValue(flags, "--semantic-report"))
@@ -236,7 +242,7 @@ func coherenceCheck(repo, change string, structuralOnly bool, semanticPath strin
 	return result, nil
 }
 
-func coherenceApprove(repo, change, digest, approvedBy string) (map[string]any, error) {
+func coherenceApprove(repo, change, digest, approvedBy string, decisionKind ...string) (map[string]any, error) {
 	pack, err := loadCoherencePackage(repo, change)
 	if err != nil {
 		return nil, err
@@ -289,6 +295,9 @@ func coherenceApprove(repo, change, digest, approvedBy string) (map[string]any, 
 	}
 	payload["status"] = "approved"
 	payload["approval"] = map[string]any{"digest": digest, "approved_by": actor, "approved_at": utcNow()}
+	if len(decisionKind) > 0 && decisionKind[0] == "technical_decision" {
+		payload["approval"] = map[string]any{"kind": "technical_decision", "digest": digest, "decided_by": actor, "decided_at": utcNow()}
+	}
 	payload["updated_at"] = utcNow()
 	document, _ := frontmatterDocument(payload, "# Coerência\n\nStatus: approved.\n\n## Impact Radius\n\nAinda não calculado para uma mudança executada.", false)
 	if err := pack.workspace.atomicWrite(filepath.Join(pack.directory, "COHERENCE.md"), document); err != nil {
@@ -306,7 +315,13 @@ func coherenceApprove(repo, change, digest, approvedBy string) (map[string]any, 
 	if err := pack.workspace.writeState(state, "# Estado atual"); err != nil {
 		return nil, err
 	}
-	return map[string]any{"change": filepath.Base(pack.directory), "status": "approved", "digest": digest, "approved_by": actor}, nil
+	result := map[string]any{"change": filepath.Base(pack.directory), "status": "approved", "digest": digest, "approved_by": actor}
+	if len(decisionKind) > 0 && decisionKind[0] == "technical_decision" {
+		delete(result, "approved_by")
+		result["decided_by"] = actor
+		result["kind"] = "technical_decision"
+	}
+	return result, nil
 }
 
 func coherenceReadRequired(workspace methodWorkspace, path, label string) ([]byte, error) {

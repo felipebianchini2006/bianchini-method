@@ -1138,7 +1138,7 @@ def _walk_known_files(directory: Path) -> list[Path]:
             if entry.is_symlink():
                 raise WorkflowError("MIGRATION_REQUIRED", f"symlink não permitido: {entry}")
         files.extend(current_path / name for name in names)
-    return files
+    return sorted(files, key=lambda path: path.as_posix())
 
 
 def _recognized_design_files(directory: Path) -> list[Path]:
@@ -1161,7 +1161,9 @@ def _recognized_design_files(directory: Path) -> list[Path]:
             continue
         if not isinstance(value, dict) or value.get("schema_version") != 1:
             continue
-        files.extend(_walk_known_files(candidate))
+        # Match the public Go contract regardless of filesystem enumeration.
+        files.extend(path for path in _walk_known_files(candidate) if path != manifest)
+        files.append(manifest)
     return files
 
 

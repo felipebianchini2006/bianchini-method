@@ -1218,7 +1218,7 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertRegex(result["id"], r"^Q001-")
             self.assertEqual(
                 (installed / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-                "0.6.0",
+                "1.0.0",
             )
             self.assertTrue((repo / ".bianchini/STATE.md").is_file())
             self.assertFalse((repo / ".superpowers").exists())
@@ -2628,6 +2628,50 @@ class MethodV04Scenarios(unittest.TestCase):
             self.assertFalse((repo / f".bianchini/debug/active/{debug_id}.md").exists())
             self.assertTrue((repo / f".bianchini/debug/resolved/{debug_id}.md").is_file())
 
+    def test_migration_order_is_independent_of_filesystem_enumeration(self) -> None:
+        import bm_v04_workflows as workflows
+
+        expected_sources = [
+            "docs/bianchini/current/specs/a.md",
+            "docs/bianchini/current/specs/nested/b.md",
+            "docs/bianchini/current/specs/z.md",
+            "docs/design/C001/a.html",
+            "docs/design/C001/z.html",
+            "docs/design/C001/DESIGN_MANIFEST.json",
+        ]
+        native_walk = os.walk
+        for reverse in (False, True):
+            with self.subTest(reverse=reverse), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                init_git(repo)
+                for relative in reversed(expected_sources):
+                    path = repo / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    text = '{"schema_version":1}\n' if path.name == "DESIGN_MANIFEST.json" else relative + "\n"
+                    path.write_text(text, encoding="utf-8")
+                (repo / ".planning").mkdir()
+                (repo / ".planning/foreign.txt").write_text("preserve\n", encoding="utf-8")
+                git(repo, "add", ".")
+                git(repo, "commit", "-m", "legacy migration order fixture")
+
+                def reordered_walk(directory, *args, **kwargs):
+                    for current, directories, names in native_walk(directory, *args, **kwargs):
+                        directories[:] = sorted(directories, reverse=reverse)
+                        yield current, directories, sorted(names, reverse=reverse)
+
+                with mock.patch.object(workflows.os, "walk", side_effect=reordered_walk):
+                    checked = workflows.migration_check(repo)
+                    self.assertEqual(
+                        [entry["source"] for entry in checked["entries"]], expected_sources,
+                        "migration must use deterministic paths with each design manifest last",
+                    )
+                    applied = workflows.migration_apply(repo)
+                self.assertEqual(applied["entries"], checked["entries"])
+                for entry in applied["entries"]:
+                    self.assertEqual(hashlib.sha256((repo / entry["target"]).read_bytes()).hexdigest(), entry["sha256"])
+                    self.assertFalse((repo / entry["source"]).exists())
+                self.assertEqual((repo / ".planning/foreign.txt").read_text(), "preserve\n")
+
     def test_migration_is_explicit_and_never_touches_planning(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
@@ -2683,10 +2727,10 @@ class MethodV04Scenarios(unittest.TestCase):
     def test_package_version_keeps_zero_four_contract_lineage(self) -> None:
         self.assertEqual(
             (ROOT / "skills/_shared/VERSION").read_text(encoding="utf-8").strip(),
-            "0.6.0",
+            "1.0.0",
         )
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$(cat skills/_shared/VERSION)" = "0.6.0"', workflow)
+        self.assertIn('test "$(cat skills/_shared/VERSION)" = "1.0.0"', workflow)
         root_schema = (ROOT / "schemas/state-v04.schema.json").read_bytes()
         packaged_schema = (
             ROOT / "skills/_shared/schemas/state-v04.schema.json"

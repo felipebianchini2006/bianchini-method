@@ -187,8 +187,13 @@ func taskComplete(repo, change, planID, taskID, packPath, result string, verific
 		if err := validateProofContext(pack, evidence, stateString(verified["digest"])); err != nil {
 			return nil, err
 		}
-		if err := validateVerificationReview(pack, reviewID, "task", planID, taskID, evidence, true); err != nil {
+		if err := unresolvedVerificationReviews(pack, "task", planID, taskID, nil); err != nil {
 			return nil, err
+		}
+		if stateString(plan.value["execution"]) != "grouped" || reviewID != "" {
+			if err := validateVerificationReview(pack, reviewID, "task", planID, taskID, evidence, true); err != nil {
+				return nil, err
+			}
 		}
 	} else if len(evidence) == 0 {
 		return nil, workflowError("STALE_EVIDENCE", "conclusão da tarefa exige verificação")
@@ -284,8 +289,18 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 		if err != nil {
 			return nil, err
 		}
-		if err := validateVerificationReview(pack, reviewID, "plan", planID, "", evidence, true); err != nil {
+		if err := unresolvedVerificationReviews(pack, "plan", planID, "", nil); err != nil {
 			return nil, err
+		}
+		for _, task := range planTasks(plan) {
+			if err := unresolvedVerificationReviews(pack, "task", planID, stateString(task["id"]), nil); err != nil {
+				return nil, err
+			}
+		}
+		if stateString(plan.value["execution"]) == "grouped" || reviewID != "" {
+			if err := validateVerificationReview(pack, reviewID, "plan", planID, "", evidence, true); err != nil {
+				return nil, err
+			}
 		}
 	} else if len(evidence) == 0 {
 		return nil, workflowError("STALE_EVIDENCE", "conclusão do plano exige verificação")

@@ -2398,7 +2398,7 @@ def policy(
         "effective_fix_round": effective_round,
         "structural_findings": list(structural_findings),
         "hypothesis_invalidated": hypothesis_invalidated,
-        "redesign_required": hypothesis_invalidated,
+        "redesign_required": False,
         "breaker": effective_round >= max_rounds or hypothesis_invalidated,
         "architecture_audit_required": False,
         "architecture_audit_mode": "manual_report_only",

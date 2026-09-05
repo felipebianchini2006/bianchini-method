@@ -115,7 +115,7 @@ func policyResult(profile, risk, change, manualPDF string, manualInScope bool, r
 		"execution": execution, "review": review, "test_cadence": cadence,
 		"max_fix_rounds": maxRounds, "risk_seam": seam, "breaker_scope": breakerScope,
 		"effective_fix_round": effectiveRound, "structural_findings": findings,
-		"hypothesis_invalidated": invalidated, "redesign_required": invalidated,
+		"hypothesis_invalidated": invalidated, "redesign_required": false,
 		"breaker":                     effectiveRound >= maxRounds || invalidated,
 		"architecture_audit_required": false, "architecture_audit_mode": "manual_report_only",
 		"manual_required": manualRequired, "manual_level": manualLevel,

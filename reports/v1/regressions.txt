@@ -1,0 +1,62 @@
+=== red-closure.log ===
+--- FAIL: TestMandatoryPlanGateCannotBeOmitted (0.60s)
+    --- FAIL: TestMandatoryPlanGateCannotBeOmitted/never_executed (0.29s)
+        verification_closure_test.go:25: omitted gate accepted: <nil>
+    --- FAIL: TestMandatoryPlanGateCannotBeOmitted/failed (0.31s)
+        verification_closure_test.go:25: omitted gate accepted: <nil>
+--- FAIL: TestProofForDifferentCommandCannotCoverGate (0.26s)
+    verification_closure_test.go:38: wrong command accepted
+--- FAIL: TestExternalVerificationDoesNotReusePass (0.25s)
+    verification_closure_test.go:52: external stale pass reused: <nil>
+--- FAIL: TestGroupedTaskCompletesWithoutIndividualReview (0.35s)
+    verification_closure_test.go:62: REVIEW_REQUIRED: conclusão exige review_id gerado por bm verify review
+FAIL
+FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	1.807s
+FAIL
+
+
+=== red-release.log ===
+--- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation (1.43s)
+    verification_test.go:331: nonexistent artifact accepted
+    verification_test.go:338: arbitrary checksum accepted
+    --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation/not_run (0.05s)
+        verification_test.go:401: invalid homologation accepted
+    --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation/failed (0.05s)
+        verification_test.go:401: invalid homologation accepted
+    --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation/critical (0.04s)
+        verification_test.go:401: invalid homologation accepted
+    --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation/high (0.05s)
+        verification_test.go:401: invalid homologation accepted
+    --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation/blocking (0.04s)
+        verification_test.go:401: invalid homologation accepted
+    --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation/wrong_proof (0.04s)
+        verification_test.go:401: invalid homologation accepted
+    --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation/not_applicable (0.05s)
+        verification_test.go:401: invalid homologation accepted
+    verification_test.go:422: modified artifact accepted
+FAIL
+FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	1.774s
+FAIL
+
+
+=== red-direct-debug.log ===
+--- FAIL: TestQuickRejectsUnexecutedAndFailedCommands (0.66s)
+    --- FAIL: TestQuickRejectsUnexecutedAndFailedCommands/#00 (0.28s)
+        direct_proof_test.go:26: narrative completion accepted
+    --- FAIL: TestQuickRejectsUnexecutedAndFailedCommands/bm-command-that-does-not-exist (0.20s)
+        direct_proof_test.go:21: failed command accepted: <nil>
+    --- FAIL: TestQuickRejectsUnexecutedAndFailedCommands/go_command-that-does-not-exist (0.18s)
+        direct_proof_test.go:21: failed command accepted: <nil>
+--- FAIL: TestDebugRejectsNarrativeRed (0.21s)
+    direct_proof_test.go:41: narrative red accepted
+FAIL
+FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	1.414s
+FAIL
+
+
+=== red-resolution.log ===
+--- FAIL: TestHomologationRejectsFictitiousResolution (0.00s)
+    release_identity_test.go:39: fictitious resolution accepted
+FAIL
+FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	0.405s
+FAIL

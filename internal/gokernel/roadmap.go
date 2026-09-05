@@ -66,6 +66,9 @@ func syncRoadmap(repo, change string) (map[string]any, error) {
 	if err != nil {
 		return nil, workflowError("MODEL_MISMATCH", err.Error())
 	}
+	if err := syncPlanningSpecs(workspace, directory, coherence); err != nil {
+		return nil, err
+	}
 	roadmap := filepath.Join(directory, "ROADMAP.md")
 	if err := workspace.atomicWrite(roadmap, content); err != nil {
 		return nil, err

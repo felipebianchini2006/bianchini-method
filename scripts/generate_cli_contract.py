@@ -41,6 +41,10 @@ def render() -> str:
         "## Comandos e interfaces",
         "",
     ]
+    lines.extend(["## Extensões do backend Go 1.0", "", "As interfaces históricas abaixo permanecem como oráculo. Estas extensões são exclusivas do Go oficial.", ""])
+    for name, extension in registry.get("native_extensions", {}).items():
+        lines.extend([f"- `{name}`: {extension['help']}"])
+    lines.append("")
     for name, command in registry["commands"].items():
         lines.extend(
             [
