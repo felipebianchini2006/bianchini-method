@@ -1,6 +1,6 @@
 ---
 name: design-projeto
-description: Use somente com invocação explícita de /design-projeto ou quando /sdd-planning detectar interface nova, redesign ou fluxo visual material sem contrato válido na mudança ativa do Bianchini Method 0.4.
+description: Use somente com invocação explícita de /design-projeto ou quando /sdd-planning detectar interface nova, redesign ou fluxo visual material sem contrato válido na mudança ativa do Bianchini Method.
 ---
 
 # Design Projeto
@@ -8,6 +8,8 @@ description: Use somente com invocação explícita de /design-projeto ou quando
 **Anuncie:** "Criando contrato visual executável antes do planejamento."
 
 Esta skill produz referência visual, não código de produção. O pacote pertence à mudança ativa em `.bianchini/`.
+
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
 
 ## 1. Definir o ciclo e o escopo
 

@@ -1,6 +1,10 @@
-# Contrato do Bianchini Method 0.4
+# Contrato do Bianchini Method
 
 Referência normativa das skills públicas. Use o binário empacotado `bin/bm` no Unix ou `bin/bm.exe` no Windows para operações determinísticas; não replique em prompt validação, score, grafo, digest, escrita atômica ou migração. Ausência do binário bloqueia: não existe fallback Python.
+
+## Versão apresentada
+
+A versão do produto vem de `bm version --json`, campo `version`, e acompanha o pacote instalado. Use esse valor em anúncios, status e entregas. `contract_version` e `STATE.md.method` são identificadores de compatibilidade do formato persistido. Não os apresente como versão do produto nem altere dados de projetos apenas para mudar o número exibido.
 
 ## Workspace canônico
 
@@ -335,7 +339,7 @@ A invocação explícita de `/executar-direto` é definitiva para a tarefa atual
 
 Tanto o quick normal quanto o protegido podem paralelizar pesquisa localizada, implementação com ownership separado e revisão especializada. O uso é adaptativo: subagentes entram quando aceleram frentes realmente independentes e nunca alteram o roteamento escolhido.
 
-`direct start` inicializa o workspace 0.4 em projeto novo e persiste `BRIEF.md`,
+`direct start` inicializa o workspace do método em projeto novo e persiste `BRIEF.md`,
 `PROGRESS.md` e `RESULT.md` em `.bianchini/quick/Qxxx-*`; score, overrides e digest
 fazem parte do brief. Evidência fica vinculada ao digest e ao fingerprint final.
 Conclusão atualiza `STATE.md` e a spec/modelo afetados.
@@ -352,7 +356,7 @@ bm debug start|list|status|resume|checkpoint|finish --repo <repo> ...
 ```
 
 `debug start` também inicializa o workspace quando não existe estado anterior.
-Consultas e retomadas são somente leitura e exigem um `STATE.md` 0.4 válido.
+Consultas e retomadas são somente leitura e exigem um `STATE.md` válido no formato suportado.
 
 Cada `Dxxx` registra esperado/real, ambiente, reprodução, hipóteses e contraprovas, causa, RED, GREEN, regressões vizinhas, risco residual e referência opcional comprovada a `Cxxx/Pxx` com relação `caused_by`, `detected_in` ou `regression_of`.
 

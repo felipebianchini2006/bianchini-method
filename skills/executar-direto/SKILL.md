@@ -5,7 +5,7 @@ description: Use para executar uma entrega coesa como quick normal ou protegido,
 
 # Executar Direto
 
-**Anuncie:** "Classificando e executando este quick com Bianchini Method 0.4."
+**Anuncie:** "Classificando e executando este quick com Bianchini Method."
 
 Use somente por invocação explícita de `/executar-direto` e resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. Não acione outra metodologia. A escolha explícita deste fluxo é a decisão de roteamento: o quick nunca aciona `/sdd-planning`, independentemente do score, dos hazards ou da complexidade encontrada.
 
@@ -15,11 +15,13 @@ Quick normal e quick protegido podem usar subagentes quando o host suportar e ho
 
 O executor principal integra os resultados, resolve conflitos e mantém uma única revisão final do quick. Uma revisão independente pode rodar em paralelo quando o risco justificar. Não criar subagente por arquivo, camada de teste ou gate mecânico.
 
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
+
 ## 1. Confirmar que é uma entrega coesa
 
 Leia regras, `.bianchini/STATE.md` quando existir, manifests, CI, Git e apenas os arquivos ligados ao objetivo. Registre objetivo, estado atual factual, não objetivos, aceite, seams e comandos reais de verificação.
 
-Não use `.planning/`. Sem `.bianchini`, `direct start` inicializa o workspace 0.4
+Não use `.planning/`. Sem `.bianchini`, `direct start` inicializa o workspace do método
 quando o projeto é novo. Se existir qualquer documentação anterior reconhecida,
 o CLI bloqueia com `MIGRATION_REQUIRED`; use `/migrar-bianchini`. Nunca use flags
 ou rotas de execução de versões anteriores.

@@ -3,5 +3,10 @@
 __pycache__/
 *.py[cod]
 
-# Artefatos locais de execução; documentos persistentes ficam em docs/bianchini/.
+# Artefatos locais de desenvolvimento deste repositório.
 /.superpowers/
+
+.ruff_cache/
+/bin/
+/dist/
+/.bianchini/

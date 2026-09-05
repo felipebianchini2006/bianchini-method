@@ -9,6 +9,8 @@ description: Use para migrar uma única vez documentação anterior do Bianchini
 
 Use por invocação explícita. Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. Não implemente adaptador de compatibilidade.
 
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
+
 ## 1. Verificar sem alterar
 
 Sempre comece por:

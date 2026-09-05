@@ -11,6 +11,8 @@ Argumentos: `all`, `N`, `N-M`. Sem argumento, mostrar `/status-projeto`. Executa
 
 Resolva `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia. Não use fallback Python. O backend Go é a única autoridade de estado, prova, revisão e conclusão. Hosts como Codex, Claude ou Grok podem mudar apresentação e distribuição do trabalho, nunca o significado de `completed`.
 
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
+
 ## 1. Preflight
 
 1. Ler `.bianchini/STATE.md`. Sem estado válido, orientar `/migrar-bianchini` ou `/sdd-planning`.

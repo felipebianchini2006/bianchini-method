@@ -1,4 +1,4 @@
-# Contexto eficiente no método 0.4
+# Contexto eficiente no Bianchini Method
 
 Contexto derivado nunca substitui `.bianchini/STATE.md`, o `SYSTEM_MODEL.md`, as specs, o plano aprovado, os resultados ou as evidências atuais.
 

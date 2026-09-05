@@ -1,17 +1,19 @@
 ---
 name: sdd-planning
-description: Use para planejar mudanças multifase com arquitetura global, ProjectModel, dependências e coerência entre todos os planos do Bianchini Method 0.4.
+description: Use para planejar mudanças multifase com arquitetura global, ProjectModel, dependências e coerência entre todos os planos do Bianchini Method.
 ---
 
 # SDD Planning
 
-**Anuncie:** "Planejando o sistema completo com Bianchini Method 0.4."
+**Anuncie:** "Planejando o sistema completo com Bianchini Method."
 
 Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md), [`../_shared/STATE_TEMPLATE.md`](../_shared/STATE_TEMPLATE.md) e [`../_shared/ADAPTIVE_GATES.md`](../_shared/ADAPTIVE_GATES.md). Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows uma vez. Ausência bloqueia; não use fallback Python.
 
 Esta skill planeja; não edita código de produção. Toda operação determinística pertence ao CLI.
 
 `/auditar-arquitetura` continua manual e report-only; não a executar automaticamente durante o planejamento. A revisão semântica do pacote usa o `SemanticReviewer` deste fluxo.
+
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
 
 ## 1. Preflight
 

@@ -1,6 +1,6 @@
 ---
 name: auditar-arquitetura
-description: Use somente quando o usuário invocar /auditar-arquitetura ou pedir explicitamente uma auditoria arquitetural. É manual, report-only e não ativa por risco ou pela presença do Bianchini Method 0.4.
+description: Use somente quando o usuário invocar /auditar-arquitetura ou pedir explicitamente uma auditoria arquitetural. É manual, report-only e não ativa por risco ou pela presença do Bianchini Method.
 disable-model-invocation: true
 ---
 
@@ -9,6 +9,8 @@ disable-model-invocation: true
 **Anuncie:** "Auditando hotspots e mudanças recentes; o resultado será somente um relatório."
 
 Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python.
+
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
 
 ## Contrato
 
