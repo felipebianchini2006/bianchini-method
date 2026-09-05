@@ -1,6 +1,6 @@
 ---
 name: preparar-escopo
-description: Use para transformar PDF de escopo, briefing, proposta ou RFP em SCOPE.md detalhado, rastreável e sem ambiguidades, pronto para o /sdd-planning do Bianchini Method 0.4; não use para manual ou PDF sem intenção de planejamento.
+description: Use para transformar PDF de escopo, briefing, proposta ou RFP em SCOPE.md detalhado, rastreável e sem ambiguidades, pronto para o /sdd-planning do Bianchini Method; não use para manual ou PDF sem intenção de planejamento.
 ---
 
 # Preparar Escopo
@@ -12,6 +12,8 @@ Leia [`../_shared/METHOD_CONTRACT.md`](../_shared/METHOD_CONTRACT.md) e [`refere
 O escopo define o produto contratado e suas restrições. Stack, arquitetura, sequência técnica e organização de arquivos pertencem ao planejamento e à execução; não transformar escolhas técnicas reversíveis em perguntas ao usuário.
 
 Esta skill interpreta o pedido. O CLI valida, calcula digests, sela `SCOPE.md` e atualiza o estado. Não criar arquitetura, roadmap, fases, plano de implementação ou código de produção.
+
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
 
 ## 1. Inspecionar a fonte
 

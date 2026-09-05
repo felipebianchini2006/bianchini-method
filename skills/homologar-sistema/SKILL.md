@@ -1,6 +1,6 @@
 ---
 name: homologar-sistema
-description: Use para homologar explicitamente o release candidate ligado a uma mudança do Bianchini Method 1.0, combinando gates automatizados, jornadas reais e varredura visual.
+description: Use para homologar explicitamente o release candidate ligado a uma mudança do Bianchini Method, combinando gates automatizados, jornadas reais e varredura visual.
 ---
 
 # Homologar Sistema
@@ -8,6 +8,8 @@ description: Use para homologar explicitamente o release candidate ligado a uma 
 **Anuncie:** "Homologando RC <id> no sistema real."
 
 Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. O CLI e o pack do RC fornecem o contrato operacional necessário.
+
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
 
 ## Princípio obrigatório
 

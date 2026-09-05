@@ -1,10 +1,10 @@
-# Bianchini Method 1.0 — candidato
+# Bianchini Method
 
 Método spec-driven para planejar e executar mudanças com visão do sistema completo, coerência entre fases, documentação viva e verificação proporcional ao risco.
 
-O candidato `1.0.0` usa um CLI Go nativo como backend oficial e mantém o contrato público do método `0.4`. O Python permanece no repositório somente como oráculo explícito de compatibilidade; não há fallback automático entre linguagens.
+O Bianchini Method usa um CLI Go nativo como backend oficial. Consulte `bm version --json` para saber a versão instalada. O Python permanece no repositório somente como oráculo explícito de compatibilidade; não há fallback automático entre linguagens.
 
-A versão 1.0 exige provas completas dos gates, valida o artefato de entrega e distingue decisão técnica de aprovação humana. É um candidato em branch; não há tag ou release definitiva publicada. Consulte [migração e reprodução](docs/workflow-v1.md).
+A versão 1.0 exige provas completas dos gates, valida o artefato de entrega e distingue decisão técnica de aprovação humana. Consulte [migração e reprodução](docs/workflow-v1.md).
 
 O planejamento representa um grafo de contratos:
 
@@ -39,7 +39,21 @@ Bianchini Method
 - `ImpactAnalyzer`: consumidores e planos afetados por uma alteração.
 - `SemanticReviewer`: simplicidade, responsabilidade arquitetural, stack e coerência interpretativa.
 
-## Workspace
+## Organização do repositório
+
+- `cmd/`, `internal/` e `tools/`: CLI Go e empacotamento da release.
+- `skills/`: instruções, recursos e oráculo de compatibilidade.
+- `tests/`, `contracts/` e `schemas/`: testes e contratos executáveis.
+- `scripts/` e `reports/evolution-0.4.7/`: validação, exemplos e baselines usados pelos testes.
+- `docs/` e `codex/`: documentação e integração com o agente.
+
+O estado de desenvolvimento deste repositório e os relatórios pontuais de validação foram retirados da árvore de arquivos. Permanecem no histórico Git, até o commit `e5bc8e6`. Binários e caches locais são ignorados.
+
+## Workspace dos projetos
+
+Nos projetos que usam o método, `.bianchini/` guarda o escopo, os planos, as provas e o estado de execução. Ela é criada pelo CLI e continua fazendo parte do projeto atendido; não precisa acompanhar o código-fonte da ferramenta.
+
+A versão mostrada em status e entregas vem de `bm version --json`, campo `version`. O valor `method: "0.4"` encontrado em estados antigos é um identificador interno do formato dos dados, preservado por compatibilidade.
 
 ```text
 .bianchini/
@@ -267,11 +281,11 @@ skills/_shared/bin/bm cycle-close --repo . --change C001
 
 ## Instalação local
 
-Baixe o archive da release `0.6.0` correspondente a `darwin-arm64`, `darwin-amd64`, `linux-arm64`, `linux-amd64` ou `windows-amd64`. Verifique o arquivo com `SHA256SUMS`, extraia e copie o diretório `skills` inteiro:
+Baixe o archive da [release atual](https://github.com/felipebianchini2006/bianchini-method/releases/latest) correspondente a `darwin-arm64`, `darwin-amd64`, `linux-arm64`, `linux-amd64` ou `windows-amd64`. Verifique o arquivo com `SHA256SUMS`, extraia e copie o diretório `skills` inteiro:
 
 ```bash
 shasum -a 256 -c SHA256SUMS
-cp -R bianchini-method_0.6.0_<plataforma>/skills/. ~/.codex/skills/
+cp -R bianchini-method_<versão>_<plataforma>/skills/. ~/.codex/skills/
 # Claude Code: troque ~/.codex por ~/.claude
 ```
 
@@ -284,9 +298,9 @@ Atualização é sempre explícita:
 ~/.codex/skills/_shared/bin/bm update-bm
 ```
 
-A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal. O updater `0.6.0` valida identidade, manifesto, `SHA256SUMS`, tamanho e digest do archive antes da troca transacional com lock, journal e backup.
+A instalação `0.4.0` aceita uma única mudança oficial da linhagem numérica anterior; depois volta à comparação semântica normal. O updater valida identidade, manifesto, `SHA256SUMS`, tamanho e digest do archive antes da troca transacional com lock, journal e backup.
 
-Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem parte da interface `0.4`. Artefatos anteriores reconhecidos entram somente por `/migrar-bianchini` ou `bm migrate`.
+Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` não fazem parte da interface atual. Artefatos anteriores reconhecidos entram somente por `/migrar-bianchini` ou `bm migrate`.
 
 ## Uso
 

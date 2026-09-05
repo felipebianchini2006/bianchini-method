@@ -2,8 +2,11 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
-## 1.0.0 — Candidato, sem tag definitiva
+## 1.0.0 — 2026-09-05
 
+- apresenta a versão instalada nas skills, sem confundir com o formato interno do estado;
+- remove da árvore do repositório estados de desenvolvimento e relatórios pontuais já preservados no Git;
+- estabiliza a ordem da migração e isola a descoberta Git das fixtures entre ambientes;
 - exige cobertura exata dos gates obrigatórios, prova atual e rejeita passe anterior a falha posterior;
 - executa provas reais no quick e no RED/GREEN do debug, rejeitando narrativa e falhas de carregamento;
 - usa execução fresca por padrão; cache determinístico depende de identidade equivalente;

@@ -5,15 +5,17 @@ description: Use para diagnosticar e corrigir bugs com sessão persistente, hip�
 
 # Corrigir Bug
 
-**Anuncie:** "Abrindo ou retomando um debug persistente no Bianchini Method 0.4."
+**Anuncie:** "Abrindo ou retomando um debug persistente no Bianchini Method."
 
 Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. O CLI e o pack do caso fornecem o contrato operacional necessário.
 
 Princípio: nenhum fix antes de uma causa sustentada por evidência. Sintoma, correlação e componente onde a falha aparece não são automaticamente causa raiz.
 
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
+
 ## 1. Abrir ou retomar
 
-Sem `.bianchini`, `debug start` inicializa o workspace 0.4 quando o projeto é
+Sem `.bianchini`, `debug start` inicializa o workspace do método quando o projeto é
 novo. Se houver documentação anterior reconhecida, o CLI retorna
 `MIGRATION_REQUIRED`; migre explicitamente antes de abrir o caso. Nenhum comando
 de debug pode cair em armazenamento anterior.

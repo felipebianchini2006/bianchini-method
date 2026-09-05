@@ -1,6 +1,6 @@
-# Uso e migração para o candidato 1.0
+# Uso e migração para o Bianchini Method 1.0
 
-O fluxo continua: preparar escopo, planejar, executar e homologar. O núcleo exige prova completa e atual antes de concluir. A versão do executável é `1.0.0`; a linhagem do contrato persistido continua `0.4`, com `planning_contract: 2`. Esta branch prepara um candidato, sem tag ou release definitiva.
+O fluxo continua: preparar escopo, planejar, executar e homologar. O núcleo exige prova completa e atual antes de concluir. A versão do executável é `1.0.0`; a linhagem do contrato persistido continua `0.4`, com `planning_contract: 2`. Anúncios, status e entregas consultam `bm version --json` e usam o campo `version`; o identificador do formato não é a versão do produto.
 
 ## Decisões e planejamento
 
@@ -104,4 +104,4 @@ O runner usa comandos públicos para selar escopo, sincronizar specs, revisar co
 
 A demonstração cobre criação, operador, isolamento, persistência em novos processos e entradas inválidas. Inclui quick de texto de ajuda, debug com regressão real e falhas controladas. O projeto é descartável; `--directory` permite reter suas evidências em diretório vazio criado com `mktemp -d`. O PDF padrão é gerado de `tests/fixtures/service_requests/scope_input.txt`.
 
-Limites e resultados desta implementação estão no relatório versionado em `reports/v1/validation.md`.
+Os registros da validação inicial estão no histórico Git, em `e5bc8e6:reports/v1/validation.md`. Para validar a versão atual, execute a suíte e o exemplo acima.

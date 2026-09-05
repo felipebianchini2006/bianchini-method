@@ -9,6 +9,8 @@ description: Use para ler `.bianchini/STATE.md` e resumir trabalho atual, coerê
 
 Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.exe` no Windows. Ausência bloqueia; não use fallback Python. Esta skill não corrige estado nem executa trabalho; o único write permitido é o cache efêmero do pack em `.bianchini/.runtime/context/`.
 
+Ao mencionar a versão na abertura, no status ou na entrega, execute o binário empacotado com `version --json` uma vez na sessão e use o campo `version`: `Bianchini Method <version>`. `contract_version` e `STATE.md.method` identificam formatos internos; não são a versão instalada.
+
 ## Fluxo
 
 1. Localizar `.bianchini/STATE.md`.
@@ -24,7 +26,7 @@ Resolva o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm.
 
 Mostrar:
 
-- método `0.4` e tipo/ID do trabalho ativo;
+- versão instalada obtida de `bm version --json` e tipo/ID do trabalho ativo;
 - status, fase, plano/unidade/gate atuais;
 - arquitetura e `SYSTEM_MODEL.md` apontados;
 - digest e aprovação;

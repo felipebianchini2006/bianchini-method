@@ -1,13 +1,13 @@
 # Backend Go oficial
 
-O pacote `0.6.0` usa o backend Go oficial:
+O pacote usa o backend Go oficial:
 
 ```text
 go build -trimpath -o bin/bm ./cmd/bm
 ./bin/bm version --json
 ```
 
-`version --json` informa `engine: go`, `official: true`, `preview: false`, contrato público `0.4` e as superfícies congeladas. Não existe descoberta automática, subprocesso Python ou fallback entre backends. A partir do pacote 0.6, prova, revisão, reabertura e fechamento de release são validados pelo núcleo Go.
+`version --json` informa `engine: go`, `official: true`, `preview: false`, `version` com a versão instalada, `contract_version` com o formato de compatibilidade e as superfícies suportadas. Não existe descoberta automática, subprocesso Python ou fallback entre backends. A partir do pacote 0.6, prova, revisão, reabertura e fechamento de release são validados pelo núcleo Go.
 
 O Python continua disponível somente como oráculo explícito durante a janela de compatibilidade:
 
