@@ -122,7 +122,10 @@ class CliContractScenarios(unittest.TestCase):
         completed = run_script(
             "run_cli_contract_fixtures.py", "--engine", "python"
         )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.returncode, 0,
+            f"Relatório das fixtures:\n{completed.stdout}\n{completed.stderr}",
+        )
         result = json.loads(completed.stdout)
         self.assertEqual(result["engine"], "python")
         self.assertEqual(result["failed"], 0)
