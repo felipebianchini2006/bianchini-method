@@ -1,3 +1,0 @@
-# Resumo
-
-Preenchido no fechamento.
