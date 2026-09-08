@@ -264,7 +264,17 @@ func TestContextCacheHeadAndCanonicalTampering(t *testing.T) {
 		t.Fatalf("cache divergente: %#v / %#v", first, second)
 	}
 	pack := filepath.Join(repo, filepath.FromSlash(stateString(first["path"])))
-	if info, err := os.Stat(pack); err != nil || info.Mode().Perm() != 0o600 {
+	// Windows maps Unix write permissions to the readonly attribute; compare
+	// with the host's representation of a newly created private file.
+	reference := filepath.Join(t.TempDir(), "permission-reference")
+	if err := os.WriteFile(reference, []byte("reference"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	expectedMode, err := os.Stat(reference)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(pack); err != nil || info.Mode().Perm() != expectedMode.Mode().Perm() {
 		t.Fatalf("modo atômico divergente: %v / %v", info, err)
 	}
 	raw, _ := os.ReadFile(pack)

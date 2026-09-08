@@ -1,0 +1,19 @@
+Go (windows-latest)	Test	﻿2026-09-08T22:43:27.3899538Z ##[group]Run go test ./...
+Go (windows-latest)	Test	2026-09-08T22:43:27.3899920Z ^[[36;1mgo test ./...^[[0m
+Go (windows-latest)	Test	2026-09-08T22:43:27.5428301Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+Go (windows-latest)	Test	2026-09-08T22:43:27.5428728Z ##[endgroup]
+Go (windows-latest)	Test	2026-09-08T22:43:27.9846779Z go: downloading golang.org/x/text v0.23.0
+Go (windows-latest)	Test	2026-09-08T22:43:54.6937991Z ?   	github.com/felipebianchini2006/bianchini-method/cmd/bm	[no test files]
+Go (windows-latest)	Test	2026-09-08T22:43:54.7378941Z ok  	github.com/felipebianchini2006/bianchini-method/internal/acceptance	0.028s
+Go (windows-latest)	Test	2026-09-08T22:45:20.3186826Z --- FAIL: TestAdapterInstallIsIdempotentAndPreservesForeignBytes (0.01s)
+Go (windows-latest)	Test	2026-09-08T22:45:20.3188389Z     adapter_test.go:62: mode=666
+Go (windows-latest)	Test	2026-09-08T22:45:20.3188952Z --- FAIL: TestSpecDiffFixtureAndPathSafety (0.04s)
+Go (windows-latest)	Test	2026-09-08T22:45:20.3189734Z     cli_test.go:193: output mode=666 want=755
+Go (windows-latest)	Test	2026-09-08T22:45:20.3190456Z --- FAIL: TestContextCacheHeadAndCanonicalTampering (0.30s)
+Go (windows-latest)	Test	2026-09-08T22:45:20.3193533Z     context_test.go:268: modo atômico divergente: &{C001-P01-T01.json 32 {2330992336 31277027} {2330992336 31277027} {2330992336 31277027} 0 5296 0 0 {{} {0 0}} C:\Users\RUNNER~1\AppData\Local\Temp\TestContextCacheHeadAndCanonicalTampering859339167\001\repo\.bianchini\.runtime\context\C001-P01-T01.json 0 0 0 false} / <nil>
+Go (windows-latest)	Test	2026-09-08T22:45:20.3195030Z FAIL
+Go (windows-latest)	Test	2026-09-08T22:45:20.3195392Z FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	83.267s
+Go (windows-latest)	Test	2026-09-08T22:45:20.3196012Z ok  	github.com/felipebianchini2006/bianchini-method/internal/workspace	0.015s
+Go (windows-latest)	Test	2026-09-08T22:45:20.3196599Z ok  	github.com/felipebianchini2006/bianchini-method/tools/bm-release	24.112s
+Go (windows-latest)	Test	2026-09-08T22:45:20.3197010Z FAIL
+Go (windows-latest)	Test	2026-09-08T22:45:20.7066806Z ##[error]Process completed with exit code 1.

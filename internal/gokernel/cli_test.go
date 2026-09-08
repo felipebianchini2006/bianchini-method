@@ -181,6 +181,10 @@ func TestSpecDiffFixtureAndPathSafety(t *testing.T) {
 	if err := os.Chmod(output, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	before, err := os.Stat(output)
+	if err != nil {
+		t.Fatal(err)
+	}
 	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", base, "--target", target, "--output", output)
 	if code != 0 || stderr != "" {
 		t.Fatalf("rewrite code=%d stderr=%q", code, stderr)
@@ -189,8 +193,8 @@ func TestSpecDiffFixtureAndPathSafety(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o755 {
-		t.Fatalf("output mode=%o want=755", info.Mode().Perm())
+	if info.Mode().Perm() != before.Mode().Perm() {
+		t.Fatalf("output mode=%o want=%o", info.Mode().Perm(), before.Mode().Perm())
 	}
 	restrictedOutput := filepath.Join(repo, "restricted.md")
 	restoreUmask, umaskSupported := setTestUmask(0o077)

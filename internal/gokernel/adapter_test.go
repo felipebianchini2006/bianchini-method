@@ -36,6 +36,10 @@ func TestAdapterInstallIsIdempotentAndPreservesForeignBytes(t *testing.T) {
 	if err := os.WriteFile(target, foreign, 0o640); err != nil {
 		t.Fatal(err)
 	}
+	before, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
 	code, stdout, stderr := runCLI(t, "adapter", "install", "--host", "generic", "--repo", repo)
 	if code != 0 || stderr != "" {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
@@ -58,7 +62,7 @@ func TestAdapterInstallIsIdempotentAndPreservesForeignBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o640 {
+	if info.Mode().Perm() != before.Mode().Perm() {
 		t.Fatalf("mode=%o", info.Mode().Perm())
 	}
 	code, stdout, stderr = runCLI(t, "adapter", "install", "--host", "generic", "--repo", repo)
