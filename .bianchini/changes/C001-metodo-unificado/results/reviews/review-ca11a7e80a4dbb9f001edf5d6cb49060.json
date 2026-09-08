@@ -1,0 +1,18 @@
+{
+  "change": "C001-metodo-unificado",
+  "findings": [],
+  "plan": "P04",
+  "proof_ids": [
+    "proof-a7c538be5c0af5e17fee3e7c80b04c24"
+  ],
+  "record_digest": "87f9d6a65145ec4bcdaf0448981076671871ccea7c4dcef2dd553be40d5d7885",
+  "resolves_reviews": [],
+  "review_id": "review-ca11a7e80a4dbb9f001edf5d6cb49060",
+  "reviewed_at": "2026-09-08T22:31:25+00:00",
+  "reviewer": "agent:root",
+  "schema_version": 1,
+  "scope": "plan",
+  "source_fingerprint": "f1dc63eb8a9257f5943f6ce04838c173d664752ac73e3bd7c7601b878956c656",
+  "task": null,
+  "verdict": "approved"
+}

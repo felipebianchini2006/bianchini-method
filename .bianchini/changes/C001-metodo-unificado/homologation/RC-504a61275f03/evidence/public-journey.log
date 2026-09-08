@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "repository": "/Users/felipebianchini/Developer/bm-service-example-eprla0pm/service-requests",
+  "change": "C001-solicitacoes-de-servico",
+  "quick": "Q001-melhorar-ajuda",
+  "debug": "D001-rejeitar-descricao-em-branco",
+  "reviewer": "fixture:protocol-test-not-independent",
+  "negative_rejections": [
+    "STALE_EVIDENCE",
+    "VERIFICATION_FAILED",
+    "VERIFICATION_FAILED",
+    "GATE_COVERAGE",
+    "REVIEW_REQUIRED",
+    "HOMOLOGATION_",
+    "HOMOLOGATION_",
+    "HOMOLOGATION_",
+    "ARTIFACT_MISMATCH"
+  ],
+  "candidate": {
+    "build": ".bianchini/.runtime/service.pyz",
+    "checksum": "08ee4dd6bba6759c121a0d588d9c9e72f3aa097413b46590ffa2cbdaab8a387d",
+    "id": "RC-d49becb97d53",
+    "kind": "file",
+    "package_digest": "953c3a20c314de6f43e4cd714432193258c9968e11f5536970ef91f2dc2b7caf",
+    "revision": "54b0428cfed50d4d9bb9187fe075ef0de049bb7c"
+  },
+  "scope_pdf_sha256": "7cda35b85e298153eabc6e867d49f2dc28c3e144c09d8e95b1f9f87fe2f8b5b1"
+}

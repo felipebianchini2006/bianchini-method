@@ -1,0 +1,102 @@
+{
+  "version": {
+    "build_commit": "4d750e9f0339e1c1911480c0dcb26340daa46d85",
+    "contract_version": "bianchini",
+    "engine": "go",
+    "implemented_surfaces": [
+      "model.init",
+      "model.validate",
+      "scope.seal",
+      "scope.verify",
+      "roadmap.sync",
+      "roadmap.next-wave",
+      "coherence.check",
+      "coherence.approve",
+      "impact.analyze",
+      "plan.complete",
+      "plan.reopen",
+      "verify.task",
+      "verify.plan",
+      "verify.release",
+      "verify.review",
+      "verify.status",
+      "context.pack",
+      "context.verify",
+      "adapter.render",
+      "adapter.install",
+      "learn.propose",
+      "learn.list",
+      "learn.approve",
+      "learn.reject",
+      "learn.deactivate",
+      "debug.start",
+      "debug.list",
+      "debug.status",
+      "debug.resume",
+      "debug.checkpoint",
+      "debug.finish",
+      "design-audit.seal",
+      "design-audit.verify",
+      "change-policy",
+      "cycle-close",
+      "policy",
+      "workspace.create",
+      "workspace.check",
+      "workspace.locate",
+      "workspace.resume",
+      "workspace.finish",
+      "spec-diff",
+      "direct.classify",
+      "direct.start",
+      "direct.status",
+      "direct.checkpoint",
+      "direct.finish",
+      "direct.reopen",
+      "update-bm",
+      "status"
+    ],
+    "official": true,
+    "preview": false,
+    "version": "1.1.0"
+  },
+  "removed_commands": [
+    {
+      "command": "migrate",
+      "exit_code": 2,
+      "stderr": "usage: bm <command> [options]\nbm: error: argument command: invalid choice: 'migrate' (choose from 'adapter', 'change-policy', 'coherence', 'context', 'cycle-close', 'debug', 'design-audit', 'direct', 'impact', 'learn', 'model', 'plan', 'policy', 'roadmap', 'scope', 'spec-diff', 'status', 'update-bm', 'verify', 'workspace')\n"
+    },
+    {
+      "command": "snapshot",
+      "exit_code": 2,
+      "stderr": "usage: bm <command> [options]\nbm: error: argument command: invalid choice: 'snapshot' (choose from 'adapter', 'change-policy', 'coherence', 'context', 'cycle-close', 'debug', 'design-audit', 'direct', 'impact', 'learn', 'model', 'plan', 'policy', 'roadmap', 'scope', 'spec-diff', 'status', 'update-bm', 'verify', 'workspace')\n"
+    },
+    {
+      "command": "planning-audit",
+      "exit_code": 2,
+      "stderr": "usage: bm <command> [options]\nbm: error: argument command: invalid choice: 'planning-audit' (choose from 'adapter', 'change-policy', 'coherence', 'context', 'cycle-close', 'debug', 'design-audit', 'direct', 'impact', 'learn', 'model', 'plan', 'policy', 'roadmap', 'scope', 'spec-diff', 'status', 'update-bm', 'verify', 'workspace')\n"
+    },
+    {
+      "command": "proof-map",
+      "exit_code": 2,
+      "stderr": "usage: bm <command> [options]\nbm: error: argument command: invalid choice: 'proof-map' (choose from 'adapter', 'change-policy', 'coherence', 'context', 'cycle-close', 'debug', 'design-audit', 'direct', 'impact', 'learn', 'model', 'plan', 'policy', 'roadmap', 'scope', 'spec-diff', 'status', 'update-bm', 'verify', 'workspace')\n"
+    },
+    {
+      "command": "telemetry",
+      "exit_code": 2,
+      "stderr": "usage: bm <command> [options]\nbm: error: argument command: invalid choice: 'telemetry' (choose from 'adapter', 'change-policy', 'coherence', 'context', 'cycle-close', 'debug', 'design-audit', 'direct', 'impact', 'learn', 'model', 'plan', 'policy', 'roadmap', 'scope', 'spec-diff', 'status', 'update-bm', 'verify', 'workspace')\n"
+    }
+  ],
+  "skills": [
+    "bianchini-method_1.1.0_darwin-arm64/skills/auditar-arquitetura/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/corrigir-bug/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/design-projeto/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/executar-direto/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/executar-plano/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/homologar-sistema/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/preparar-escopo/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/sdd-planning/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/status-projeto/SKILL.md",
+    "bianchini-method_1.1.0_darwin-arm64/skills/update-bm/SKILL.md"
+  ],
+  "scope_help": "usage: bm scope [-h] [--repo REPO] --change CHANGE [--source SOURCE]\n                [--draft DRAFT] [--pages PAGES] [--page-manifest PATH]\n                [--extraction {native,ocr,mixed}]\n                {seal,verify}\n\npositional arguments:\n  {seal,verify}\n\noptional arguments:\n  -h, --help            show this help message and exit\n  --repo REPO\n  --change CHANGE\n  --source SOURCE\n  --draft DRAFT\n  --pages PAGES\n  --page-manifest PATH   required for seal; per-page extraction record\n  --extraction {native,ocr,mixed}\n"
+}

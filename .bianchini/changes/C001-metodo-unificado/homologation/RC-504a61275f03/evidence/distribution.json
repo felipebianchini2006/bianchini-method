@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "version": "1.1.0",
+  "build_commit": "4d750e9f0339e1c1911480c0dcb26340daa46d85",
+  "source_date_epoch": 1788906625,
+  "artifacts": [
+    {
+      "target": "darwin-amd64",
+      "archive": "bianchini-method_1.1.0_darwin-amd64.tar.gz",
+      "sha256": "e35d96ad8a5aee3ce4503f1d2e34fa854610465a5f4d55c88151a7c889a718d7",
+      "size": 3647630,
+      "binary": "skills/_shared/bin/bm"
+    },
+    {
+      "target": "darwin-arm64",
+      "archive": "bianchini-method_1.1.0_darwin-arm64.tar.gz",
+      "sha256": "2b6d407d5e33555047615c5c11d96e3326208e5dfa76180bd6d472d7e7275a2f",
+      "size": 3396356,
+      "binary": "skills/_shared/bin/bm"
+    },
+    {
+      "target": "linux-amd64",
+      "archive": "bianchini-method_1.1.0_linux-amd64.tar.gz",
+      "sha256": "e9984603961d4fb33445b68de55254ec2712a0ce3c32f58c5c278d0e0cd55305",
+      "size": 3602786,
+      "binary": "skills/_shared/bin/bm"
+    },
+    {
+      "target": "linux-arm64",
+      "archive": "bianchini-method_1.1.0_linux-arm64.tar.gz",
+      "sha256": "51efa45d7a5f00d438740c0c9a0a14e0a480b856008806cff571b7dd64df8931",
+      "size": 3286254,
+      "binary": "skills/_shared/bin/bm"
+    },
+    {
+      "target": "windows-amd64",
+      "archive": "bianchini-method_1.1.0_windows-amd64.tar.gz",
+      "sha256": "579a8c68a6b73e4bb2e9759a04f2442b4a27ec7de24e7729d89318997328ccde",
+      "size": 3678564,
+      "binary": "skills/_shared/bin/bm.exe"
+    }
+  ]
+}
