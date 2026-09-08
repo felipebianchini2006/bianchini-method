@@ -99,7 +99,7 @@ func rawUpdateArchive(t *testing.T, entries []updateArchiveEntry) []byte {
 	return buffer.Bytes()
 }
 
-func updateFetcher(version string, archive, manifest []byte) (updateFetch, *[]string) {
+func updateFetcher(version string, archive []byte) (updateFetch, *[]string) {
 	calls := []string{}
 	releaseManifest, checksums := updateReleaseMetadata(version, archive)
 	fetch := func(url string, _ time.Duration) ([]byte, error) {
@@ -107,8 +107,6 @@ func updateFetcher(version string, archive, manifest []byte) (updateFetch, *[]st
 		switch {
 		case strings.HasSuffix(url, "/skills/_shared/VERSION"):
 			return []byte(version + "\n"), nil
-		case strings.HasSuffix(url, "/skills/_shared/releases/0.4.0.json"):
-			return manifest, nil
 		case strings.HasSuffix(url, "/release-manifest.json"):
 			return releaseManifest, nil
 		case strings.HasSuffix(url, "/SHA256SUMS"):
@@ -158,7 +156,7 @@ func TestUpdateUsesVersionedNativeReleaseArchive(t *testing.T) {
 }
 
 func TestUpdateParserFreezesPublicFlagsWithoutTestSource(t *testing.T) {
-	fetch, calls := updateFetcher("3.2.0", nil, nil)
+	fetch, calls := updateFetcher("3.2.0", nil)
 	_, err := runUpdateWithFetcher([]string{
 		"--check", "--skills-root", filepath.Join(t.TempDir(), "missing-skills"),
 		"--timeout", "0.001", "--format", "json",
@@ -178,7 +176,7 @@ func TestUpdateParserFreezesPublicFlagsWithoutTestSource(t *testing.T) {
 func TestUpdateCheckOnlyDoesNotDownloadOrWrite(t *testing.T) {
 	skills := filepath.Join(t.TempDir(), "skills")
 	writeUpdateInstallation(t, skills, "3.1.0", "local")
-	fetch, calls := updateFetcher("3.2.0", nil, nil)
+	fetch, calls := updateFetcher("3.2.0", nil)
 	resultValue, err := runUpdateWithFetcher([]string{"--check", "--skills-root", skills, "--format", "json"}, fetch, defaultUpdateFS())
 	if err != nil {
 		t.Fatal(err)
@@ -204,7 +202,7 @@ func TestInstalledPackageUpdatesAtomicallyAndPreservesForeignSkills(t *testing.T
 	if err := os.WriteFile(foreign, []byte("foreign\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	fetch, calls := updateFetcher("3.2.0", updateArchive(t, "3.2.0", "remote"), nil)
+	fetch, calls := updateFetcher("3.2.0", updateArchive(t, "3.2.0", "remote"))
 	result, err := updateBianchiniMethod(updateRequest{skillsRoot: skills, fetch: fetch, fs: defaultUpdateFS(), timeout: 15 * time.Second})
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +223,7 @@ func TestUpdateInstallsCleanSkillsRootFromZeroVersion(t *testing.T) {
 	if err := os.Mkdir(skills, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	fetch, calls := updateFetcher("3.2.0", updateArchive(t, "3.2.0", "clean"), nil)
+	fetch, calls := updateFetcher("3.2.0", updateArchive(t, "3.2.0", "clean"))
 	result, err := updateBianchiniMethod(updateRequest{skillsRoot: skills, fetch: fetch, fs: defaultUpdateFS(), timeout: 15 * time.Second})
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +237,7 @@ func TestUpdateInstallsCleanSkillsRootFromZeroVersion(t *testing.T) {
 func TestUpdateFailureRollsBackCompleteInstallation(t *testing.T) {
 	skills := filepath.Join(t.TempDir(), "skills")
 	writeUpdateInstallation(t, skills, "3.1.0", "local")
-	fetch, _ := updateFetcher("3.2.0", updateArchive(t, "3.2.0", "remote"), nil)
+	fetch, _ := updateFetcher("3.2.0", updateArchive(t, "3.2.0", "remote"))
 	fsops := defaultUpdateFS()
 	realRename := fsops.rename
 	calls := 0
@@ -392,7 +390,7 @@ func TestUpdateArchiveRejectsTraversalLinksDuplicatesAndSize(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			skills := filepath.Join(t.TempDir(), "skills")
 			writeUpdateInstallation(t, skills, "3.1.0", "local")
-			fetch, _ := updateFetcher("3.2.0", test.archive(t), nil)
+			fetch, _ := updateFetcher("3.2.0", test.archive(t))
 			_, err := updateBianchiniMethod(updateRequest{skillsRoot: skills, fetch: fetch, fs: defaultUpdateFS(), timeout: 15 * time.Second})
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("err=%v", err)
@@ -417,38 +415,6 @@ func TestUpdateArchiveRejectsTraversalLinksDuplicatesAndSize(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "conteúdo extraído excede") {
 			t.Fatalf("err=%v", err)
 		}
-	})
-}
-
-func TestUpdateLineageResetTo040RequiresAndValidatesManifest(t *testing.T) {
-	manifest := []byte(`{"schema_version":1,"release_version":"0.4.0","lineage_reset":{"authorized":true,"from_major_versions":[3],"to_version":"0.4.0"}}`)
-	manifest = append(manifest, '\n')
-	archive := updateArchive(t, "0.4.0", "reset", updateArchiveEntry{name: "bianchini-method-main/skills/_shared/releases/0.4.0.json", content: manifest})
-
-	t.Run("authorized", func(t *testing.T) {
-		skills := filepath.Join(t.TempDir(), "skills")
-		writeUpdateInstallation(t, skills, "3.2.0", "local")
-		fetch, calls := updateFetcher("0.4.0", archive, manifest)
-		result, err := updateBianchiniMethod(updateRequest{skillsRoot: skills, fetch: fetch, fs: defaultUpdateFS(), timeout: 15 * time.Second})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if stateString(result["status"]) != "updated" || len(*calls) != 5 {
-			t.Fatalf("result=%#v calls=%v", result, *calls)
-		}
-		assertUpdateMarker(t, skills, "0.4.0", "reset")
-	})
-
-	t.Run("invalid authorization", func(t *testing.T) {
-		skills := filepath.Join(t.TempDir(), "skills")
-		writeUpdateInstallation(t, skills, "3.2.0", "local")
-		bad := bytes.Replace(manifest, []byte(`"authorized":true`), []byte(`"authorized":false`), 1)
-		fetch, _ := updateFetcher("0.4.0", archive, bad)
-		_, err := updateBianchiniMethod(updateRequest{skillsRoot: skills, fetch: fetch, fs: defaultUpdateFS(), timeout: 15 * time.Second})
-		if err == nil || !strings.Contains(err.Error(), "não autoriza") {
-			t.Fatalf("err=%v", err)
-		}
-		assertUpdateMarker(t, skills, "3.2.0", "local")
 	})
 }
 
@@ -506,7 +472,7 @@ func TestUpdateGitCheckoutFastForwardsOfficialMainWithoutArchive(t *testing.T) {
 	updateGitCommand(t, seed, "commit", "-m", "v3.2")
 	updateGitCommand(t, seed, "push", "origin", "main")
 	expectedHead := updateGitCommand(t, seed, "rev-parse", "HEAD")
-	fetch, calls := updateFetcher("3.2.0", nil, nil)
+	fetch, calls := updateFetcher("3.2.0", nil)
 	result, err := updateBianchiniMethod(updateRequest{skillsRoot: filepath.Join(local, "skills"), fetch: fetch, fs: defaultUpdateFS(), timeout: 15 * time.Second})
 	if err != nil {
 		t.Fatal(err)

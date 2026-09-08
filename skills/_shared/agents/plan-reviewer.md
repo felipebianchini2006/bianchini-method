@@ -21,7 +21,7 @@ Não recebe o histórico da conversa nem o repositório inteiro.
 ## Responsabilidade
 
 - **Spec:** comportamento, contratos e aceite, sem requisito silenciosamente adiado.
-- **Qualidade:** correção, simplicidade, compatibilidade e regressões proporcionais.
+- **Qualidade:** correção, simplicidade, impacto em consumidores e regressões proporcionais.
 - **Espaço negativo**, quando houver efeito irreversível, persistência ou concorrência: interrupção antes/depois do efeito, estado durável de retomada, evidência ambígua e mudança entre inspeção e ação.
 
 Classificar findings como `critical`, `high`, `medium` ou `low`, citando arquivo e trecho. Findings graves identificam `risk_seam` e contrato violado. Confirmar escopo do diff.

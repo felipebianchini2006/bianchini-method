@@ -1,10 +1,10 @@
 # Contrato do Bianchini Method
 
-Referência normativa das skills públicas. Use o binário empacotado `bin/bm` no Unix ou `bin/bm.exe` no Windows para operações determinísticas; não replique em prompt validação, score, grafo, digest, escrita atômica ou migração. Ausência do binário bloqueia: não existe fallback Python.
+Referência normativa das skills públicas. Use o binário empacotado `bin/bm` no Unix ou `bin/bm.exe` no Windows para operações determinísticas; não replique em prompt validação, score, grafo, digest ou escrita atômica. Ausência do binário bloqueia: não existe fallback Python.
 
 ## Versão apresentada
 
-A versão do produto vem de `bm version --json`, campo `version`, e acompanha o pacote instalado. Use esse valor em anúncios, status e entregas. `contract_version` e `STATE.md.method` são identificadores de compatibilidade do formato persistido. Não os apresente como versão do produto nem altere dados de projetos apenas para mudar o número exibido.
+A versão do produto vem de `bm version --json`, campo `version`, e acompanha o pacote instalado. Use esse valor em anúncios, status e entregas. `STATE.md.method` identifica o método atual; não o apresente como versão do produto.
 
 ## Workspace canônico
 
@@ -25,8 +25,9 @@ Todo estado persistente novo vive em `.bianchini/`:
 │   ├── SYSTEM_MODEL.md
 │   ├── ROADMAP.md
 │   ├── COHERENCE.md
-│   ├── plans/
+│   ├── plans/P01-slug/{PLAN.md,RESULT.md,evidence/}
 │   ├── results/
+│   ├── homologation/RC-id/{HOMOLOGATION.md,evidence/,delivery/}
 │   └── SUMMARY.md
 ├── quick/Q001-slug/
 ├── debug/{active,resolved}/
@@ -37,12 +38,7 @@ Todo estado persistente novo vive em `.bianchini/`:
 
 `.runtime/` é ignorado pelo Git e contém somente locks, staging e recuperação de escrita interrompida. O restante é legível, versionável e confinado ao repositório.
 
-`.planning/` é namespace estrangeiro: nunca ler como fonte do método, copiar, converter, mover, apagar ou usar como fallback. Documentação anterior do Bianchini só entra pelo fluxo explícito de migração.
-
-`direct`, `debug`, `workspace` e `cycle-close` nunca possuem fallback para
-formatos anteriores. O primeiro `direct start` ou `debug start` inicializa
-`.bianchini` somente em projeto novo. Qualquer fonte anterior reconhecida produz
-`MIGRATION_REQUIRED` antes de escrever. Argumentos públicos antigos são inválidos.
+Documentação fora de `.bianchini/` não é estado nem fallback do método. `direct`, `debug`, `workspace` e `cycle-close` usam apenas o contrato atual.
 
 ## MethodWorkspace e estado
 
@@ -57,7 +53,8 @@ O documento só recebe status `ready_for_sdd` quando `bm scope seal` confirmar s
 ```bash
 bm scope seal --repo <repo> --change C001-slug \
   --source <escopo.pdf> --draft <scope-draft.md> \
-  --pages <total> --extraction native|ocr|mixed
+  --pages <total> --extraction native|ocr|mixed \
+  --page-manifest <manifesto.json>
 bm scope verify --repo <repo> --change C001-slug [--source <escopo.pdf>]
 ```
 
@@ -133,8 +130,8 @@ Determinístico e bloqueante:
 - `provides`, `consumes` e produtor ausente;
 - consumidor anterior ao produtor;
 - ownership incompatível;
-- contrato removido antes da migração de consumidores;
-- ordem e compatibilidade de migração;
+- contrato removido antes da atualização de consumidores;
+- ordem e recuperação de migração de dados;
 - requisito sem fase, fase sem aceite ou plano sem verificação;
 - journey incompleta;
 - efeito externo sem guard obrigatório;
@@ -292,12 +289,10 @@ O gate do plano usa `bm verify plan` e cobertura completa dos comandos declarado
 | alto/crítico | `strict` | por tarefa | RED/GREEN e revisão independente |
 
 - `verification.fast`: prova focal da unidade;
-- `verification.plan`: suítes afetadas, regressão do plano, E2E crítico e mutação seletiva exigida;
-- `verification.release`: comandos completos aprovados, contratos, regressão, E2E, build e evidência de mutação vigente.
+- `verification.plan`: suítes afetadas, regressão do plano e E2E crítico;
+- `verification.release`: comandos completos aprovados, contratos, regressão, E2E e build.
 
-Regressão é transversal. Não criar tarefa ou agente por camada de teste. Não perseguir coverage ou mutation score global. Retry, concorrência ou reinício exigem localizar o invariante quebrado antes de escolher correção local ou mudança arquitetural proporcional.
-
-O executor persiste política e fix rounds por `risk_seam` no proof store. Mudança do código após falha conta como tentativa de correção; reexecutar o mesmo código é verificação. Renomear a tarefa não zera o seam. Ao atingir o limite, `FIX_LIMIT_REACHED` bloqueia outra tentativa; registrar diagnóstico e replanejar o problema sem apagar provas ou reiniciar contagem. Não marcar sucesso por falta de orçamento.
+Regressão é transversal. Não criar tarefa ou agente por camada de teste. Retry, concorrência ou reinício exigem localizar o invariante quebrado antes de escolher correção local ou mudança arquitetural proporcional. Falta de orçamento não autoriza marcar sucesso.
 
 ### Contratos internos
 
@@ -364,24 +359,9 @@ GREEN antes de RED é inválido. RED exige comando real, arquivo do teste e assi
 
 Bug que restaura contrato aceito não muda spec. Contrato errado exige decisão e impact radius.
 
-## Migração explícita
-
-Não existe adaptador permanente. Projetos anteriores terminam no fluxo em que estão e depois executam:
-
-```bash
-bm migrate check --repo <repo>
-bm migrate apply --repo <repo>
-```
-
-Os antigos comandos `route`, `legacy-transition` e `repo-hygiene` estão aposentados e devem ser rejeitados pela CLI sem criar ou alterar workspace.
-
-`check` é somente leitura. `apply` exige projeto `idle`/concluído e Git limpo, usa mapa origem→destino, SHA-256, staging transacional e rollback. Reconhece somente documentação anterior do Bianchini em `docs/living`, `docs/bianchini`, `artifacts/bianchini`, documentos Bianchini identificáveis em `docs/design` e resultados em `.superpowers/bianchini/direct`.
-
-Colisão, formato desconhecido, symlink externo, path traversal, checksum divergente ou ciclo ativo bloqueiam. A origem só é removida após verificar o destino. O manifesto fica em `.bianchini/archive/import-AAAA-MM-DD/`. `.planning/` permanece byte a byte intocado.
-
 ## Encerramento e DocViva
 
-Toda tarefa terminal atualiza `STATE.md` atomicamente. Depois do último plano, `bm verify release` repete os gates integrados declarados em verifications dos planos no estado final, grava o RC e exige revisão final vinculada aos mesmos proofs. A homologação aceita ocorre em `changes/`, para o fingerprint exato, antes do fechamento. Só então o método sincroniza specs/modelo atuais e move a mudança para `archive/`.
+Toda tarefa terminal atualiza `STATE.md` atomicamente. Depois do último plano, commite o código do candidato; `bm verify release` exige que mudanças fora de `.bianchini/` estejam commitadas. Então ele repete os gates integrados declarados em `verifications`, grava o RC e exige revisão final vinculada às mesmas provas. A homologação aceita ocorre em `changes/Cxxx-*/homologation/<RC-id>/`, para o fingerprint exato, antes do fechamento. Só então o método sincroniza specs/modelo atuais e move a mudança para `archive/`.
 
 ```bash
 bm cycle-close --repo <repo> --change C001
@@ -391,7 +371,7 @@ Relatar separadamente: código/commit, testes, sandbox, deploy, efeito em produ�
 
 ## Atualização e segurança
 
-`/update-bm` permanece manual. A transição para `0.4.0` usa o manifesto oficial de mudança de linhagem uma única vez; depois retorna à comparação semântica normal.
+`/update-bm` permanece manual e compara o pacote instalado com a distribuição atual antes de qualquer escrita.
 
 Sem autorização explícita, não cobrar, publicar, enviar mensagem real, apagar dados, executar migração destrutiva, alterar produção de forma arriscada ou expor segredo/dado pessoal. Nunca versionar credenciais, payloads sensíveis, logs grandes ou artefatos temporários.
 
@@ -403,9 +383,9 @@ Cache é `fresh` por padrão. `verify.cache: deterministic` só vale para entrad
 
 `direct checkpoint --command` executa os comandos declarados no brief e guarda proofs. Checkpoint narrativo não comprova o aceite. `direct finish` cobra cobertura vigente de todos os comandos.
 
-`verify release --build <arquivo> --delivery ready` calcula SHA-256 real; `--checksum` opcional confere a expectativa. `--artifact-kind container` inspeciona a imagem local via Docker. `--artifact-kind deployment` consulta o endpoint de saúde indicado em build e exige HTTP 200 com JSON `{"version":"<SHA-256 em execução>"}`. Gates recebem BM_CANDIDATE_BUILD e BM_CANDIDATE_CHECKSUM para operar o alvo correto. Artefato e candidato são revalidados no fechamento.
+`verify release --build <arquivo> --delivery ready` calcula SHA-256 real; `--checksum` opcional confere a expectativa. `--artifact-kind container` inspeciona a imagem local via Docker. `--artifact-kind deployment` consulta o endpoint de saúde indicado em build e exige HTTP 200 com JSON `{"version":"<SHA-256 em execução>"}`. O candidato vincula revisão, artefato, checksum e `package_digest`; uma alteração no pacote de planejamento produz outra identidade de RC. Gates recebem BM_CANDIDATE_BUILD e BM_CANDIDATE_CHECKSUM para operar o alvo correto. Artefato, candidato e limpeza do código são revalidados depois dos gates e no fechamento.
 
-HOMOLOGATION.md contém gates `{proof_id, result: passed}` cobrindo todos os proofs do RC. not_run/failed/N/A não dispensam gates obrigatórios. Exclusões só pertencem ao planejamento quando fora do escopo; procedimentos exigem manual_proofs reais. Finding critical/high ou blocking não resolvido impede aceite independentemente de blockers.
+HOMOLOGATION.md contém gates `{proof_id, result: passed}` cobrindo todas as provas do RC. `not_run`, `failed` e N/A não dispensam gates obrigatórios. Exclusões só pertencem ao planejamento quando fora do escopo; procedimentos exigem `manual_proofs` no diretório de evidências do RC. Todo finding com severidade diferente de `info`, e qualquer finding com `blocking: true`, precisa estar resolvido antes do aceite.
 
 Finding material em `verify review --verdict changes_requested` usa `--finding` com JSON: target, observed, requirement, severity, evidence (arquivo real), expected_fix. Não exige RED artificial. Após corrigir, revisão aprovada usa provas atuais e `--resolves-review <id>`. Sugestões opcionais ficam fora dos findings bloqueantes.
 

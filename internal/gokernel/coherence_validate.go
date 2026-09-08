@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func coherenceStructuralFindings(current, expected projectModel, plans []planContract, requirements []string, typed bool) []any {
+func coherenceStructuralFindings(current, expected projectModel, plans []planContract, requirements []string, _ bool) []any {
 	findings := []any{}
 	order, counts, known := map[string]int{}, map[string]int{}, map[string]bool{}
 	for index, plan := range plans {
@@ -28,9 +28,6 @@ func coherenceStructuralFindings(current, expected projectModel, plans []planCon
 	}
 
 	for _, plan := range plans {
-		if typed && plan.schema != 2 {
-			findings = append(findings, coherenceFinding("LEGACY_PLAN_CONTRACT", "ERROR", "structural", []string{plan.id}, nil, plan.id+" usa contrato legado sem tarefas tipadas.", "Reescrever o plano com schema_version 2 e tarefas Txx."))
-		}
 		if len(normalizedPlanStrings(plan, "acceptance")) == 0 {
 			findings = append(findings, coherenceFinding("MISSING_ACCEPTANCE", "ERROR", "structural", []string{plan.id}, nil, plan.id+" não declara critérios de aceite.", "Declarar ao menos um resultado observável."))
 		}
@@ -47,7 +44,7 @@ func coherenceStructuralFindings(current, expected projectModel, plans []planCon
 				findings = append(findings, coherenceFinding("ORDER_VIOLATION", "ERROR", "structural", []string{plan.id, dependency}, nil, plan.id+" aparece antes de sua dependência "+dependency+".", "Reordenar o roadmap para executar o provider primeiro."))
 			}
 		}
-		if plan.schema == 2 {
+		{
 			findings = append(findings, coherenceTaskFindings(plan)...)
 			for _, section := range []string{"modules", "interfaces", "data"} {
 				available := map[string]bool{}
@@ -278,20 +275,11 @@ func coherenceComponentIDs(model projectModel) map[string]bool {
 }
 
 func coherencePlanOwns(plan planContract) []string {
-	if plan.schema == 2 {
-		return normalizedPlanStrings(plan, "ownership")
-	}
-	return normalizedPlanStrings(plan, "owns")
+	return normalizedPlanStrings(plan, "ownership")
 }
 
 func coherencePlanObjects(plan planContract, field string) []map[string]any {
 	raw := plan.value[field]
-	if field == "effects" && plan.schema == 1 {
-		raw = plan.value["external_effects"]
-		if raw == nil {
-			raw = plan.value["effects"]
-		}
-	}
 	result := []map[string]any{}
 	for _, value := range stateArray(raw) {
 		if item, ok := value.(map[string]any); ok {

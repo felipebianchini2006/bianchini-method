@@ -15,10 +15,7 @@ Ao mencionar a versão na abertura, no status ou na entrega, execute o binário 
 
 ## 1. Abrir ou retomar
 
-Sem `.bianchini`, `debug start` inicializa o workspace do método quando o projeto é
-novo. Se houver documentação anterior reconhecida, o CLI retorna
-`MIGRATION_REQUIRED`; migre explicitamente antes de abrir o caso. Nenhum comando
-de debug pode cair em armazenamento anterior.
+Sem `.bianchini`, `debug start` inicializa o workspace atual do método. Nenhum comando de debug usa armazenamento fora de `.bianchini/`.
 
 ```bash
 bm debug list --repo <repo>
@@ -142,6 +139,8 @@ Revise:
 - regressões cobrem vizinhos reais;
 - logs e artefatos não expõem dados;
 - comportamento fora de escopo não mudou.
+
+Com o fix verde, simplifique somente o trecho tocado quando isso reduzir complexidade real sem alterar comportamento. Depois de refatoração relevante, revise o delta por regressões, duplicação, abstrações rasas, fallbacks silenciosos, comentários obsoletos e testes frágeis. Corrija findings reais e repita GREEN, reprodução original e regressões afetadas.
 
 Bug que restaura spec aceita não altera a spec. Se a investigação provar que contrato, ownership, modelo, migração, journey ou invariante aceito está errado, finalize como `escalated`, registre os contratos afetados e use o impact radius no planejamento. Não use bug para contornar aprovação.
 

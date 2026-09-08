@@ -368,6 +368,9 @@ func contextTruthy(value any) bool {
 		return typed != 0
 	case int64:
 		return typed != 0
+	case json.Number:
+		number, err := typed.Float64()
+		return err == nil && number != 0
 	case []any:
 		return len(typed) > 0
 	case map[string]any:

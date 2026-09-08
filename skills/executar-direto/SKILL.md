@@ -23,7 +23,7 @@ Leia regras, `.bianchini/STATE.md` quando existir, manifests, CI, Git e apenas o
 
 Não use `.planning/`. Sem `.bianchini`, `direct start` inicializa o workspace do método
 quando o projeto é novo. Se existir qualquer documentação anterior reconhecida,
-o CLI bloqueia com `MIGRATION_REQUIRED`; use `/migrar-bianchini`. Nunca use flags
+o CLI bloqueia estados fora do contrato atual. Nunca use flags
 ou rotas de execução de versões anteriores.
 
 ## 2. Classificar o risco

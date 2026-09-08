@@ -7,7 +7,7 @@ O manual descreve o release candidate aceito, não a intenção da spec nem fun�
 - Fonte versionável: `docs/manuals/manual-do-sistema.md`.
 - PDF curto quando `manual_pdf: quick_start` e completo quando `manual_pdf: full`: `artifacts/delivery/manual-do-sistema.pdf`.
 - Com `manual_pdf: scope`, o nível vem do escopo aprovado; com `none`, nenhum manual é gerado.
-- Manifesto geral da entrega: `artifacts/delivery/DELIVERY.md`.
+- Fonte, PDF e manifesto ficam em `.bianchini/changes/Cxxx-*/homologation/<RC-id>/delivery/`.
 
 ## Conteúdo mínimo do manual
 

@@ -6,7 +6,7 @@
 ---
 {
   "schema_version": 1,
-  "method": "0.4",
+  "method": "bianchini",
   "status": "pending_approval",
   "active_work": {
     "kind": "change",
@@ -42,7 +42,7 @@ Resumo humano curto e coerente com o frontmatter. Não adicionar ledger, histór
 
 - Chaves raiz permitidas: `schema_version`, `method`, `status`, `active_work`, `current_unit`, `blockers`, `next_action`, `last_completed`, `pointers`, `digest`, `updated_at`.
 - `schema_version` é `1` e versiona apenas o formato compacto do índice.
-- `method` é `0.4`; correções do pacote não alteram o contrato do projeto.
+- `method` é `bianchini`.
 - `active_work.kind`: `change | quick | debug | migration | null`.
 - IDs: `C001`, `P01`, `Q001` e `D001`.
 - `status`: `idle | planning | scope_ready | pending_approval | approved | approved_with_stale | active | executing | pending_close | blocked`.
@@ -55,14 +55,14 @@ Resumo humano curto e coerente com o frontmatter. Não adicionar ledger, histór
 - O corpo Markdown é opcional e curto.
 - São proibidos no estado: `history`, `ledger`, `events`, `results`, logs, hipóteses, comandos completos, diffs e evidências extensas.
 
-O executável preserva `method: "0.4"` como linhagem de esquema. A versão apresentada ao usuário vem de `bm version --json`, campo `version`; não deste índice. `pending_approval` pode aguardar decisão técnica do agente; `COHERENCE.md` distingue `technical_decision` de aprovação humana. O estado só reflete conclusão depois que o núcleo valida cobertura, atualidade e candidato. Nunca editar `STATE.md` para substituir gates.
+A versão apresentada ao usuário vem de `bm version --json`, campo `version`; não deste índice. `pending_approval` pode aguardar decisão técnica do agente; `COHERENCE.md` distingue `technical_decision` de aprovação humana. O estado só reflete conclusão depois que o núcleo valida cobertura, atualidade e candidato. Nunca editar `STATE.md` para substituir gates.
 
 ## Estado ocioso
 
 ```json
 {
   "schema_version": 1,
-  "method": "0.4",
+  "method": "bianchini",
   "status": "idle",
   "active_work": null,
   "current_unit": null,

@@ -61,9 +61,9 @@ func runExecutionWorkspaceWithDependencies(args []string, dependencies execution
 	change, plan := lastValue(flags, "--change"), lastValue(flags, "--plan")
 	if action != "check" && action != "finish" && (change == "" || plan == "") {
 		if action == "create" {
-			return nil, fmt.Errorf("--change e --plan são obrigatórios para criar workspace 0.4")
+			return nil, fmt.Errorf("--change e --plan são obrigatórios para criar workspace")
 		}
-		return nil, fmt.Errorf("--change e --plan são obrigatórios para %s no método 0.4", action)
+		return nil, fmt.Errorf("--change e --plan são obrigatórios para %s", action)
 	}
 	if action == "finish" && change == "" {
 		return nil, fmt.Errorf("--change é obrigatório para finalizar workspaces")
@@ -310,9 +310,6 @@ func executionWorkspaceCreate(root, change, plan, target string, dependencies ex
 }
 
 func executionWorkspaceValidateApprovedPackage(pack coherencePackage) (map[string]string, error) {
-	if pack.planningContract < 2 {
-		return map[string]string{}, nil
-	}
 	findings, findingsOK := pack.contract["findings"].([]any)
 	semantic, semanticOK := pack.contract["semantic"].(map[string]any)
 	if !findingsOK || !semanticOK {
@@ -360,10 +357,13 @@ func executionWorkspacePlan(plans []planContract, identifier string) (planContra
 }
 
 func executionWorkspaceResults(workspace methodWorkspace, directory string) (map[string]map[string]any, error) {
-	paths, _ := filepath.Glob(filepath.Join(directory, "results", "P*.md"))
-	sort.Strings(paths)
+	paths, _ := planFiles(workspace.layout.Plans(filepath.Base(directory)))
 	results := map[string]map[string]any{}
-	for _, path := range paths {
+	for _, planPath := range paths {
+		path := filepath.Join(filepath.Dir(planPath), "RESULT.md")
+		if _, statErr := os.Lstat(path); os.IsNotExist(statErr) {
+			continue
+		}
 		if err := workspace.validateWorkspacePath(path); err != nil {
 			return nil, workflowError("DOCVIVA_INCOMPLETE", "resultado inválido: "+filepath.Base(path))
 		}
@@ -418,17 +418,13 @@ func missingExecutionValues(values []string, present func(string) bool) []string
 
 func executionWorkspaceValidateCommittedPackage(root string, pack coherencePackage, planPath string, manifest map[string]string, git func(string, ...string) (string, error)) error {
 	required := []string{filepath.Join(pack.directory, "COHERENCE.md")}
-	if pack.planningContract >= 2 {
-		keys := make([]string, 0, len(manifest))
-		for relative := range manifest {
-			keys = append(keys, relative)
-		}
-		sort.Strings(keys)
-		for _, relative := range keys {
-			required = append(required, filepath.Join(pack.directory, filepath.FromSlash(relative)))
-		}
-	} else {
-		required = append(required, filepath.Join(pack.directory, "SYSTEM_MODEL.md"), planPath)
+	keys := make([]string, 0, len(manifest))
+	for relative := range manifest {
+		keys = append(keys, relative)
+	}
+	sort.Strings(keys)
+	for _, relative := range keys {
+		required = append(required, filepath.Join(pack.directory, filepath.FromSlash(relative)))
 	}
 	seen := map[string]bool{}
 	for _, path := range required {
@@ -594,7 +590,7 @@ func executionWorkspaceCheck(root string, git func(string, ...string) (string, e
 		return nil, executionWorkspaceGitError(err)
 	}
 	if !executionBranch.MatchString(branch) {
-		return nil, workflowError("DIRTY_WORKSPACE", "branch de execução 0.4 inválida")
+		return nil, workflowError("DIRTY_WORKSPACE", "branch de execução inválida")
 	}
 	paths, _ := filepath.Glob(filepath.Join(root, ".bianchini", ".runtime", "workspace-*.json"))
 	sort.Strings(paths)

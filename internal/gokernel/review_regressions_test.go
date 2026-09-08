@@ -65,7 +65,7 @@ func TestReviewFixLimitCannotBeBypassedByPassingOtherGate(t *testing.T) {
 	ws := newMethodWorkspace(repo)
 	pack := workflowProofPackage(ws, filepath.Join(ws.dir, "quick", "Q001-limit"), strings.Repeat("a", 64))
 	request := verificationRequest{pack: pack, scope: "quick", unit: "Q001-limit/gate-01", seam: "shared-risk", packageDigest: strings.Repeat("a", 64)}
-	failing, _ := legacyVerificationSpec(`python3 -c "raise SystemExit(1)"`, "failure")
+	failing, _ := commandVerificationSpec(`python3 -c "raise SystemExit(1)"`, "failure")
 	for i := 0; i <= 3; i++ {
 		os.WriteFile(filepath.Join(repo, "version.txt"), []byte(strings.Repeat("x", i+1)), 0600)
 		result, err := executeVerification(request, failing)
@@ -76,7 +76,7 @@ func TestReviewFixLimitCannotBeBypassedByPassingOtherGate(t *testing.T) {
 			t.Fatalf("round %d proof: %#v", i, result)
 		}
 	}
-	passing, _ := legacyVerificationSpec("go version", "control")
+	passing, _ := commandVerificationSpec("go version", "control")
 	request.unit = "Q001-limit/gate-02"
 	if _, err := executeVerification(request, passing); err != nil {
 		t.Fatal(err)

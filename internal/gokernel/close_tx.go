@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	methodlayout "github.com/felipebianchini2006/bianchini-method/internal/workspace"
 )
 
 var closeChangeID = regexp.MustCompile(`^C[0-9]{3}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?$`)
@@ -36,20 +38,21 @@ type closeJournal struct {
 func closeError(code, message string) error { return workflowError(code, message) }
 
 func closeJournalPath(root string) string {
-	return filepath.Join(root, ".bianchini", ".runtime", "cycle-close.json")
+	return filepath.Join(methodlayout.New(root).Runtime(), "cycle-close.json")
 }
 
 func closeTransactionPath(root, change string) string {
-	return filepath.Join(root, ".bianchini", ".runtime", "cycle-close-"+change)
+	return filepath.Join(methodlayout.New(root).Runtime(), "cycle-close-"+change)
 }
 
 func withCloseLock(root string, action func() (map[string]any, error)) (map[string]any, error) {
-	workspace := filepath.Join(root, ".bianchini")
+	layout := methodlayout.New(root)
+	workspace := layout.Dir()
 	info, err := os.Lstat(workspace)
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return nil, closeError("PATH_UNSAFE", "workspace .bianchini ausente ou inválido")
 	}
-	runtime := filepath.Join(workspace, ".runtime")
+	runtime := layout.Runtime()
 	if runtimeInfo, statErr := os.Lstat(runtime); statErr == nil && runtimeInfo.Mode()&os.ModeSymlink != 0 {
 		return nil, closeError("PATH_UNSAFE", "runtime não pode ser symlink")
 	}
@@ -407,11 +410,12 @@ func closeDigestMap(value map[string]string) bool {
 }
 
 func closePaths(root, change string) map[string]string {
+	layout := methodlayout.New(root)
 	return map[string]string{
-		"current":     filepath.Join(root, ".bianchini", "current"),
-		"change":      filepath.Join(root, ".bianchini", "changes", change),
-		"archive":     filepath.Join(root, ".bianchini", "archive", change),
-		"state":       filepath.Join(root, ".bianchini", "STATE.md"),
+		"current":     layout.Current(),
+		"change":      layout.Change(change),
+		"archive":     layout.ArchivedChange(change),
+		"state":       layout.State(),
 		"transaction": closeTransactionPath(root, change),
 	}
 }

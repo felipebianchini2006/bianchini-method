@@ -43,12 +43,12 @@ func TestCoherenceAndImpactFrozenInputErrors(t *testing.T) {
 	}
 }
 
-func TestCoherenceSchemaOneStructuralCheckAndApproval(t *testing.T) {
+func TestCoherenceRejectsSchemaOne(t *testing.T) {
 	repo := t.TempDir()
 	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	code, stdout, stderr := runCLI(t, "model", "init", "--repo", repo, "--change", "legacy package")
+	code, stdout, stderr := runCLI(t, "model", "init", "--repo", repo, "--change", "schema antigo")
 	if code != 0 || stderr != "" {
 		t.Fatalf("change code=%d stderr=%q", code, stderr)
 	}
@@ -68,19 +68,10 @@ func TestCoherenceSchemaOneStructuralCheckAndApproval(t *testing.T) {
 		"verifications": []any{"go test ./..."}, "model_delta": map[string]any{},
 	}
 	planDocument, _ := frontmatterDocument(plan, "# P01", false)
-	if err := os.WriteFile(filepath.Join(directory, "plans", "P01.md"), planDocument, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanTest(t, directory, "P01", planDocument)
 	code, stdout, stderr = runCLI(t, "coherence", "check", "--repo", repo, "--change", change, "--structural-only")
-	if code != 0 || stderr != "" {
-		t.Fatalf("check code=%d stderr=%q", code, stderr)
-	}
-	var checked map[string]any
-	if err := json.Unmarshal([]byte(stdout), &checked); err != nil {
-		t.Fatal(err)
-	}
-	if checked["status"] != "structurally_valid" || stateInt(checked["structural_findings"]) != 0 {
-		t.Fatalf("checked=%#v", checked)
+	if code != 3 || stdout != "" || !strings.Contains(stderr, "schema_version exige 2") {
+		t.Fatalf("check code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
@@ -106,9 +97,7 @@ func TestCoherenceSchemaTwoCheckReviewApproveAndStartDescriptivePlan(t *testing.
 		t.Fatal(err)
 	}
 	planDocument, _ := frontmatterDocument(roadmapPlan("P01", nil), "# P01", false)
-	if err := os.WriteFile(filepath.Join(directory, "plans", "P01-fundacao.md"), planDocument, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writePlanTest(t, directory, "P01-fundacao", planDocument)
 	if err := os.WriteFile(filepath.Join(directory, "specs", "expected", "api.md"), []byte("# API\n\n## API-001: Responde saúde\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

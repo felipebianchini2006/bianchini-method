@@ -15,7 +15,7 @@ Ao mencionar a versão na abertura, no status ou na entrega, execute o binário 
 
 ## 1. Preflight
 
-1. Ler `.bianchini/STATE.md`. Sem estado válido, orientar `/migrar-bianchini` ou `/sdd-planning`.
+1. Ler `.bianchini/STATE.md`. Sem estado válido, orientar `/sdd-planning`.
 2. Confirmar pacote aprovado, `COHERENCE.md` atual, planos solicitados aprovados e ausência de `stale_plans` que afetem a onda.
 3. Executar:
 
@@ -38,7 +38,7 @@ Crie worktree somente quando houver isolamento simultâneo real, pedido explíci
 bm workspace create --repo <repo> --change C001 --plan P01
 ```
 
-Não crie um worktree por fase por padrão. Ao terminar e integrar uma branch legada `bm/c001-p01`, limpe somente worktrees limpos e branches já ancestrais do `HEAD` atual:
+Não crie um worktree por fase por padrão. Ao terminar e integrar uma branch de trabalho, limpe somente worktrees limpos e branches já ancestrais do `HEAD` atual:
 
 ```bash
 bm workspace finish --repo <repo> --change C001
@@ -110,9 +110,9 @@ Revise na cadência do modo:
 - `slice`: cada tarefa Txx representa uma slice vertical; revisão por Txx;
 - `strict`: uma revisão por tarefa crítica.
 
-Use [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) como contrato da revisão. O revisor recebe requisito, diff e `proof_id`. Avalia contrato, correção, segurança, simplicidade, compatibilidade e testes. Não redesenha por preferência. Entregue o caminho do arquivo de saída da revisão; em `grouped`, nunca revise por microtarefa.
+Use [`../_shared/agents/plan-reviewer.md`](../_shared/agents/plan-reviewer.md) como contrato da revisão. O revisor recebe requisito, diff e prova. Avalia contrato, correção, segurança, simplicidade e testes. Não redesenha por preferência. Entregue o parecer em `change/results/`; em `grouped`, nunca revise por microtarefa.
 
-Em risco alto ou crítico envolvendo autenticação, autorização, pagamentos, privacidade, segredos, migração destrutiva ou integridade, aplique a passagem somente leitura de [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md). Não executá-la em tarefa comum. Entregue o caminho do arquivo de saída do parecer e trate findings no mesmo ciclo limitado.
+Ao fim de cada plano, faça uma verificação de segurança proporcional à superfície alterada: trust boundaries, entrada, autorização, dados, segredos, dependências e operações destrutivas aplicáveis. Em autenticação, autorização, pagamentos, privacidade, segredos, migração destrutiva ou integridade, aprofunde a revisão com [`../_shared/agents/security-reviewer.md`](../_shared/agents/security-reviewer.md). Trate findings reais antes de fechar o plano.
 
 Registre o veredito:
 
@@ -139,7 +139,13 @@ Quando o plano ainda não foi concluído, use apenas a segunda chamada. Dependen
 
 Não reescreva histórico para esconder a conclusão anterior. A auditoria de reabertura é preservada.
 
-## 6. Concluir tarefa e plano
+## 6. Simplificar e revisar o resultado
+
+Quando o comportamento estiver verde, examine somente o código tocado e seus limites próximos. Remova duplicação, nesting, nomes enganosos, wrappers sem valor e abstrações sem necessidade concreta. Preserve entradas, saídas, erros, efeitos e ordem. Clareza vale mais que menos linhas.
+
+Após refatoração relevante, faça um sweep focado no intervalo alterado: regressões, fallbacks silenciosos, acoplamento novo, comentários obsoletos, testes frágeis, dependência de tempo/rede e abstrações duplicadas. Corrija findings reais e rode novamente as provas afetadas. Não transforme esse passe em auditoria total do repositório.
+
+## 7. Concluir tarefa e plano
 
 Após prova verde vigente, conclua. Em grouped, omita `--review`; em strict/slice, forneça a revisão correspondente ao mesmo fingerprint:
 
@@ -162,11 +168,11 @@ bm plan complete --repo <repo> --change C001 --plan P01 \
   --completed-task T01 --completed-task T02
 ```
 
-`--completed-task T01` é compatibilidade explícita e, quando usado, deve listar todas as tarefas na ordem aprovada. Ele nunca substitui resultados, provas ou revisão persistidos.
+`--completed-task T01`, quando exigido pelo comando, deve listar todas as tarefas na ordem aprovada. Ele nunca substitui resultados, provas ou revisão persistidos.
 
-`completed` significa que o núcleo validou os artefatos, não que o executor declarou sucesso. Evidência narrativa continua permitida apenas no schema legado e deve ser reportada como garantia legada.
+`completed` significa que o núcleo validou os artefatos, não que o executor declarou sucesso.
 
-## 7. Release, homologação e fechamento
+## 8. Release, homologação e fechamento
 
 Depois do último plano, execute os gates integrados dos planos sobre o candidato final, preservando as provas históricas das tarefas:
 
@@ -178,7 +184,7 @@ bm verify review --repo <repo> --change C001 --scope release \
   --proof <proof-id> [--proof <proof-id> ...]
 ```
 
-O release produz `results/RELEASE.md` com RC, fingerprint e provas. Homologue esse RC enquanto a mudança ainda está em `.bianchini/changes/`. Procedimentos manuais exigem evidência do mesmo RC. Só depois registre `HOMOLOGATION.md` aceita.
+O release produz `results/RELEASE.md` com RC, fingerprint e provas. Homologue esse RC em `homologation/<RC-id>/HOMOLOGATION.md`. Procedimentos manuais exigem evidência sob `homologation/<RC-id>/evidence/` do mesmo RC.
 
 Commite o código e os artefatos finais. Então execute:
 
@@ -187,8 +193,6 @@ bm cycle-close --repo <repo> --change C001
 ```
 
 O fechamento bloqueia se o release não estiver revisado, se a prova estiver stale, se a homologação não pertencer ao RC exato, se houver blocker ou se o candidato não for ancestral do `HEAD` salvo apenas por commits de `.bianchini`.
-
-Projetos antigos não são declarados inválidos em massa. Antes de confiar em resultados legados, execute uma auditoria final de release; preserve o histórico e reabra somente unidades com falha reproduzida.
 
 ## Saída
 

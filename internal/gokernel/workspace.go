@@ -9,10 +9,12 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	methodlayout "github.com/felipebianchini2006/bianchini-method/internal/workspace"
 )
 
 const (
-	methodVersion04 = "0.4"
+	methodIdentity  = "bianchini"
 	stateLimitBytes = 64 * 1024
 )
 
@@ -31,6 +33,7 @@ var workspaceStateHistory = map[string]bool{
 }
 
 type methodWorkspace struct {
+	layout      methodlayout.Layout
 	root        string
 	dir         string
 	state       string
@@ -42,14 +45,16 @@ type methodWorkspace struct {
 }
 
 func newMethodWorkspace(root string) methodWorkspace {
-	directory := filepath.Join(root, ".bianchini")
-	current := filepath.Join(directory, "current")
+	layout := methodlayout.New(root)
+	directory := layout.Dir()
+	current := layout.Current()
 	return methodWorkspace{
-		root: root, dir: directory, state: filepath.Join(directory, "STATE.md"),
-		current: current, changes: filepath.Join(directory, "changes"),
-		runtime:     filepath.Join(directory, ".runtime"),
-		currentMod:  filepath.Join(current, "SYSTEM_MODEL.md"),
-		currentSpec: filepath.Join(current, "specs"),
+		layout: layout,
+		root:   root, dir: directory, state: filepath.Join(directory, "STATE.md"),
+		current: current, changes: layout.Changes(),
+		runtime:     layout.Runtime(),
+		currentMod:  layout.CurrentModel(),
+		currentSpec: layout.CurrentSpecs(),
 	}
 }
 
@@ -116,7 +121,7 @@ func (workspace methodWorkspace) initialize() error {
 
 func (workspace methodWorkspace) initialState() map[string]any {
 	return map[string]any{
-		"schema_version": 1, "method": methodVersion04, "active_work": nil,
+		"schema_version": 1, "method": methodIdentity, "active_work": nil,
 		"current_unit": nil, "status": "idle", "blockers": []any{},
 		"next_action":    "Iniciar /sdd-planning, /executar-direto ou /corrigir-bug.",
 		"last_completed": nil,
@@ -180,8 +185,8 @@ func (workspace methodWorkspace) validateState(state map[string]any) (map[string
 	if stateInt(state["schema_version"]) != 1 {
 		return nil, workflowError("DOCVIVA_INCOMPLETE", "STATE.md exige schema_version 1")
 	}
-	if stateString(state["method"]) != methodVersion04 {
-		return nil, workflowError("MIGRATION_REQUIRED", "STATE.md não pertence ao método 0.4")
+	if stateString(state["method"]) != methodIdentity {
+		return nil, workflowError("MODEL_MISMATCH", "STATE.md não pertence ao método bianchini")
 	}
 	if _, ok := state["blockers"].([]any); !ok {
 		return nil, workflowError("DOCVIVA_INCOMPLETE", "STATE.md.blockers exige lista de strings")

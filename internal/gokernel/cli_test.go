@@ -48,10 +48,10 @@ func TestVersionJSONIdentifiesOfficialBackend(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Engine != "go" || result.ContractVersion != "0.4" || !result.Official || result.Preview || result.Version != Version {
+	if result.Engine != "go" || result.ContractVersion != "bianchini" || !result.Official || result.Preview || result.Version != Version {
 		t.Fatalf("unexpected version identity: %+v", result)
 	}
-	if result.BuildCommit == "" || len(result.ImplementedSurfaces) != 65 {
+	if result.BuildCommit == "" || len(result.ImplementedSurfaces) != len(ImplementedSurfaces) {
 		t.Fatalf("missing build metadata: %+v", result)
 	}
 }
@@ -115,7 +115,7 @@ func TestDirectClassifyFixtures(t *testing.T) {
 
 func TestDirectReopenTerminalIsImmutable(t *testing.T) {
 	code, stdout, stderr := runCLI(t, "direct", "reopen", "--repo", t.TempDir(), "--slug", "Q001-terminal", "--next-action", "continuar")
-	if code != 2 || stdout != "" || stderr != "ORDER_VIOLATION: quick 0.4 terminal é imutável\n" {
+	if code != 2 || stdout != "" || stderr != "ORDER_VIOLATION: quick terminal é imutável\n" {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
@@ -149,56 +149,6 @@ func TestDirectClassifyRejectsUnsafeRiskPathsLikePython(t *testing.T) {
 				t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 			}
 		})
-	}
-}
-
-func TestRetiredCommandsRemainInvalid(t *testing.T) {
-	for _, command := range []string{"legacy-transition", "repo-hygiene", "route"} {
-		t.Run(command, func(t *testing.T) {
-			code, stdout, stderr := runCLI(t, command)
-			if code != 2 || stdout != "" {
-				t.Fatalf("code=%d stdout=%q", code, stdout)
-			}
-			want := "bm: error: " + argparseInvalidChoice("command", command, staticCLICommandChoices) + "\n"
-			if !strings.Contains(stderr, "usage: bm") || !strings.HasSuffix(stderr, want) {
-				t.Fatalf("unexpected stderr: %q", stderr)
-			}
-		})
-	}
-}
-
-func TestWorkspaceRejectsRetiredCompanionFlags(t *testing.T) {
-	repo := t.TempDir()
-	state := filepath.Join(repo, "legacy-state.json")
-	code, stdout, stderr := runCLI(t, "workspace", "create", "--repo", repo, "--plan", "P01", "--planning-version", "v2", "--state", state)
-	want := "bm: error: unrecognized arguments: --planning-version v2 --state " + state + "\n"
-	if code != 2 || stdout != "" || !strings.Contains(stderr, "usage: bm") || !strings.HasSuffix(stderr, want) {
-		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
-	}
-}
-
-func TestStatusLegacyFixtures(t *testing.T) {
-	repo := t.TempDir()
-	state := filepath.Join(repo, "legacy.md")
-	if err := os.WriteFile(state, []byte("method_version: 1\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	code, stdout, stderr := runCLI(t, "status", state, "--format", "json")
-	if code != 0 || stderr != "" {
-		t.Fatalf("code=%d stderr=%q", code, stderr)
-	}
-	assertJSONEqual(t, stdout, `{"implicit_legacy":false,"method_mode":"legacy-superpowers","method_version":1,"mode":"legacy-superpowers","status":"legacy"}`)
-
-	code, stdout, stderr = runCLI(t, "status", state, "--root", repo)
-	if code != 0 || stderr != "" {
-		t.Fatalf("default json with root: code=%d stderr=%q", code, stderr)
-	}
-	assertJSONEqual(t, stdout, `{"implicit_legacy":false,"method_mode":"legacy-superpowers","method_version":1,"mode":"legacy-superpowers","status":"legacy"}`)
-
-	code, stdout, stderr = runCLI(t, "status", state, "--format", "text")
-	want := "# Status do projeto\n\n- Método: v1 legado (Superpowers)\n- Marcador implícito: não\n"
-	if code != 0 || stderr != "" || stdout != want {
-		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
@@ -262,21 +212,5 @@ func TestSpecDiffFixtureAndPathSafety(t *testing.T) {
 	code, _, stderr = runCLI(t, "spec-diff", "--root", repo, "--base", filepath.Join(repo, ".planning", "base.md"), "--target", target, "--output", filepath.Join(repo, "unsafe.md"))
 	if code != 2 || stderr != "SPEC_PATH_INVALID: spec base usa namespace estrangeiro\n" {
 		t.Fatalf("expected .planning rejection, code=%d stderr=%q", code, stderr)
-	}
-}
-
-func TestStatusRejectsSymlink(t *testing.T) {
-	repo := t.TempDir()
-	realState := filepath.Join(repo, "real.md")
-	linkState := filepath.Join(repo, "link.md")
-	if err := os.WriteFile(realState, []byte("method_version: 1\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(realState, linkState); err != nil {
-		t.Fatal(err)
-	}
-	code, _, stderr := runCLI(t, "status", linkState, "--format", "json")
-	if code != 2 || !strings.Contains(stderr, "PATH_SAFETY") {
-		t.Fatalf("expected symlink rejection, code=%d stderr=%q", code, stderr)
 	}
 }

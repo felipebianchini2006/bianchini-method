@@ -115,27 +115,13 @@ func safeUpdateArchivePath(name string) (string, error) {
 	return strings.Join(parts, "/"), nil
 }
 
-func validateRemoteSkills(remoteSkills, latest, installed string, lineageManifest []byte) error {
+func validateRemoteSkills(remoteSkills, latest string) error {
 	remoteVersion, err := readInstalledUpdateVersion(remoteSkills)
 	if err != nil {
 		return err
 	}
 	if remoteVersion != latest {
 		return userError("versão do archive diverge da versão consultada")
-	}
-	if lineageManifest != nil {
-		manifestPath := filepath.Join(remoteSkills, filepath.FromSlash(lineageResetManifest))
-		info, err := os.Lstat(manifestPath)
-		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			return userError("archive não contém manifesto de reset regular")
-		}
-		archiveManifest, err := os.ReadFile(manifestPath)
-		if err != nil || !bytes.Equal(archiveManifest, lineageManifest) {
-			return userError("manifesto de reset do archive diverge da fonte oficial consultada")
-		}
-		if err := validateLineageManifest(archiveManifest, installed, latest); err != nil {
-			return err
-		}
 	}
 	for _, name := range managedSkillDirectories {
 		if err := rejectUpdateTreeLinks(filepath.Join(remoteSkills, name), "pacote "+name); err != nil {

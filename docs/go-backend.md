@@ -1,25 +1,15 @@
-# Backend Go oficial
+# Backend Go
 
-O pacote usa o backend Go oficial:
+`bm` é o backend oficial e único do Bianchini Method. `bm version --json` informa `engine: go`, `official: true`, `version` e as superfícies implementadas.
 
-```text
-go build -trimpath -o bin/bm ./cmd/bm
-./bin/bm version --json
-```
+O backend resolve caminhos dentro de `.bianchini/`, valida contratos, escreve de forma atômica e vincula provas ao estado atual. As skills orientam decisões e jornadas; não replicam validação determinística em Markdown.
 
-`version --json` informa `engine: go`, `official: true`, `preview: false`, `version` com a versão instalada, `contract_version` com o formato de compatibilidade e as superfícies suportadas. Não existe descoberta automática, subprocesso Python ou fallback entre backends. A partir do pacote 0.6, prova, revisão, reabertura e fechamento de release são validados pelo núcleo Go.
+As garantias têm limites claros:
 
-O Python continua disponível somente como oráculo explícito durante a janela de compatibilidade:
+- digest confirma os bytes incluídos;
+- manifesto de páginas confirma fonte, ferramenta declarada e IDs registrados por página;
+- revisão semântica é um parecer vinculado às entradas atuais;
+- prova de comando confirma a execução registrada no ambiente indicado;
+- homologação confirma somente cenários realmente operados no RC identificado.
 
-```text
-python3 scripts/run_cli_contract_fixtures.py --engine python
-python3 scripts/run_cli_contract_fixtures.py --engine go --binary ./bin/bm
-```
-
-As fixtures congeladas incluem cenários positivos, negativos e jornadas multioperação. O gate integrado adicional executa os fluxos schema 1 e schema 2 nos dois backends; as garantias novas de verificação são cobertas diretamente pela suíte Go.
-
-## Distribuição
-
-O builder gera archives reproduzíveis para cinco alvos, `release-manifest.json` e `SHA256SUMS`. Cada archive contém as skills, o binário nativo, `LICENSE` e `THIRD_PARTY_NOTICES.md`. O updater valida identidade, tamanho e SHA-256 antes de extrair, rejeita paths inseguros e usa lock, journal, backup e recuperação transacional.
-
-Builds cruzados provam compilação. Execução local prova somente a plataforma nativa; os outros binários precisam de auditoria de runtime em seus sistemas antes de uma publicação de release.
+Nenhuma dessas garantias, isoladamente, prova ausência de defeitos, fidelidade semântica completa, deploy bem-sucedido ou efeito em produção.

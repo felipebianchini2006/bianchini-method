@@ -17,7 +17,7 @@ func TestMandatoryPlanGateCannotBeOmitted(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			spec, _ := legacyVerificationSpec("go version", "gate do plano")
+			spec, _ := commandVerificationSpec("go version", "gate do plano")
 			proof, err := executeVerification(verificationRequest{pack: pack, scope: "plan", plan: "P01", unit: "P01/gate-01", seam: "plan-gate", packageDigest: stateString(coherence["digest"])}, spec)
 			if err != nil {
 				t.Fatal(err)
@@ -44,7 +44,7 @@ func TestProofForDifferentCommandCannotCoverGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec, _ := legacyVerificationSpec("go env GOOS", "gate do plano")
+	spec, _ := commandVerificationSpec("go env GOOS", "gate do plano")
 	proof, err := executeVerification(verificationRequest{pack: pack, scope: "plan", plan: "P01", unit: "P01/gate-01", seam: "plan-gate", packageDigest: stateString(coherence["digest"])}, spec)
 	if err != nil {
 		t.Fatal(err)

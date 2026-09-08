@@ -1,7 +1,6 @@
 ---
 name: auditar-arquitetura
 description: Use somente quando o usuário invocar /auditar-arquitetura ou pedir explicitamente uma auditoria arquitetural. É manual, report-only e não ativa por risco ou pela presença do Bianchini Method.
-disable-model-invocation: true
 ---
 
 # Auditar Arquitetura
@@ -39,10 +38,12 @@ Não classificar arquivo como problema apenas porque muda muito. Histórico apon
 
 ## Análise
 
+Procure módulos profundos: uma interface pequena que esconde comportamento e complexidade úteis. Aplique o teste de remoção a wrappers suspeitos: se apagá-los apenas espalhar a mesma complexidade pelos chamadores, eles fornecem localidade; se a complexidade desaparecer, podem ser rasos. Uma seam precisa concentrar invariantes e reduzir o que cada chamador precisa saber. Evite criar interface hipotética com um único adapter sem necessidade demonstrada.
+
 Procurar oportunidades locais e verificáveis em:
 
 - limites de responsabilidade e acoplamento;
-- contratos públicos, estados, erros e compatibilidade;
+- contratos públicos, estados, erros e consumidores;
 - ownership de dados, invariantes, migração e concorrência;
 - trust boundaries, autorização, segredos e privacidade;
 - resiliência, observabilidade, deploy e recuperação;
@@ -63,10 +64,10 @@ Ordenar pelo nível de confiança:
 
 Cada candidato deve conter exatamente os campos:
 
-- `Problema`: comportamento estrutural observado e evidência com caminhos;
+- `Problema`: comportamento estrutural observado, profundidade/localidade perdida e evidência com caminhos;
 - `Proposta`: menor mudança capaz de testar ou corrigir o problema;
 - `Benefício`: custo, risco ou complexidade reduzidos;
-- `Risco`: regressão, migração, compatibilidade e custo da proposta;
+- `Risco`: regressão, migração de dados, impacto em consumidores e custo da proposta;
 - `Prioridade`: `P0 | P1 | P2 | P3`, justificada.
 
 Separar uma seção `Defeitos funcionais diretos` dos candidatos estruturais. Para cada defeito, informar reprodução, impacto e gate que deve bloquear; não sugerir que a auditoria arquitetural o aprovou ou corrigiu.

@@ -130,7 +130,7 @@ func TestScopeSealVerifyAndTamper(t *testing.T) {
 	if err := os.WriteFile(draft, []byte(scopeDraft(false)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	code, stdout, stderr = runCLI(t, "scope", "seal", "--repo", repo, "--change", change, "--source", source, "--draft", draft, "--pages", "2", "--extraction", "native")
+	code, stdout, stderr = runCLI(t, "scope", "seal", "--repo", repo, "--change", change, "--source", source, "--draft", draft, "--pages", "2", "--extraction", "native", "--page-manifest", scopeTestManifest(t, source, inputs))
 	if code != 0 || stderr != "" {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
@@ -199,7 +199,7 @@ func TestScopeSealRejectsInvalidInputWithoutMutation(t *testing.T) {
 			source, draft := filepath.Join(inputs, "scope.pdf"), filepath.Join(inputs, "draft.md")
 			_ = os.WriteFile(source, scopePDF(), 0o600)
 			_ = os.WriteFile(draft, []byte(scopeDraft(test.unsourced)), 0o600)
-			code, stdout, stderr = runCLI(t, "scope", "seal", "--repo", repo, "--change", change, "--source", source, "--draft", draft, "--pages", test.pages, "--extraction", "native")
+			code, stdout, stderr = runCLI(t, "scope", "seal", "--repo", repo, "--change", change, "--source", source, "--draft", draft, "--pages", test.pages, "--extraction", "native", "--page-manifest", scopeTestManifest(t, source, inputs))
 			if code != 3 || stdout != "" || !strings.Contains(stderr, test.want) {
 				t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 			}
@@ -209,4 +209,22 @@ func TestScopeSealRejectsInvalidInputWithoutMutation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func scopeTestManifest(t *testing.T, source, directory string) string {
+	t.Helper()
+	content, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := scopeExtractionRecord{SourceSHA256: sha256Bytes(content), PageCount: 2, Tool: "test fixture", Pages: []scopePageRecord{{Page: 1, Items: []string{"ACT-001", "FLW-001", "REQ-001"}}, {Page: 2, Items: []string{}, Reason: "Encerramento sem novos requisitos"}}}
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "pages.json")
+	if err := os.WriteFile(path, encoded, 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

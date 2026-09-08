@@ -85,11 +85,9 @@ func closeChange(root, change string) (map[string]any, error) {
 	}
 	manifest := map[string]string{}
 	specPackage := map[string]any{}
-	if pack.planningContract >= 2 {
-		manifest, err = coherenceArtifactManifest(pack.workspace, pack.directory)
-		if err != nil {
-			return nil, err
-		}
+	manifest, err = coherenceArtifactManifest(pack.workspace, pack.directory)
+	if err != nil {
+		return nil, err
 	}
 	if pack.specContract == 1 {
 		specPackage, err = loadModelSpecPackage(pack.workspace, pack.directory, coherence)
@@ -98,7 +96,7 @@ func closeChange(root, change string) (map[string]any, error) {
 		}
 	}
 	packageDigest := coherencePackageDigest(pack.current, pack.expected, pack.plans, findings, semantic, pack.planningContract, manifest, specPackage)
-	if pack.planningContract < 2 && packageDigest != stateString(coherence["digest"]) {
+	if packageDigest != stateString(coherence["digest"]) {
 		return nil, workflowError("STALE_EVIDENCE", "pacote aprovado mudou após o checkpoint")
 	}
 	results, err := planResultPayloads(pack.workspace, pack.directory)
@@ -123,11 +121,9 @@ func closeChange(root, change string) (map[string]any, error) {
 		if !waveEvidence(result["verification"]) {
 			return nil, workflowError("STALE_EVIDENCE", "resultado de "+plan.id+" não possui verificação")
 		}
-		if plan.schema == 2 {
-			completed, ok := waveExactStringList(result["completed_tasks"])
-			if !ok || !sameStrings(completed, planTaskIDs(plan)) {
-				return nil, workflowError("DOCVIVA_INCOMPLETE", "resultado de "+plan.id+" não comprova todas as tarefas")
-			}
+		completed, ok := waveExactStringList(result["completed_tasks"])
+		if !ok || !sameStrings(completed, planTaskIDs(plan)) {
+			return nil, workflowError("DOCVIVA_INCOMPLETE", "resultado de "+plan.id+" não comprova todas as tarefas")
 		}
 	}
 	calculated, err := effectiveProjectModel(pack.current, pack.plans, results)
@@ -138,25 +134,20 @@ func closeChange(root, change string) (map[string]any, error) {
 		return nil, workflowError("MODEL_MISMATCH", "modelo entregue diverge do SYSTEM_MODEL final")
 	}
 	requirements := []string{}
-	if pack.planningContract >= 2 {
-		requirements, err = coherenceRequirements(pack.workspace, pack.directory)
-		if err != nil {
-			return nil, err
-		}
+	requirements, err = coherenceRequirements(pack.workspace, pack.directory)
+	if err != nil {
+		return nil, err
 	}
-	for _, raw := range coherenceStructuralFindings(pack.current, pack.expected, pack.plans, requirements, pack.planningContract >= 2) {
+	for _, raw := range coherenceStructuralFindings(pack.current, pack.expected, pack.plans, requirements, true) {
 		if stateString(stateObject(raw)["severity"]) == "ERROR" {
 			return nil, workflowError("COHERENCE_ERROR", "auditoria estrutural final encontrou ERROR")
 		}
 	}
-	var release map[string]any
-	if pack.planningContract >= 2 {
-		release, err = validateReleaseClosure(pack, coherence)
-		if err != nil {
-			return nil, err
-		}
+	release, err := validateReleaseClosure(pack, coherence)
+	if err != nil {
+		return nil, err
 	}
-	archive := filepath.Join(pack.workspace.dir, "archive", filepath.Base(pack.directory))
+	archive := pack.workspace.layout.ArchivedChange(filepath.Base(pack.directory))
 	if err := pack.workspace.validateWorkspacePath(archive); err != nil {
 		return nil, err
 	}
@@ -168,19 +159,15 @@ func closeChange(root, change string) (map[string]any, error) {
 		"plans": planIdentifiers(pack.plans), "coherence_digest": packageDigest,
 		"final_model_digest": pack.expected.digest(), "closed_at": utcNow(),
 	}
-	if pack.specContract == 1 {
-		summary["specs_promoted"], summary["specs_status"] = true, "managed"
-		for key, value := range specPackage {
-			summary[key] = value
-		}
+	summary["specs_promoted"], summary["specs_status"] = true, "managed"
+	for key, value := range specPackage {
+		summary[key] = value
 	}
-	if release != nil {
-		summary["release_fingerprint"] = release["fingerprint"]
-		summary["release_review"] = release["review_id"]
-		summary["homologation"] = "accepted"
-	}
+	summary["release_fingerprint"] = release["fingerprint"]
+	summary["release_review"] = release["review_id"]
+	summary["homologation"] = "accepted"
 	summaryDocument, _ := frontmatterDocument(summary, "# Resumo\n\nMudança "+filepath.Base(pack.directory)+" concluída com "+fmt.Sprintf("%d", len(pack.plans))+" plano(s) verificado(s).", false)
-	if pack.specContract == 1 {
+	{
 		state, err := pack.workspace.readState()
 		if err != nil {
 			return nil, err
@@ -213,59 +200,6 @@ func closeChange(root, change string) (map[string]any, error) {
 		result["model_digest"], result["specs_promoted"], result["specs_status"] = pack.expected.digest(), true, "managed"
 		return result, nil
 	}
-	return closeLegacyChange(pack, archive, summaryDocument)
-}
-
-func closeLegacyChange(pack coherencePackage, archive string, summary []byte) (map[string]any, error) {
-	if err := pack.workspace.atomicWrite(filepath.Join(pack.directory, "SUMMARY.md"), summary); err != nil {
-		return nil, err
-	}
-	architecturePath := filepath.Join(pack.directory, "ARCHITECTURE.md")
-	modelPath := filepath.Join(pack.directory, "SYSTEM_MODEL.md")
-	architecture, model := mustReadClose(architecturePath), mustReadClose(modelPath)
-	previousArchitecture := mustReadClose(filepath.Join(pack.workspace.current, "ARCHITECTURE.md"))
-	previousModel := mustReadClose(pack.workspace.currentMod)
-	if architecture == nil || model == nil || previousArchitecture == nil || previousModel == nil {
-		return nil, workflowError("MODEL_MISMATCH", "artefato final ausente")
-	}
-	moved := false
-	if err := pack.workspace.atomicWrite(filepath.Join(pack.workspace.current, "ARCHITECTURE.md"), architecture); err != nil {
-		return nil, err
-	}
-	if err := pack.workspace.atomicWrite(pack.workspace.currentMod, model); err != nil {
-		_ = pack.workspace.atomicWrite(filepath.Join(pack.workspace.current, "ARCHITECTURE.md"), previousArchitecture)
-		return nil, err
-	}
-	if err := os.MkdirAll(filepath.Dir(archive), 0o755); err != nil {
-		return nil, err
-	}
-	if err := durableRename(pack.directory, archive); err != nil {
-		_ = pack.workspace.atomicWrite(filepath.Join(pack.workspace.current, "ARCHITECTURE.md"), previousArchitecture)
-		_ = pack.workspace.atomicWrite(pack.workspace.currentMod, previousModel)
-		return nil, err
-	}
-	moved = true
-	state, err := pack.workspace.readState()
-	if err == nil {
-		state["active_work"], state["current_unit"], state["status"], state["blockers"] = nil, nil, "idle", []any{}
-		state["next_action"] = "Iniciar o próximo trabalho a partir do modelo atual."
-		state["last_completed"] = map[string]any{"kind": "change", "id": filepath.Base(archive), "status": "completed"}
-		state["pointers"] = map[string]any{
-			"architecture": ".bianchini/current/ARCHITECTURE.md", "system_model": ".bianchini/current/SYSTEM_MODEL.md",
-			"specs": ".bianchini/current/specs", "coherence": ".bianchini/archive/" + filepath.Base(archive) + "/COHERENCE.md",
-		}
-		state["digest"], state["updated_at"] = pack.expected.digest(), utcNow()
-		err = pack.workspace.writeState(state, "# Estado atual")
-	}
-	if err != nil {
-		if moved {
-			_ = durableRename(archive, pack.directory)
-		}
-		_ = pack.workspace.atomicWrite(filepath.Join(pack.workspace.current, "ARCHITECTURE.md"), previousArchitecture)
-		_ = pack.workspace.atomicWrite(pack.workspace.currentMod, previousModel)
-		return nil, err
-	}
-	return map[string]any{"change": filepath.Base(archive), "status": "completed", "archive": archive, "model_digest": pack.expected.digest()}, nil
 }
 
 func planIdentifiers(plans []planContract) []string {

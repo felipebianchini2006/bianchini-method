@@ -38,7 +38,7 @@ func runDirect(args []string) (any, error) {
 		if _, err := parseFlags(args[1:], directValueFlags, directBooleanFlags); err != nil {
 			return nil, err
 		}
-		return nil, domainError("ORDER_VIOLATION", "quick 0.4 terminal é imutável")
+		return nil, domainError("ORDER_VIOLATION", "quick terminal é imutável")
 	}
 	if oneOf(action, "start", "status", "checkpoint", "finish") {
 		return runDirectLifecycle(action, args[1:])

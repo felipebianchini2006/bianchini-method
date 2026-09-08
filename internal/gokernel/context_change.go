@@ -537,7 +537,11 @@ func contextChangePayload(root string, reader *contextSourceReader, state map[st
 	}
 	completedProviders, dependencyResults := make([]any, 0), make([]any, 0)
 	for _, dependencyID := range contextSortedKeys(requiredResults) {
-		result, err := reader.frontmatter(filepath.Join(change, "results", dependencyID+".md"), "resultado "+dependencyID)
+		dependencyPlan, found := planFileForID(filepath.Join(change, "plans"), dependencyID)
+		if !found {
+			return nil, contextError("PACK_INCOMPLETE", "plano dependente ausente: "+dependencyID)
+		}
+		result, err := reader.frontmatter(filepath.Join(filepath.Dir(dependencyPlan), "RESULT.md"), "resultado "+dependencyID)
 		if err != nil {
 			return nil, err
 		}
@@ -745,8 +749,20 @@ func contextRCPayload(root string, reader *contextSourceReader, state map[string
 			if !info.IsDir() {
 				continue
 			}
-			candidate := filepath.Join(change, "results", "HOMOLOGATION.md")
-			if candidateInfo, statErr := os.Lstat(candidate); statErr == nil {
+			releases := filepath.Join(change, "homologation")
+			if _, statErr := os.Lstat(releases); os.IsNotExist(statErr) {
+				continue
+			}
+			releaseChildren, releaseErr := contextChildren(releases, "homologation")
+			if releaseErr != nil {
+				return nil, releaseErr
+			}
+			for _, release := range releaseChildren {
+				candidate := filepath.Join(release, "HOMOLOGATION.md")
+				candidateInfo, statErr := os.Lstat(candidate)
+				if statErr != nil {
+					continue
+				}
 				if candidateInfo.Mode()&os.ModeSymlink != 0 {
 					return nil, contextError("PATH_UNSAFE", "HOMOLOGATION.md não pode ser symlink")
 				}

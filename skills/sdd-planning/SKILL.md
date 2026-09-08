@@ -19,11 +19,10 @@ Ao mencionar a versão na abertura, no status ou na entrega, execute o binário 
 
 1. Ler regras do repositório, `.bianchini/STATE.md` quando existir, manifests, lockfiles, CI, testes e histórico recente.
 2. Sem `.bianchini/`, executar `bm model init --repo <repo>` para criar o workspace.
-3. Se existir documentação anterior do Bianchini, não adaptar nem importar durante o planejamento: instruir `/migrar-bianchini`.
-4. Nunca ler `.planning/` como estado, contexto ou fallback.
-5. Confirmar Git, stack, escopo e trabalho ativo. Mudança concorrente no mesmo workspace bloqueia.
-6. Se houver mudança ativa com status `scope_ready`, executar `bm scope verify --repo <repo> --change Cxxx-slug`, reutilizar seu ID e não resumir novamente o PDF.
-7. Sem mudança ativa, iniciar com `bm model init --repo <repo> --change "<nome curto>"` e usar o ID `Cxxx-slug` retornado.
+3. Nunca ler documentação fora de `.bianchini/` como estado ou fallback do método.
+4. Confirmar Git, stack, escopo e trabalho ativo. Mudança concorrente no mesmo workspace bloqueia.
+5. Se houver mudança ativa com status `scope_ready`, executar `bm scope verify --repo <repo> --change Cxxx-slug`, reutilizar seu ID e não resumir novamente o PDF.
+6. Sem mudança ativa, iniciar com `bm model init --repo <repo> --change "<nome curto>"` e usar o ID `Cxxx-slug` retornado.
 
 Escopo vindo de PDF só entra quando `scope verify` retornar `verified: true` e `ready_for_sdd`. Digest inválido, fonte trocada ou `SCOPE.md` alterado bloqueia. Mudança ativa em outro estágio não é substituída.
 
@@ -33,7 +32,7 @@ Uma interface nova, redesign ou fluxo visual material exige design aprovado ante
 
 Ordem de leitura: decisão atual, escopo, modelo/specs aceitos, design válido, código, testes, documentação e histórico.
 
-Brownfield com múltiplas aplicações/linguagens, legado relevante ou contratos pouco claros usa [`../_shared/agents/repo-cartographer.md`](../_shared/agents/repo-cartographer.md) em modo somente leitura. Não usar em projeto novo ou pequeno. Cache transitório: `.bianchini/.runtime/cartography/<hash-do-HEAD>-<digest-do-escopo>.md`; `HEAD` diferente invalida o cache e escopo diferente gera outro arquivo.
+Brownfield com múltiplas aplicações/linguagens, histórico estrutural relevante ou contratos pouco claros usa [`../_shared/agents/repo-cartographer.md`](../_shared/agents/repo-cartographer.md) em modo somente leitura. Não usar em projeto novo ou pequeno. Cache transitório: `.bianchini/.runtime/cartography/<hash-do-HEAD>-<digest-do-escopo>.md`; `HEAD` diferente invalida o cache e escopo diferente gera outro arquivo.
 
 Use [`references/stack-research.md`](references/stack-research.md) e grave `.bianchini/changes/Cxxx-slug/RESEARCH.md` no menor modo suficiente:
 
@@ -56,7 +55,9 @@ specs/MANIFEST.json  mapeamento SCOPE → spec (gerado para IDs iguais)
 specs/diff.md    projeção gerada pelo roadmap sync
 ARCHITECTURE.md  decisões, stack, seams, trade-offs e alternativas
 SYSTEM_MODEL.md  módulos, contratos, ownership, dados, integrações e journeys
-plans/Pxx.md ou plans/Pxx-*.md   fases e tarefas tipadas
+plans/Pxx-slug/PLAN.md           plano e cenários
+plans/Pxx-slug/RESULT.md         resultado no mesmo contexto
+plans/Pxx-slug/evidence/         provas do plano
 ROADMAP.md       visão derivada de todas as fases e suas relações
 ```
 
@@ -66,9 +67,15 @@ Para specs compactas, use headings `## REQ-001: comportamento` com os mesmos IDs
 
 Não use a LLM para decidir ordem topológica, cobertura ou referências válidas. O CLI deriva e valida esses dados depois que os planos estiverem materializados.
 
-## 4. Planejar por contratos
+## 4. Planejar por contratos e provas
 
-Cada plano em `plans/Pxx.md` ou `plans/Pxx-entrega.md` representa uma entrega rejeitável ou verificável. O prefixo `Pxx` é a identidade canônica e deve coincidir com o `id` do frontmatter; o sufixo descritivo em kebab-case é opcional. Não criar tarefa por arquivo, camada de teste, ferramenta ou documento.
+Antes de decompor a mudança, formule a alegação que cada plano precisa tornar verdadeira, os modos de falha importantes e o caminho de evidência capaz de confirmar ou refutar a alegação. Derive esse caminho das entradas controláveis, efeitos observáveis, transições, invariantes e limites reais do sistema.
+
+Compare alternativas e escolha a menor prova não duplicada que cobre a alegação e o risco. Declare o limite da prova. Quando a verdade decisiva estiver indireta, planeje a menor affordance de verificação que torne o estado observável, repetível e diagnosticável, com ciclo de vida temporário ou durável explícito.
+
+Premissa incerta de alto impacto recebe prova de viabilidade antes dos planos dependentes. A prova deve testar a incerteza real e registrar resultado em `change/results/`; protótipo que apenas repete uma suposição não libera dependências.
+
+Cada `plans/Pxx-slug/PLAN.md` representa uma entrega rejeitável ou verificável. `Pxx` coincide com o `id` do frontmatter. Não criar tarefa por arquivo, camada de teste, ferramenta ou documento.
 
 O frontmatter de cada plano declara:
 
@@ -92,6 +99,16 @@ effects: []
 rollback: <recuperação>
 verifications: [<comando real e resultado esperado>]
 future_constraints: []
+scenarios:
+  - id: SCN-001
+    requirements: [REQ-001]
+    journey: primary-flow
+    platform: web
+    profile: admin
+    state: success
+    expected: <efeito observável>
+    risk: <falha concreta que este cenário detecta>
+    evidence_kinds: [observation, screenshot]
 execution: grouped | slice | strict
 review: plan_gate | per_slice | per_task
 tasks:
@@ -118,6 +135,8 @@ Cada `Txx` é uma unidade executável e verificável, não uma nota em prosa. A 
 Para `kind: command`, use exatamente um de `argv` ou `run`; `argv` é preferido e não passa por shell. Para `kind: procedure`, use `run` como descrição determinística, não declare `argv` e planeje o artefato real que será entregue como evidência. `cwd` é relativo ao repositório e `timeout_seconds` fica entre 1 e 3600.
 
 O modo define a granularidade obrigatória: `grouped → plan_gate`, `slice → per_slice` (cada Txx é a slice vertical identificável), `strict → per_task`. O CLI rejeita combinações incompatíveis, campos extras, IDs duplicados, dependência futura/cíclica, requisito sem tarefa e referência de módulo/interface/dado ausente no modelo.
+
+`scenarios` cobre requisitos, jornadas e combinações relevantes de plataforma, perfil e estado, sem produto cartesiano artificial. Campos obrigatórios: `id`, `requirements`, `platform`, `profile`, `state`, `expected`, `risk` e `evidence_kinds`; `journey` associa o cenário ao `SYSTEM_MODEL` quando aplicável. Plataformas válidas: `web`, `android`, `ios`, `mobile`, `desktop`, `api`, `cli`, `library`, `data` e `infra`. UI exige `observation` e `screenshot`; API e CLI exigem `observation`; acrescente `log` quando ele comprovar o efeito.
 
 No corpo, registre apenas contexto complementar, estados de erro/recuperação e decisões úteis. Não usar `TBD`, "tratar erros" ou abstração para consumidor futuro inexistente.
 

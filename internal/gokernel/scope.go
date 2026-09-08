@@ -68,7 +68,7 @@ func runScope(args []string) (any, error) {
 	}
 	flags, err := parseFlags(args[1:], map[string]bool{
 		"--repo": true, "--change": true, "--source": true, "--draft": true,
-		"--pages": true, "--extraction": true,
+		"--pages": true, "--extraction": true, "--page-manifest": true,
 	}, map[string]bool{})
 	if err != nil {
 		return nil, err
@@ -89,8 +89,9 @@ func runScope(args []string) (any, error) {
 	}
 	source, draft := lastValue(flags, "--source"), lastValue(flags, "--draft")
 	pagesRaw, extraction := lastValue(flags, "--pages"), lastValue(flags, "--extraction")
-	if source == "" || draft == "" || pagesRaw == "" || extraction == "" {
-		return nil, &commandError{message: "scope seal exige --source, --draft, --pages e --extraction"}
+	manifestPath := lastValue(flags, "--page-manifest")
+	if source == "" || draft == "" || pagesRaw == "" || extraction == "" || manifestPath == "" {
+		return nil, &commandError{message: "scope seal exige --source, --draft, --pages, --extraction e --page-manifest"}
 	}
 	pages, err := strconv.Atoi(pagesRaw)
 	if err != nil {
@@ -99,7 +100,7 @@ func runScope(args []string) (any, error) {
 	if !oneOf(extraction, "native", "ocr", "mixed") {
 		return nil, argparseError(argparseInvalidChoice("--extraction", extraction, []string{"native", "ocr", "mixed"}))
 	}
-	return sealScope(repo, change, source, draft, pages, extraction)
+	return sealScope(repo, change, source, draft, pages, extraction, manifestPath)
 }
 
 func scopeError(code, message string) error { return workflowError(code, message) }
@@ -166,7 +167,7 @@ func scopeDirectory(workspace methodWorkspace, change string) (string, error) {
 	return directory, nil
 }
 
-func sealScope(repo, change, source, draft string, pages int, extraction string) (map[string]any, error) {
+func sealScope(repo, change, source, draft string, pages int, extraction, manifestPath string) (map[string]any, error) {
 	if pages < 1 || pages > 10000 {
 		return nil, scopeError("SCOPE_SOURCE_INVALID", "quantidade de páginas inválida")
 	}
@@ -193,6 +194,13 @@ func sealScope(repo, change, source, draft string, pages int, extraction string)
 	}
 	body, coverage, err := validateScopeBody(string(draftBytes), pages)
 	if err != nil {
+		return nil, err
+	}
+	record, err := readScopeExtractionRecord(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := reconcileScopeExtraction(record, body, stateString(sourceMetadata["sha256"]), pages); err != nil {
 		return nil, err
 	}
 	root, err := safeRoot(repo)
@@ -228,7 +236,7 @@ func sealScope(repo, change, source, draft string, pages int, extraction string)
 			"kind": "pdf", "name": sourceMetadata["name"], "sha256": sourceMetadata["sha256"],
 			"pages": pages, "extraction": extraction,
 		},
-		"coverage": coverage, "sealed_at": utcNow(),
+		"coverage": coverage, "extraction_record": scopeExtractionValue(record), "sealed_at": utcNow(),
 	}
 	metadata["scope_digest"] = scopeDigest(metadata, body)
 	document, err := scopeDocument(metadata, body)
@@ -295,7 +303,7 @@ func verifyScope(repo, change, source string) (map[string]any, error) {
 	if err != nil {
 		return nil, scopeError("SCOPE_FORMAT_INVALID", err.Error())
 	}
-	expectedKeys := []string{"schema_version", "document", "status", "change", "source", "coverage", "sealed_at", "scope_digest"}
+	expectedKeys := []string{"schema_version", "document", "status", "change", "source", "coverage", "extraction_record", "sealed_at", "scope_digest"}
 	if !hasExactKeys(metadata, expectedKeys) {
 		return nil, scopeError("SCOPE_FORMAT_INVALID", "frontmatter do SCOPE.md é inválido")
 	}
@@ -326,6 +334,19 @@ func verifyScope(repo, change, source string) (map[string]any, error) {
 	}
 	if body != strings.ReplaceAll(originalBody, "\r\n", "\n") {
 		return nil, scopeError("SCOPE_FORMAT_INVALID", "corpo do SCOPE.md não está normalizado")
+	}
+	recordContent, err := json.Marshal(metadata["extraction_record"])
+	if err != nil {
+		return nil, err
+	}
+	var record scopeExtractionRecord
+	decoder := json.NewDecoder(strings.NewReader(string(recordContent)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&record); err != nil {
+		return nil, scopeError("SCOPE_COVERAGE_INVALID", err.Error())
+	}
+	if err := reconcileScopeExtraction(record, body, sourceHash, pages); err != nil {
+		return nil, err
 	}
 	if !mapsEqual(stateObject(metadata["coverage"]), coverage) {
 		return nil, scopeError("SCOPE_FORMAT_INVALID", "cobertura selada diverge do documento")
@@ -456,8 +477,10 @@ func validateScopeBody(raw string, pages int) (string, map[string]any, error) {
 	coverage := map[string]any{
 		"identified_items": len(items), "sourced_items": len(items), "unsourced_items": 0,
 		"open_questions": 0, "blocking_decisions": 0, "open_contradictions": 0,
+		"declared_pages": pages, "source_integrity": "sha256", "page_processing": "declared",
+		"page_coverage": "record_reconciled", "semantic_fidelity": "not_verified_by_cli",
 	}
-	provenance := fmt.Sprintf("- Páginas processadas: 1-%d de %d.\n- Itens estruturados: %d\n- Itens sem fonte: 0\n- Questões abertas: 0\n- Decisões bloqueantes: 0\n- Contradições abertas: 0", pages, pages, len(items))
+	provenance := fmt.Sprintf("- Páginas declaradas pelo extrator: %d.\n- Cobertura: registro por página conciliado pelo CLI.\n- Fidelidade semântica: exige comparação com a fonte; não comprovada pelo selo.\n- Itens estruturados: %d\n- Itens sem fonte: 0\n- Questões abertas: 0\n- Decisões bloqueantes: 0\n- Contradições abertas: 0", pages, len(items))
 	body, err := replaceScopeProvenance(normalized, provenance)
 	return body, coverage, err
 }

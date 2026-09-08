@@ -12,16 +12,67 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/service_requests"
-sys.path.insert(0, str(ROOT / "tests"))
-from test_method_v04_cli import empty_model, git, init_git, markdown_document, typed_plan, typed_task
-
 IDS = ["FLW-001", "REQ-001", "REQ-002", "REQ-003", "NFR-001", "BR-001", "DAT-001", "ERR-001", "RSK-001"]
+PAGE_IDS = ["ACT-001", "ACT-002", *IDS]
+
+
+def git(root, *args):
+    completed = subprocess.run(["git", *args], cwd=root, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise AssertionError(completed.stderr)
+    return completed.stdout.strip()
+
+
+def init_git(root):
+    root.mkdir(parents=True)
+    git(root, "init", "-b", "main")
+    git(root, "config", "user.name", "BM Test")
+    git(root, "config", "user.email", "test@example.invalid")
+    (root / ".gitignore").write_text("/.bianchini/.runtime/\n", encoding="utf-8")
+
+
+def markdown_document(frontmatter, title):
+    return "---\n" + json.dumps(frontmatter, ensure_ascii=False, sort_keys=True, indent=2) + f"\n---\n\n# {title}\n"
+
+
+def empty_model(**sections):
+    model = {"schema_version": 1, "modules": [], "interfaces": [], "capabilities": [],
+             "contracts": [], "ownership": [], "data": [], "integrations": [], "journeys": [],
+             "invariants": [], "effects": []}
+    model.update(sections)
+    return model
+
+
+def typed_task(identifier, *, covers):
+    return {"id": identifier, "name": f"Entregar {identifier}", "result": f"Resultado observável de {identifier}",
+            "covers": covers, "depends_on": [], "files": [f"src/{identifier.lower()}.py"],
+            "action": "Implementar pelo seam público existente.",
+            "verify": {"kind": "command", "argv": ["python3", "-m", "unittest", f"tests.test_{identifier.lower()}"],
+                       "cwd": ".", "timeout_seconds": 60, "proves": f"{identifier} entrega o item rastreado.", "cache": "fresh"},
+            "done": f"{identifier} passa pela interface pública.", "risk_seam": "typed-planning"}
+
+
+def typed_plan(identifier, *, requirements, tasks, provides, model_delta):
+    return {"schema_version": 2, "id": identifier, "status": "planned",
+            "result": f"Resultado observável de {identifier}", "requirements": requirements,
+            "acceptance": [f"Aceite observável de {identifier}"], "depends_on": [], "provides": provides,
+            "consumes": [], "modules": [], "interfaces": [], "ownership": [], "data": [],
+            "model_delta": model_delta, "migrations": [], "effects": [], "rollback": f"Reverter o commit de {identifier}.",
+            "verifications": ["python3 -B test_service.py", "python3 -B external_gate.py"], "future_constraints": [],
+            "execution": "slice", "review": "per_slice", "tasks": tasks,
+            "scenarios": [{"id": "SCN-001", "platform": "cli", "profile": "cliente",
+                           "state": "success", "expected": "cliente cria e consulta a própria solicitação",
+                           "requirements": requirements, "risk": "duplicidade e perda de persistência",
+                           "evidence_kinds": ["observation", "log"]},
+                          {"id": "SCN-002", "platform": "cli", "profile": "operador",
+                           "state": "error", "expected": "acesso indevido é rejeitado",
+                           "requirements": requirements, "risk": "quebra de permissão e isolamento",
+                           "evidence_kinds": ["observation", "log"]}]}
 
 
 def digest(path):
@@ -84,8 +135,11 @@ def run_example(binary, base, review, scope_pdf=None):
         # A textual fixture PDF, no optional packages or external services.
         scope_pdf = base / "scope.pdf"
         create_scope_pdf(scope_pdf)
+    page_manifest = base / "scope-pages.json"
+    page_manifest.write_text(json.dumps({"source_sha256": digest(scope_pdf), "page_count": 1, "tool": "fixture-native",
+                                         "pages": [{"page": 1, "items": PAGE_IDS, "reason": ""}]}, sort_keys=True))
     cli("scope", "seal", "--repo", repo, "--change", change, "--source", scope_pdf,
-        "--draft", draft, "--pages", "1", "--extraction", "native")
+        "--draft", draft, "--pages", "1", "--page-manifest", page_manifest, "--extraction", "native")
     sealed = cli("scope", "verify", "--repo", repo, "--change", change, "--source", scope_pdf)
     assert sealed["verified"] is True
     (directory / "RESEARCH.md").write_text("# Pesquisa\n\nPython e SQLite fornecem CLI e transações locais sem serviço. "
@@ -109,7 +163,9 @@ def run_example(binary, base, review, scope_pdf=None):
     plan.update(result="Solicitações funcionam após reinício com isolamento", execution="grouped", review="plan_gate",
                 acceptance=["criar, operar, acompanhar e rejeitar acesso indevido"],
                 verifications=["python3 -B test_service.py", "python3 -B external_gate.py"])
-    (directory / "plans/P01-services.md").write_text(markdown_document(plan, "Entrega vertical de solicitações"))
+    plan_directory = directory / "plans/P01-services"
+    plan_directory.mkdir(parents=True)
+    (plan_directory / "PLAN.md").write_text(markdown_document(plan, "Entrega vertical de solicitações"))
     spec_lines = ["# Comportamento técnico observável"]
     descriptions = ["CLI cria, opera e consulta por identidade.", "create retorna id e open.", "Operador lista e atualiza estado.",
                     "get retorna registro do dono.", "Um novo processo lê os dados confirmados.", "Consulta alheia e escrita por usuário são rejeitadas.",
@@ -121,7 +177,7 @@ def run_example(binary, base, review, scope_pdf=None):
     cli("model", "validate", "--repo", repo, "--change", change)
     checked = cli("coherence", "check", "--repo", repo, "--change", change, "--structural-only")
     semantic = base / "semantic.json"
-    semantic.write_text(json.dumps({"prompt": "service-example-v1", "inputs": checked["review_input_digest"],
+    semantic.write_text(json.dumps({"prompt": "service-example-1.1", "inputs": checked["review_input_digest"],
                                    "sources": review["sources"], "findings": review["findings"]}))
     checked = cli("coherence", "check", "--repo", repo, "--change", change, "--semantic-report", semantic)
     cli("coherence", "approve", "--repo", repo, "--change", change, "--digest", checked["digest"], "--decided-by", "agent:example")
@@ -168,12 +224,33 @@ def run_example(binary, base, review, scope_pdf=None):
     release = cli("verify", "release", "--repo", repo, "--change", change, "--build", artifact, "--delivery", "ready")
     proofs = [arg for proof in release["proof_ids"] for arg in ("--proof", proof)]
     cli("verify", "review", "--repo", repo, "--change", change, "--scope", "release", "--reviewer", review["reviewer"], "--verdict", "approved", *proofs)
-    homologation = {"schema_version": 1, "change": change, "rc": release["candidate"], "fingerprint": release["fingerprint"],
-                    "status": "accepted", "blockers": [], "findings": [], "manual_proofs": [],
-                    "gates": [{"proof_id": p, "result": "passed"} for p in release["proof_ids"]]}
+    homologation_path = repo / release["homologation"]
+    homologation = frontmatter(homologation_path)
+    evidence_dir = homologation_path.parent / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    observation = evidence_dir / "service-observation.txt"
+    log = evidence_dir / "service-candidate.log"
+    candidate_db = runtime / "candidate.sqlite"
+    candidate_env = {**os.environ, "SERVICE_TOKEN": "demo-a"}
+    created = subprocess.run(["python3", artifact, "--db", candidate_db, "create", "--description", "Pedido real"],
+                             cwd=repo, env=candidate_env, text=True, capture_output=True, check=True)
+    request_id = str(json.loads(created.stdout)["id"])
+    own = subprocess.run(["python3", artifact, "--db", candidate_db, "get", "--id", request_id],
+                         cwd=repo, env=candidate_env, text=True, capture_output=True, check=True)
+    foreign = subprocess.run(["python3", artifact, "--db", candidate_db, "get", "--id", request_id],
+                             cwd=repo, env={**os.environ, "SERVICE_TOKEN": "demo-b"}, text=True, capture_output=True)
+    assert json.loads(own.stdout)["description"] == "Pedido real"
+    assert foreign.returncode != 0 and json.loads(foreign.stdout)["error"] == "not_found"
+    observation.write_text("Candidato criou e consultou a solicitação do cliente; outro cliente recebeu not_found.\n")
+    log.write_text(created.stdout + own.stdout + foreign.stdout + foreign.stderr)
+    evidence = [{"kind": "observation", "path": observation.relative_to(repo).as_posix(), "sha256": digest(observation)},
+                {"kind": "log", "path": log.relative_to(repo).as_posix(), "sha256": digest(log)}]
+    for scenario in homologation["scenarios"]:
+        scenario.update(result="passed", observed="comportamento real confirmado", evidence=evidence)
+    homologation["status"] = "accepted"
 
     def save_homologation(value):
-        (directory / "results/HOMOLOGATION.md").write_text(markdown_document(value, "Homologação da CLI real"))
+        homologation_path.write_text(markdown_document(value, "Homologação da CLI real"))
         git(repo, "add", ".bianchini")
         git(repo, "commit", "-m", "record candidate acceptance", "--allow-empty")
 

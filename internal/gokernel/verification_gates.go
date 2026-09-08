@@ -41,7 +41,7 @@ func requiredVerifications(pack coherencePackage, scope, planID, taskID string) 
 			continue
 		}
 		for i, raw := range normalizedPlanStrings(plan, "verifications") {
-			spec, err := legacyVerificationSpec(raw, "gate do plano")
+			spec, err := commandVerificationSpec(raw, "gate do plano")
 			if err != nil {
 				return nil, err
 			}

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -13,16 +12,12 @@ ASSET = ROOT / "internal" / "gokernel" / "assets" / "cli-help.json"
 
 
 class CliHelpScenarios(unittest.TestCase):
-    def test_generated_help_matches_python_oracle_byte_for_byte(self) -> None:
-        checked = subprocess.run(
-            ["python3", str(ROOT / "scripts" / "generate_cli_help.py"), "--check"],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertIn("CLI_HELP_OK: 85 paths", checked.stdout)
+    def test_help_is_generated_from_the_native_contract(self) -> None:
+        asset = json.loads(ASSET.read_text(encoding="utf-8"))
+        self.assertEqual(asset["source"], "contracts/cli-surfaces.json")
+        self.assertEqual(asset["schema_version"], 1)
+        for removed in ("migrate", "snapshot", "planning-audit", "task-brief", "proof-map", "telemetry"):
+            self.assertNotIn(removed, asset["command_choices"])
 
     def test_asset_covers_root_commands_and_actions(self) -> None:
         asset = json.loads(ASSET.read_text(encoding="utf-8"))

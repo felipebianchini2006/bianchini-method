@@ -74,13 +74,6 @@ func initializeModelWorkspace(repo string) (map[string]any, error) {
 			"workspace": workspace.dir, "created": false,
 		}, nil
 	}
-	legacy, err := hasLegacyBianchiniArtifacts(root)
-	if err != nil {
-		return nil, err
-	}
-	if legacy {
-		return nil, workflowError("MIGRATION_REQUIRED", "documentação anterior detectada; use /migrar-bianchini")
-	}
 	if _, statErr := os.Lstat(workspace.dir); statErr == nil {
 		return nil, workflowError("MODEL_MISMATCH", ".bianchini existe sem STATE.md válido")
 	}
@@ -91,7 +84,7 @@ func initializeModelWorkspace(repo string) (map[string]any, error) {
 		return nil, err
 	}
 	return map[string]any{
-		"method": methodVersion04, "status": "idle", "workspace": workspace.dir, "created": true,
+		"method": methodIdentity, "status": "idle", "workspace": workspace.dir, "created": true,
 	}, nil
 }
 
@@ -129,7 +122,7 @@ func validateModelWorkspace(repo string) (map[string]any, error) {
 		return nil, workflowError("MODEL_MISMATCH", "SYSTEM_MODEL.md incompleto: "+strings.Join(modelMissing, ", "))
 	}
 	return map[string]any{
-		"valid": true, "method": methodVersion04, "status": stateString(state["status"]),
+		"valid": true, "method": methodIdentity, "status": stateString(state["status"]),
 		"state": workspace.state, "system_model": modelPath,
 	}, nil
 }
@@ -160,11 +153,11 @@ func createModelChange(repo, name string) (map[string]any, error) {
 		return nil, err
 	}
 	workID := identifier + "-" + slug
-	directory := filepath.Join(workspace.changes, workID)
+	directory := workspace.layout.Change(workID)
 	if _, statErr := os.Lstat(directory); statErr == nil {
 		return nil, workflowError("MODEL_MISMATCH", "mudança já existe: "+workID)
 	}
-	for _, path := range []string{directory, filepath.Join(directory, "plans"), filepath.Join(directory, "results"), filepath.Join(directory, "specs", "expected")} {
+	for _, path := range []string{directory, workspace.layout.Plans(workID), workspace.layout.ChangeResults(workID), filepath.Join(workspace.layout.ChangeSpecs(workID), "expected"), workspace.layout.ChangeHomologation(workID)} {
 		if err := workspace.mkdirAll(path); err != nil {
 			removeNewWorkspacePath(directory, workspace.changes)
 			return nil, err
@@ -236,7 +229,7 @@ func createModelChange(repo, name string) (map[string]any, error) {
 	}
 	failed = false
 	return map[string]any{
-		"method": methodVersion04, "change": workID, "status": "planning",
+		"method": methodIdentity, "change": workID, "status": "planning",
 		"spec_contract": 1, "path": directory,
 	}, nil
 }
@@ -265,11 +258,11 @@ func validateModelChange(repo, change string) (map[string]any, error) {
 	if err != nil {
 		return nil, workflowError("MODEL_MISMATCH", err.Error())
 	}
-	expected, err := loadProjectModel(filepath.Join(directory, "SYSTEM_MODEL.md"))
+	expected, err := loadProjectModel(workspace.layout.ChangeModel(filepath.Base(directory)))
 	if err != nil {
 		return nil, workflowError("MODEL_MISMATCH", err.Error())
 	}
-	plans, err := filepath.Glob(filepath.Join(directory, "plans", "P*.md"))
+	plans, err := planFiles(workspace.layout.Plans(filepath.Base(directory)))
 	if err != nil || len(plans) == 0 {
 		return nil, workflowError("COHERENCE_ERROR", "a mudança exige ao menos um plano")
 	}
@@ -313,22 +306,10 @@ func loadCoherenceContract(directory string) (map[string]any, *int, error) {
 		return nil, nil, workflowError("COHERENCE_ERROR", err.Error())
 	}
 	schema := stateInt(coherence["schema_version"])
-	if schema == 0 {
-		schema = 1
-	}
-	if schema != 1 && schema != 2 {
-		return nil, nil, workflowError("COHERENCE_ERROR", "schema_version de COHERENCE inválido")
+	if schema != 2 {
+		return nil, nil, workflowError("COHERENCE_ERROR", "COHERENCE exige schema_version 2")
 	}
 	planningContract := stateInt(coherence["planning_contract"])
-	if planningContract == 0 {
-		planningContract = 1
-	}
-	if planningContract != 1 && planningContract != 2 {
-		return nil, nil, workflowError("COHERENCE_ERROR", "planning_contract inválido")
-	}
-	if schema == 1 {
-		return coherence, nil, nil
-	}
 	if planningContract != 2 {
 		return nil, nil, workflowError("COHERENCE_ERROR", "COHERENCE schema 2 exige planning_contract: 2")
 	}
@@ -397,7 +378,7 @@ func inspectCurrentSpecs(workspace methodWorkspace) (map[string][]byte, error) {
 	manifestPath := filepath.Join(workspace.currentSpec, "MANIFEST.json")
 	manifestInfo, err := os.Lstat(manifestPath)
 	if err != nil || manifestInfo.Mode()&os.ModeSymlink != 0 || !manifestInfo.Mode().IsRegular() {
-		return nil, workflowError("SPEC_BASE_MANIFEST_MISSING", "specs atuais legadas exigem manifesto explícito antes de change schema 2")
+		return nil, workflowError("SPEC_BASE_MANIFEST_MISSING", "specs atuais exigem manifesto explícito")
 	}
 	manifest, err := decodeJSONObjectFromFile(manifestPath)
 	if err != nil {
@@ -523,42 +504,6 @@ func modelSlug(value string) (string, error) {
 		slug = strings.TrimRight(string(runes[:48]), "-")
 	}
 	return slug, nil
-}
-
-func hasLegacyBianchiniArtifacts(root string) (bool, error) {
-	for _, relative := range []string{
-		"docs/living/PROJECT_STATE.md", "docs/bianchini", "artifacts/bianchini", ".superpowers/bianchini/direct",
-	} {
-		if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(relative))); err == nil {
-			return true, nil
-		}
-	}
-	designRoot := filepath.Join(root, "docs", "design")
-	entries, err := os.ReadDir(designRoot)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, workflowError("MIGRATION_REQUIRED", err.Error())
-	}
-	for _, entry := range entries {
-		if entry.Type()&os.ModeSymlink != 0 {
-			return false, workflowError("MIGRATION_REQUIRED", "symlink não permitido: "+filepath.Join(designRoot, entry.Name()))
-		}
-		if !entry.IsDir() {
-			continue
-		}
-		manifestPath := filepath.Join(designRoot, entry.Name(), "DESIGN_MANIFEST.json")
-		info, err := os.Lstat(manifestPath)
-		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			continue
-		}
-		manifest, err := decodeJSONObjectFromFile(manifestPath)
-		if err == nil && stateInt(manifest["schema_version"]) == 1 {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func missingMapKeys(value map[string]any, required []string) []string {

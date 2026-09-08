@@ -72,7 +72,7 @@ func workflowRepo(flags parsedFlags, create bool) (string, error) {
 		if _, statErr := os.Lstat(workspace.dir); statErr == nil {
 			return "", workflowError("DOCVIVA_INCOMPLETE", ".bianchini existe sem STATE.md válido")
 		}
-		return "", workflowError("DOCVIVA_INCOMPLETE", "Bianchini Method 0.4 não iniciado; execute model init")
+		return "", workflowError("DOCVIVA_INCOMPLETE", "Bianchini Method não iniciado; execute model init")
 	}
 	if _, err := initializeModelWorkspace(root); err != nil {
 		return "", err

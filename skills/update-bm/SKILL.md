@@ -1,7 +1,6 @@
 ---
 name: update-bm
 description: Use somente com invocação explícita de /update-bm para verificar e atualizar a instalação local do Bianchini Method.
-disable-model-invocation: true
 ---
 
 # Atualizar Bianchini Method

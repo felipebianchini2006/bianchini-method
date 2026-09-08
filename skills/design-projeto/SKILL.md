@@ -24,9 +24,9 @@ Resolver o binário empacotado `../_shared/bin/bm` no Unix ou `../_shared/bin/bm
 
 - Sem interface: encerrar como `not_applicable` sem criar design.
 - Interface existente com design system estável e mudança pequena: documentar somente o delta.
-- Landing page, site institucional ou portfólio: usar `taste-skill`, `design-taste-frontend` ou equivalente quando instalado.
-- Dashboard, SaaS, ERP, aplicativo ou fluxo multiestado: usar somente o modo de conceito de `frontend-app-builder` ou equivalente quando instalado; parar antes de qualquer implementação de produção.
-- Sem adaptador: usar o contrato interno desta skill.
+- Se houver uma skill visual disponível, use sua orientação de craft e inspeção sem importar seu framework, estado, inicializadores ou dependências.
+- Landing, conteúdo e produto operacional pedem critérios diferentes. Identifique se o design é a experiência ou serve a uma tarefa antes de escolher densidade, tipografia, movimento e navegação.
+- Sem ferramenta especializada, use o contrato interno desta skill.
 
 Adaptadores são opcionais. Nunca tornar o BM dependente de Claude, Taste, Image Gen ou fornecedor específico.
 
@@ -124,7 +124,7 @@ Antes de aprovar o manifesto, usar browser ou simulador para:
 5. capturar uma evidência por layout distinto;
 6. atualizar `files`, selar novamente e verificar.
 
-Sem runner visual, manter o manifesto `draft` e bloquear apenas o planejamento visual correspondente. Screenshot inventado ou vazio não é evidência. Usar no máximo uma correção visual antes do aceite. Preferência estética tardia não autoriza reiniciar o conceito.
+Sem runner visual, manter o manifesto `draft` e bloquear apenas o planejamento visual correspondente. Screenshot inventado ou vazio não é evidência. Itere o necessário para corrigir problemas reais. O design aprovado prevalece; heurísticas e preferências genéricas não autorizam substituí-lo.
 
 ## Paradas
 

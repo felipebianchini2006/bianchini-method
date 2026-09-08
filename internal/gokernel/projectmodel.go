@@ -289,65 +289,30 @@ func parsePlanContract(value map[string]any) (planContract, error) {
 		return planContract{}, fmt.Errorf("plano %s: model_delta exige objeto", identifier)
 	}
 	schema := stateInt(value["schema_version"])
-	if schema == 0 {
-		schema = 1
+	if schema != 2 {
+		return planContract{}, fmt.Errorf("plano %s: schema_version exige 2", identifier)
 	}
-	if schema != 1 && schema != 2 {
-		return planContract{}, fmt.Errorf("plano %s: schema_version exige 1 ou 2", identifier)
-	}
-	if schema == 2 {
-		if err := validatePlanV2(identifier, value); err != nil {
-			return planContract{}, err
-		}
-	} else {
-		for _, field := range []string{"depends_on", "provides", "consumes", "touches", "requirements", "acceptance", "verifications", "future_constraints"} {
-			if _, err := stringValues(value[field], field); err != nil {
-				return planContract{}, err
-			}
-		}
-		owns := value["owns"]
-		if owns == nil {
-			owns = value["ownership"]
-		}
-		if _, err := stringValues(owns, "owns"); err != nil {
-			return planContract{}, err
-		}
-		migrations := value["migrations"]
-		if migrations == nil {
-			migrations = []any{}
-		}
-		if err := validateMappingList(migrations, "migrations"); err != nil {
-			return planContract{}, err
-		}
-		effects := value["external_effects"]
-		if effects == nil {
-			effects = value["effects"]
-		}
-		if effects == nil {
-			effects = []any{}
-		}
-		if err := validateMappingList(effects, "external_effects"); err != nil {
-			return planContract{}, err
-		}
+	if err := validatePlan(identifier, value); err != nil {
+		return planContract{}, err
 	}
 	return planContract{id: identifier, schema: schema, modelDelta: cloneMap(delta), value: value}, nil
 }
 
-func validatePlanV2(identifier string, value map[string]any) error {
+func validatePlan(identifier string, value map[string]any) error {
 	fields := []string{
 		"schema_version", "id", "status", "result", "requirements", "acceptance", "depends_on",
 		"provides", "consumes", "modules", "interfaces", "ownership", "data", "model_delta",
-		"migrations", "effects", "rollback", "verifications", "future_constraints", "execution", "review", "tasks",
+		"migrations", "effects", "rollback", "verifications", "future_constraints", "execution", "review", "tasks", "scenarios",
 	}
 	allowed := stringSet(fields)
 	for _, key := range sortedMapKeys(value) {
 		if !allowed[key] {
-			return fmt.Errorf("campo desconhecido no plano v2: %s", key)
+			return fmt.Errorf("campo desconhecido no plano: %s", key)
 		}
 	}
 	missing := missingMapKeys(value, fields)
 	if len(missing) > 0 {
-		return fmt.Errorf("campo obrigatório ausente no plano v2: %s", missing[0])
+		return fmt.Errorf("campo obrigatório ausente no plano: %s", missing[0])
 	}
 	if stateString(value["status"]) != "planned" {
 		return fmt.Errorf("plano %s: status exige planned", identifier)
@@ -392,6 +357,51 @@ func validatePlanV2(identifier string, value map[string]any) error {
 	for _, field := range []string{"migrations", "effects"} {
 		if err := validateMappingList(value[field], field); err != nil {
 			return err
+		}
+	}
+	if scenarios, present := value["scenarios"]; present {
+		if err := validatePlanScenarios(identifier, scenarios); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validatePlanScenarios(plan string, raw any) error {
+	scenarios, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("plano %s: scenarios exige lista", plan)
+	}
+	for _, item := range scenarios {
+		scenario, ok := item.(map[string]any)
+		if !ok {
+			return fmt.Errorf("plano %s: scenario exige objeto", plan)
+		}
+		allowed := stringSet([]string{"id", "requirements", "journey", "platform", "profile", "state", "expected", "risk", "evidence_kinds"})
+		for _, key := range sortedMapKeys(scenario) {
+			if !allowed[key] {
+				return fmt.Errorf("plano %s: campo desconhecido no scenario: %s", plan, key)
+			}
+		}
+		if missing := missingMapKeys(scenario, []string{"id", "requirements", "platform", "profile", "state", "expected", "risk", "evidence_kinds"}); len(missing) > 0 {
+			return fmt.Errorf("plano %s: campo obrigatório ausente no scenario: %s", plan, missing[0])
+		}
+		for _, field := range []string{"id", "platform", "profile", "state", "expected", "risk"} {
+			if strings.TrimSpace(stateString(scenario[field])) == "" {
+				return fmt.Errorf("plano %s: scenario.%s exige texto", plan, field)
+			}
+		}
+		if _, err := stringValues(scenario["requirements"], "scenario.requirements"); err != nil {
+			return err
+		}
+		kinds, err := stringValues(scenario["evidence_kinds"], "scenario.evidence_kinds")
+		if err != nil || len(kinds) == 0 {
+			return fmt.Errorf("plano %s: scenario.evidence_kinds exige lista não vazia", plan)
+		}
+		for _, kind := range kinds {
+			if !oneOf(kind, "observation", "screenshot", "log") {
+				return fmt.Errorf("plano %s: evidence_kind inválido: %s", plan, kind)
+			}
 		}
 	}
 	return nil

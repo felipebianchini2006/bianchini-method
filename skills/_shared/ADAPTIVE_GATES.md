@@ -2,21 +2,19 @@
 
 Os gates provam a entrega na stack real e alimentam `verification.fast`, `verification.plan` e `verification.release`.
 
-No fluxo atual, model validate, roadmap sync e coherence check validam o pacote e suas specs. READINESS.md, planning-audit, planning-check e snapshot pertencem à compatibilidade legada; não acrescentá-los ao fluxo atual. A revisão do pacote não se repete por tarefa.
-
-Quando a telemetria estiver habilitada, registrar após o gate apenas duração, tokens informados pelo host, fix rounds e contador de falhas. A evidência detalhada continua no ledger/relatório sanitizado.
+`model validate`, `roadmap sync` e `coherence check` validam o pacote e suas specs. A revisão do pacote não se repete por tarefa.
 
 - `fast`: menor comando útil durante grupo, slice ou tarefa;
 - `plan`: sequência completa ao concluir o plano;
-- `release`: regressão automatizada, E2E codificado, evidência de mutação exigida e build do RC antes da execução real e da varredura visual de homologação.
+- `release`: regressão automatizada, E2E codificado e build do RC antes da execução real e da varredura visual de homologação.
 
 ## Composição por estágio
 
-- `fast`: unitários focados quando houver lógica, integração/contrato focada quando uma fronteira mudar e regressão diretamente relacionada. Não roda E2E completo nem mutation testing.
-- `plan`: suítes afetadas de unitários e integração/contrato, regressão do plano, E2E das jornadas críticas entregues e mutação seletiva somente quando `bm policy` exigir.
-- `release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E de todas as jornadas críticas, regressão completa configurada, evidência de mutação vigente quando obrigatória e build do RC.
+- `fast`: unitários focados quando houver lógica, integração/contrato focada quando uma fronteira mudar e regressão diretamente relacionada. Não roda E2E completo.
+- `plan`: suítes afetadas de unitários e integração/contrato, regressão do plano e E2E das jornadas críticas entregues. Quando `bm policy` exigir prova adicional de sensibilidade, registrá-la pelo fluxo normal de `verify`.
+- `release`: suíte unitária completa configurada, integração/contratos aplicáveis, E2E de todas as jornadas críticas, regressão completa configurada e build do RC.
 
-Essas famílias compõem os comandos do estágio. Não criar tarefa, revisão ou subagente por camada de teste. E2E continua orientado a jornada crítica, não a cada tela. Mutation testing usa escopo por seam de risco; nunca usa score global como meta.
+Essas famílias compõem os comandos do estágio. Não criar tarefa, revisão ou subagente por camada de teste. E2E continua orientado a jornada crítica, não a cada tela.
 
 ## Descoberta
 
@@ -39,8 +37,7 @@ Selecionar somente as aplicáveis:
 | type/compile | contratos estáticos ou compilação | TypeScript, Kotlin, Swift, Go, Rust, Java, .NET |
 | unit | regras isoladas observáveis | todas |
 | integration | contratos entre módulos/infra, incluindo contract tests | API, banco, filas, filesystem, provedores |
-| mutation | sensibilidade dos testes em regras materiais | cálculo, permissão, estado, dinheiro, integridade |
-| migration | ida, compatibilidade e rollback/forward-fix | bancos e dados persistidos |
+| migration | ida, consumidores afetados e rollback/forward-fix | bancos e dados persistidos |
 | build/package | artefato distribuível | web, mobile, desktop, biblioteca, CLI |
 | security | autorização, segredos, dependências, entradas | áreas de alto/crítico risco |
 | e2e/smoke | jornada real pelo limite externo | UI, API pública, CLI |
@@ -57,12 +54,6 @@ Selecionar somente as aplicáveis:
 - **CLI:** lint/compilação, unitários, invocação real com sucesso, erro, código de saída e filesystem temporário.
 - **Dados/ML:** validação de schema, determinismo/tolerância, amostra representativa, regressão de métricas e custo quando aplicável.
 - **Infra:** validação do manifesto/plano, policy/security, dry-run e aplicação apenas com autorização do ambiente.
-
-## Mutation testing seletivo
-
-Executar somente no `plan` e no `release`, nunca por microtarefa. Risco baixo e mudanças puramente visuais/documentais são `not_required`; risco médio usa `selective` apenas em lógica material; risco alto/crítico usa `required_selective` nos seams alterados. Usar ferramenta existente ou aprovada no planejamento.
-
-Não bloquear por percentual ou score global. Bloquear somente mutante sobrevivente que demonstre alteração de comportamento aprovado de risco alto/crítico sem falha do teste. Justificar equivalentes e inalcançáveis sem criar campanha de cobertura.
 
 ## Falha e reexecução
 

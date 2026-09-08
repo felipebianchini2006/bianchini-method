@@ -13,7 +13,7 @@ func workflowProofPackage(workspace methodWorkspace, directory, digest string) c
 func quickVerificationGates(brief map[string]any) ([]requiredVerification, error) {
 	var gates []requiredVerification
 	for i, raw := range stringsFromAny(brief["verification"]) {
-		spec, err := legacyVerificationSpec(raw, "aceite do quick")
+		spec, err := commandVerificationSpec(raw, "aceite do quick")
 		if err != nil {
 			return nil, err
 		}
@@ -30,7 +30,7 @@ func verifyQuickCommands(workspace methodWorkspace, directory string, brief map[
 	pack := workflowProofPackage(workspace, directory, stateString(brief["digest"]))
 	var ids []string
 	for _, raw := range commands {
-		spec, err := legacyVerificationSpec(raw, "aceite do quick")
+		spec, err := commandVerificationSpec(raw, "aceite do quick")
 		if err != nil {
 			return nil, err
 		}

@@ -17,7 +17,7 @@ func executeDebugProof(workspace methodWorkspace, value map[string]any, event st
 	if raw == "" {
 		return "", workflowError("STALE_EVIDENCE", event+" exige --command executável")
 	}
-	spec, err := legacyVerificationSpec(raw, stateString(value["expected"]))
+	spec, err := commandVerificationSpec(raw, stateString(value["expected"]))
 	if err != nil {
 		return "", err
 	}

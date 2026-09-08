@@ -73,8 +73,11 @@ Salve o draft fora do repositório, em diretório temporário, e sele:
 ```bash
 bm scope seal --repo <repo> --change C001-slug \
   --source <escopo.pdf> --draft <scope-draft.md> \
-  --pages <total> --extraction native|ocr|mixed
+  --pages <total> --extraction native|ocr|mixed \
+  --page-manifest <manifesto.json>
 ```
+
+O manifesto contém `source_sha256`, `page_count`, `tool` e `pages`; cada página declara `items` com IDs ou `reason` somente quando não houver item. `scope seal` concilia esse registro com o draft e o incorpora em `SCOPE.md.extraction_record`. O selo prova integridade do arquivo, processamento declarado e registro por página; não afirma fidelidade semântica que o CLI não verificou.
 
 `scope seal` deve rejeitar item sem fonte, aceite incompleto, página impossível, placeholder, pergunta, decisão ou contradição aberta. Ele grava somente o `SCOPE.md` aprovado pelo contrato e muda o estado para `scope_ready`.
 

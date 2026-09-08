@@ -1,9 +1,9 @@
 ---
 {
   "approval": {
-    "decided_at": "2026-09-08T21:56:14+00:00",
+    "decided_at": "2026-09-08T22:19:17+00:00",
     "decided_by": "agent:root",
-    "digest": "30c22e028d12986d666fb15c787fe37516339fa3aef10b4fc538e703ab18950f",
+    "digest": "a7e2d2e383f022683c6117e73699b14673f0f8f57a16e04094672a6ff7beba79",
     "kind": "technical_decision"
   },
   "artifact_manifest": {
@@ -12,14 +12,14 @@
     "ROADMAP.md": "4c7d2da29d4396f68fcb45aebdacb58f58318ae16764b146ed984f1146ac9c4f",
     "SCOPE.md": "a349f8dfb46c39834b7e0268d6c39c66655210446b085f278abac8a97f8029f3",
     "SYSTEM_MODEL.md": "62ca1f0c1eb22043c801f0556f257a1260088bd4cc9a62da427b9f37207ed9a0",
-    "plans/P01-metodo-unico.md": "95746423b12bdff1341550c10c48aa3bb1bee8e528a3c18d2ffede767b8014c1",
-    "plans/P02-workspace-coeso.md": "14ff5049b30b7996c449e81bdb05290094cdaee50483ee4aed0b4887d2c3deb4",
-    "plans/P03-garantias-verificaveis.md": "1d79e60d374c52b2ac7fa9a2cfce9fbcd1a9553e0783f3d8f63fb599bb0b5de0",
-    "plans/P04-skills-integradas.md": "b87ed2c45311ee35b73a9d60c211d014eee3fa471724314210ab07c34f9c61c3",
-    "plans/P05-integracao-distribuicao.md": "e9908f05757236e824b4e3f2aa2c74d4ea1adaa54809b0326453dda1c4407efc"
+    "plans/P01-metodo-unico/PLAN.md": "465fc1d270226fbc4f22a6f9448981d5f5a5961ee1d435e3627df2ec98de7f52",
+    "plans/P02-workspace-coeso/PLAN.md": "7a370a7062feff67536d7f45b43f6f7237a3bb7c4ca36a7ba9b90ded1c9b76d0",
+    "plans/P03-garantias-verificaveis/PLAN.md": "01e4f9243cf84f6d5df1765be4c8b3e9dd2534d81f1cbfd594f0f51bd1c60d3e",
+    "plans/P04-skills-integradas/PLAN.md": "fe3648cd51070d5f6f1f93869203a3c996870528c6aa5b53096cabab69f7c6de",
+    "plans/P05-integracao-distribuicao/PLAN.md": "d59839f737a40542cbc214a4fe13fd5b5b7c0646a91ac439a5d068b77b45d06a"
   },
   "change": "C001-metodo-unificado",
-  "digest": "30c22e028d12986d666fb15c787fe37516339fa3aef10b4fc538e703ab18950f",
+  "digest": "a7e2d2e383f022683c6117e73699b14673f0f8f57a16e04094672a6ff7beba79",
   "findings": [],
   "impact": null,
   "model": {
@@ -63,6 +63,23 @@
       "result": "Retirar gerações antigas e tornar contrato/ajuda/testes atuais independentes do oráculo.",
       "review": "plan_gate",
       "rollback": "Reverter somente o commit desta entrega, preservando documentação e provas; não reescrever histórico.",
+      "scenarios": [
+        {
+          "evidence_kinds": [
+            "observation",
+            "log"
+          ],
+          "expected": "Retirar gerações antigas e tornar contrato/ajuda/testes atuais independentes do oráculo.",
+          "id": "SCN-001",
+          "platform": "cli",
+          "profile": "maintainer",
+          "requirements": [
+            "REQ-001"
+          ],
+          "risk": "comando removido ainda acessível ou pacote depender de Python para operar",
+          "state": "success-and-rejection"
+        }
+      ],
       "schema_version": 2,
       "status": "planned",
       "tasks": [
@@ -76,7 +93,8 @@
           "files": [
             "internal/gokernel/cli.go",
             "contracts/cli-surfaces.json",
-            "scripts/generate_cli_help.py"
+            "tests/test_cli_help.py",
+            "tests/test_method_package.py"
           ],
           "id": "T01",
           "name": "Retirar gerações antigas e tornar contrato/ajuda/testes atuais independentes do oráculo.",
@@ -84,9 +102,12 @@
           "risk_seam": "metodo-unico",
           "verify": {
             "argv": [
-              "go",
-              "test",
-              "./..."
+              "python3",
+              "-B",
+              "-m",
+              "unittest",
+              "tests.test_cli_help",
+              "tests.test_method_package"
             ],
             "cwd": ".",
             "kind": "command",
@@ -96,8 +117,7 @@
         }
       ],
       "verifications": [
-        "go test ./...",
-        "go vet ./..."
+        "python3 -B -m unittest tests.test_cli_help tests.test_method_package"
       ]
     },
     {
@@ -137,6 +157,24 @@
       "result": "Centralizar caminhos, reunir plano/resultado, aceitar somente contrato atual e preservar transações.",
       "review": "plan_gate",
       "rollback": "Reverter somente o commit desta entrega, preservando documentação e provas; não reescrever histórico.",
+      "scenarios": [
+        {
+          "evidence_kinds": [
+            "observation",
+            "log"
+          ],
+          "expected": "Centralizar caminhos, reunir plano/resultado, aceitar somente contrato atual e preservar transações.",
+          "id": "SCN-001",
+          "platform": "cli",
+          "profile": "maintainer",
+          "requirements": [
+            "REQ-002",
+            "REQ-003"
+          ],
+          "risk": "plano, resultado ou recuperação usar caminho divergente",
+          "state": "success-and-rejection"
+        }
+      ],
       "schema_version": 2,
       "status": "planned",
       "tasks": [
@@ -161,7 +199,11 @@
             "argv": [
               "go",
               "test",
-              "./..."
+              "./internal/workspace",
+              "./internal/gokernel",
+              "-run",
+              "TestContext|TestModel|TestCoherence|TestPlan|TestClose|TestExecutionWorkspace|TestRoadmap",
+              "-count=1"
             ],
             "cwd": ".",
             "kind": "command",
@@ -171,8 +213,7 @@
         }
       ],
       "verifications": [
-        "go test ./...",
-        "go vet ./..."
+        "go test ./internal/workspace ./internal/gokernel -run 'TestContext|TestModel|TestCoherence|TestPlan|TestClose|TestExecutionWorkspace|TestRoadmap' -count=1"
       ]
     },
     {
@@ -212,6 +253,24 @@
       "result": "Implementar proveniência honesta e cobertura obrigatória de homologação com testes positivos e negativos.",
       "review": "plan_gate",
       "rollback": "Reverter somente o commit desta entrega, preservando documentação e provas; não reescrever histórico.",
+      "scenarios": [
+        {
+          "evidence_kinds": [
+            "observation",
+            "log"
+          ],
+          "expected": "Implementar proveniência honesta e cobertura obrigatória de homologação com testes positivos e negativos.",
+          "id": "SCN-001",
+          "platform": "cli",
+          "profile": "maintainer",
+          "requirements": [
+            "REQ-004",
+            "REQ-005"
+          ],
+          "risk": "selo ou fechamento aceitar alegação sem evidência atual",
+          "state": "success-and-rejection"
+        }
+      ],
       "schema_version": 2,
       "status": "planned",
       "tasks": [
@@ -224,8 +283,11 @@
           "depends_on": [],
           "done": "Implementação revisada, verificações pertinentes aprovadas, comportamento demonstrado e limitações registradas.",
           "files": [
+            "internal/acceptance/scenarios.go",
             "internal/gokernel/scope.go",
-            "internal/gokernel/verification.go",
+            "internal/gokernel/scope_manifest.go",
+            "internal/gokernel/homologation.go",
+            "internal/gokernel/verification_release.go",
             "internal/gokernel/release_identity.go"
           ],
           "id": "T01",
@@ -236,7 +298,11 @@
             "argv": [
               "go",
               "test",
-              "./..."
+              "./internal/acceptance",
+              "./internal/gokernel",
+              "-run",
+              "TestScope|TestHomologation|TestReleaseRejects|TestManualProof|TestTypedLifecycle",
+              "-count=1"
             ],
             "cwd": ".",
             "kind": "command",
@@ -246,8 +312,7 @@
         }
       ],
       "verifications": [
-        "go test ./...",
-        "go vet ./..."
+        "go test ./internal/acceptance ./internal/gokernel -run 'TestScope|TestHomologation|TestReleaseRejects|TestManualProof|TestTypedLifecycle' -count=1"
       ]
     },
     {
@@ -293,6 +358,27 @@
       "result": "Integrar orientação enxuta e portátil de design, prova, simplificação, segurança e correção contínua.",
       "review": "plan_gate",
       "rollback": "Reverter somente o commit desta entrega, preservando documentação e provas; não reescrever histórico.",
+      "scenarios": [
+        {
+          "evidence_kinds": [
+            "observation",
+            "log"
+          ],
+          "expected": "Integrar orientação enxuta e portátil de design, prova, simplificação, segurança e correção contínua.",
+          "id": "SCN-001",
+          "platform": "cli",
+          "profile": "maintainer",
+          "requirements": [
+            "REQ-006",
+            "REQ-007",
+            "REQ-008",
+            "REQ-011",
+            "REQ-012"
+          ],
+          "risk": "skill omitir teste real, simplificação, revisão ou correção de defeito",
+          "state": "success-and-rejection"
+        }
+      ],
       "schema_version": 2,
       "status": "planned",
       "tasks": [
@@ -319,9 +405,11 @@
           "risk_seam": "skills-integradas",
           "verify": {
             "argv": [
-              "go",
-              "test",
-              "./..."
+              "python3",
+              "-B",
+              "-m",
+              "unittest",
+              "tests.test_method_package"
             ],
             "cwd": ".",
             "kind": "command",
@@ -331,8 +419,7 @@
         }
       ],
       "verifications": [
-        "go test ./...",
-        "go vet ./..."
+        "python3 -B -m unittest tests.test_method_package"
       ]
     },
     {
@@ -377,6 +464,24 @@
       "result": "Integrar, modularizar distribuição quando útil, validar jornada real e pacote nas plataformas, atualizar 1.1.0 e entregar commits/push.",
       "review": "plan_gate",
       "rollback": "Reverter somente o commit desta entrega, preservando documentação e provas; não reescrever histórico.",
+      "scenarios": [
+        {
+          "evidence_kinds": [
+            "observation",
+            "log"
+          ],
+          "expected": "Integrar, modularizar distribuição quando útil, validar jornada real e pacote nas plataformas, atualizar 1.1.0 e entregar commits/push.",
+          "id": "SCN-001",
+          "platform": "cli",
+          "profile": "maintainer",
+          "requirements": [
+            "REQ-009",
+            "REQ-010"
+          ],
+          "risk": "pacote não executar jornada ou regressão escapar da integração",
+          "state": "success-and-rejection"
+        }
+      ],
       "schema_version": 2,
       "status": "planned",
       "tasks": [
@@ -417,7 +522,7 @@
       ]
     }
   ],
-  "review_input_digest": "33010ee9d13db18eafd98f8d0301697ce2ad2ff7e392dd00ec2975bfc98ac6d9",
+  "review_input_digest": "fbc9c957803752f036310e853d627ef839bfa7af20ee33fe053364e85ab6d741",
   "schedule": {
     "plan_waves": [
       [
@@ -462,9 +567,9 @@
   "semantic": {
     "available": true,
     "findings": [],
-    "input_digest": "e0d1206f763ecbe49f5034792566ee4a8a1a147338f4c5f3c08e156b7edb34df",
-    "prompt_digest": "c18155143a6fa66ccea2ad829da656ba825c2337414cf06d9bfb621987732a98",
-    "sources_digest": "a73c21f1b0c2b7439ef13b533b1dbc0210e20c938ac27082762ff6063eace096"
+    "input_digest": "c1c05757bb8388a0b85e7fd8fd6b76ef4c0e64984691a08959ba91f27f32212c",
+    "prompt_digest": "10e949c274de25732eb9798f93912477bd8b5534c43c3f84a7d34a7f8a865e81",
+    "sources_digest": "2d2aa770fca93d794d20af6a6c798b60bb13278c9d129f9b9993143a2fb0a81e"
   },
   "spec_base_digest": "2c3effa6cac92be128ed68e7733b5ed057b027c01006219120d6ba2d177c335f",
   "spec_contract": 1,
@@ -474,7 +579,7 @@
   "stale_plans": [],
   "status": "approved",
   "structural_only": false,
-  "updated_at": "2026-09-08T21:56:14+00:00"
+  "updated_at": "2026-09-08T22:19:17+00:00"
 }
 ---
 

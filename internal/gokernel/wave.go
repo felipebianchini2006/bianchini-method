@@ -62,14 +62,14 @@ func waveRoot(repo string) (string, error) {
 	}
 	root, err := filepath.Abs(repo)
 	if err != nil {
-		return "", waveError("WAVE_INCOMPLETE", "repo 0.4 exige .bianchini")
+		return "", waveError("WAVE_INCOMPLETE", "repositório exige .bianchini")
 	}
 	info, err := os.Lstat(root)
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		if err == nil && info.Mode()&os.ModeSymlink != 0 {
 			return "", waveError("PATH_UNSAFE", "repo não pode ser symlink")
 		}
-		return "", waveError("WAVE_INCOMPLETE", "repo 0.4 exige .bianchini")
+		return "", waveError("WAVE_INCOMPLETE", "repositório exige .bianchini")
 	}
 	workspace := filepath.Join(root, ".bianchini")
 	workspaceInfo, err := os.Lstat(workspace)
@@ -77,7 +77,7 @@ func waveRoot(repo string) (string, error) {
 		if err == nil && workspaceInfo.Mode()&os.ModeSymlink != 0 {
 			return "", waveError("PATH_UNSAFE", ".bianchini atravessa symlink: "+workspace)
 		}
-		return "", waveError("WAVE_INCOMPLETE", "repo 0.4 exige .bianchini")
+		return "", waveError("WAVE_INCOMPLETE", "repositório exige .bianchini")
 	}
 	return filepath.Clean(root), nil
 }
@@ -244,7 +244,7 @@ func waveRoadmapPlans(root, change string) ([]planContract, []string, error) {
 	for _, child := range children {
 		info, _ := os.Lstat(child)
 		name := filepath.Base(child)
-		if !info.Mode().IsRegular() || filepath.Ext(name) != ".md" || !strings.HasPrefix(name, "P") {
+		if !info.IsDir() || !strings.HasPrefix(name, "P") {
 			continue
 		}
 		identifier, valid := planFileID(name)
@@ -255,7 +255,11 @@ func waveRoadmapPlans(root, change string) ([]planContract, []string, error) {
 			return nil, nil, waveError("WAVE_INCOMPLETE", "arquivos de plano duplicam identidade: "+identifier)
 		}
 		actual = append(actual, identifier)
-		byID[identifier] = child
+		planPath := filepath.Join(child, "PLAN.md")
+		if _, safeErr := waveSafeFile(root, planPath, "plano "+identifier); safeErr != nil {
+			return nil, nil, safeErr
+		}
+		byID[identifier] = planPath
 	}
 	expectedFiles := append([]string{}, phaseIDs...)
 	sort.Strings(expectedFiles)
@@ -311,7 +315,7 @@ func validateWaveDependencies(plans []planContract) error {
 				return waveError("WAVE_INCOMPLETE", plan.id+" depende de plano inexistente: "+dependency)
 			}
 		}
-		if plan.schema == 2 {
+		{
 			tasks := planTasks(plan)
 			taskKnown := map[string]bool{}
 			for _, task := range tasks {
@@ -404,11 +408,11 @@ func waveArtifactManifest(root, change string, coherence map[string]any, planIDs
 	required := []string{"SCOPE.md", "RESEARCH.md", "ARCHITECTURE.md", "SYSTEM_MODEL.md", "ROADMAP.md"}
 	planFiles := map[string]string{}
 	for relative := range manifest {
-		if !strings.HasPrefix(relative, "plans/") {
+		if !strings.HasPrefix(relative, "plans/") || !strings.HasSuffix(relative, "/PLAN.md") {
 			continue
 		}
-		identifier, valid := planFileID(strings.TrimPrefix(relative, "plans/"))
-		if !valid || strings.Count(relative, "/") != 1 {
+		identifier, valid := planFileID(relative)
+		if !valid || strings.Count(relative, "/") != 2 {
 			return nil, waveError("WAVE_INCOMPLETE", "arquivo de plano com identidade inválida no artifact_manifest: "+relative)
 		}
 		if _, duplicate := planFiles[identifier]; duplicate {
@@ -524,7 +528,7 @@ func waveValidateState(root, change, packageDigest string) (map[string]any, erro
 	if err != nil {
 		return nil, err
 	}
-	if stateInt(state["schema_version"]) != 1 || stateString(state["method"]) != "0.4" {
+	if stateInt(state["schema_version"]) != 1 || stateString(state["method"]) != methodIdentity {
 		return nil, waveError("WAVE_INCOMPLETE", "STATE.md possui contrato inválido")
 	}
 	if stateString(state["digest"]) != packageDigest {
@@ -557,29 +561,33 @@ func waveCompletedResults(root, change string, plans []planContract, packageDige
 		known[plan.id] = plan
 		completedTasks[plan.id] = map[string]bool{}
 	}
-	results := filepath.Join(change, "results")
-	if _, err := waveConfined(root, results, "results"); err != nil {
+	plansRoot := filepath.Join(change, "plans")
+	if _, err := waveConfined(root, plansRoot, "plans"); err != nil {
 		return nil, nil, err
 	}
-	if info, err := os.Lstat(results); err == nil {
+	if info, err := os.Lstat(plansRoot); err == nil {
 		if !info.IsDir() {
-			return nil, nil, waveError("WAVE_INCOMPLETE", "results deve ser diretório")
+			return nil, nil, waveError("WAVE_INCOMPLETE", "plans deve ser diretório")
 		}
-		children, err := waveChildren(root, results, "results")
+		children, err := waveChildren(root, plansRoot, "plans")
 		if err != nil {
 			return nil, nil, err
 		}
 		for _, child := range children {
 			info, _ := os.Lstat(child)
-			identifier := strings.TrimSuffix(filepath.Base(child), filepath.Ext(child))
-			if !info.Mode().IsRegular() || !wavePlanID.MatchString(identifier) {
+			identifier, valid := planFileID(child)
+			if !info.IsDir() || !valid {
 				continue
 			}
 			plan, exists := known[identifier]
 			if !exists {
 				return nil, nil, waveError("WAVE_INCOMPLETE", "resultado pertence a plano desconhecido: "+identifier)
 			}
-			value, err := waveFrontmatter(root, child, "resultado "+identifier)
+			resultPath := filepath.Join(child, "RESULT.md")
+			if _, statErr := os.Lstat(resultPath); os.IsNotExist(statErr) {
+				continue
+			}
+			value, err := waveFrontmatter(root, resultPath, "resultado "+identifier)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -589,7 +597,7 @@ func waveCompletedResults(root, change string, plans []planContract, packageDige
 			completedPlans[identifier] = true
 		}
 	}
-	tasksRoot := filepath.Join(results, "tasks")
+	tasksRoot := filepath.Join(change, "results", "tasks")
 	if _, err := os.Lstat(tasksRoot); err == nil {
 		planDirectories, err := waveChildren(root, tasksRoot, "resultados de tarefas")
 		if err != nil {
@@ -632,9 +640,6 @@ func waveCompletedResults(root, change string, plans []planContract, packageDige
 	}
 	for planID := range completedPlans {
 		plan := known[planID]
-		if plan.schema != 2 {
-			continue
-		}
 		missing := []string{}
 		for _, identifier := range planTaskIDs(plan) {
 			if !completedTasks[planID][identifier] {
@@ -892,11 +897,6 @@ func projectNextWave(repo, reference string) (map[string]any, error) {
 			}
 			continue
 		}
-		if plan.schema == 1 {
-			identity := prefix + "/" + plan.id
-			parallel = append(parallel, map[string]any{"identity": identity, "plan": plan.id, "task": nil, "pack_identity": identity, "dependencies_satisfied": satisfiedPlans})
-			continue
-		}
 		for _, task := range planTasks(plan) {
 			taskID := stateString(task["id"])
 			identity := prefix + "/" + plan.id + "/" + taskID
@@ -972,43 +972,34 @@ func waveResourceConflicts(selected []waveResource, files []string) []string {
 }
 
 func wavePlanIdentities(prefix string, plan planContract) []string {
-	if plan.schema == 2 {
-		result := []string{}
-		for _, task := range planTasks(plan) {
-			result = append(result, prefix+"/"+plan.id+"/"+stateString(task["id"]))
-		}
-		return result
+	result := []string{}
+	for _, task := range planTasks(plan) {
+		result = append(result, prefix+"/"+plan.id+"/"+stateString(task["id"]))
 	}
-	return []string{prefix + "/" + plan.id}
+	return result
 }
 
 func canonicalPlanMapping(plan planContract) map[string]any {
-	if plan.schema == 2 {
-		tasks := make([]any, 0)
-		for _, task := range planTasks(plan) {
-			tasks = append(tasks, canonicalTaskMapping(task))
-		}
-		return map[string]any{
-			"schema_version": 2, "id": plan.id, "status": "planned", "result": strings.TrimSpace(stateString(plan.value["result"])),
-			"requirements": normalizedPlanStrings(plan, "requirements"), "acceptance": normalizedPlanStrings(plan, "acceptance"),
-			"depends_on": normalizedPlanStrings(plan, "depends_on"), "provides": normalizedPlanStrings(plan, "provides"),
-			"consumes": normalizedPlanStrings(plan, "consumes"), "modules": normalizedPlanStrings(plan, "modules"),
-			"interfaces": normalizedPlanStrings(plan, "interfaces"), "ownership": normalizedPlanStrings(plan, "ownership"),
-			"data": normalizedPlanStrings(plan, "data"), "model_delta": cloneMap(plan.modelDelta),
-			"migrations": cloneAnyList(plan.value["migrations"]), "effects": cloneAnyList(plan.value["effects"]),
-			"rollback": strings.TrimSpace(stateString(plan.value["rollback"])), "verifications": normalizedPlanStrings(plan, "verifications"),
-			"future_constraints": normalizedPlanStrings(plan, "future_constraints"), "execution": stateString(plan.value["execution"]),
-			"review": stateString(plan.value["review"]), "tasks": tasks,
-		}
+	tasks := make([]any, 0)
+	for _, task := range planTasks(plan) {
+		tasks = append(tasks, canonicalTaskMapping(task))
 	}
-	return map[string]any{
-		"id": plan.id, "depends_on": normalizedPlanStrings(plan, "depends_on"), "provides": normalizedPlanStrings(plan, "provides"),
-		"consumes": normalizedPlanStrings(plan, "consumes"), "owns": normalizedPlanStrings(plan, "owns"), "touches": normalizedPlanStrings(plan, "touches"),
+	result := map[string]any{
+		"schema_version": 2, "id": plan.id, "status": "planned", "result": strings.TrimSpace(stateString(plan.value["result"])),
 		"requirements": normalizedPlanStrings(plan, "requirements"), "acceptance": normalizedPlanStrings(plan, "acceptance"),
-		"verifications": normalizedPlanStrings(plan, "verifications"), "model_delta": cloneMap(plan.modelDelta),
-		"migrations": cloneAnyList(plan.value["migrations"]), "external_effects": cloneAnyList(plan.value["external_effects"]),
-		"future_constraints": normalizedPlanStrings(plan, "future_constraints"),
+		"depends_on": normalizedPlanStrings(plan, "depends_on"), "provides": normalizedPlanStrings(plan, "provides"),
+		"consumes": normalizedPlanStrings(plan, "consumes"), "modules": normalizedPlanStrings(plan, "modules"),
+		"interfaces": normalizedPlanStrings(plan, "interfaces"), "ownership": normalizedPlanStrings(plan, "ownership"),
+		"data": normalizedPlanStrings(plan, "data"), "model_delta": cloneMap(plan.modelDelta),
+		"migrations": cloneAnyList(plan.value["migrations"]), "effects": cloneAnyList(plan.value["effects"]),
+		"rollback": strings.TrimSpace(stateString(plan.value["rollback"])), "verifications": normalizedPlanStrings(plan, "verifications"),
+		"future_constraints": normalizedPlanStrings(plan, "future_constraints"), "execution": stateString(plan.value["execution"]),
+		"review": stateString(plan.value["review"]), "tasks": tasks,
 	}
+	if scenarios, present := plan.value["scenarios"]; present {
+		result["scenarios"] = scenarios
+	}
+	return result
 }
 
 func canonicalTaskMapping(task map[string]any) map[string]any {

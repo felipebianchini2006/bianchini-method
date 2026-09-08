@@ -27,12 +27,9 @@ func executionWorkspaceGit(t *testing.T, repo string, args ...string) string {
 }
 
 func executionWorkspacePlanFixture(dependsOn, consumes []string) map[string]any {
-	return map[string]any{
-		"id": "P01", "schema_version": 1, "model_delta": map[string]any{},
-		"depends_on": dependsOn, "consumes": consumes, "provides": []string{},
-		"acceptance":    []string{"workspace criado"},
-		"verifications": []string{"go test ./..."},
-	}
+	plan := roadmapPlan("P01", dependsOn)
+	plan["consumes"] = consumes
+	return plan
 }
 
 func executionWorkspaceRepository(t *testing.T, plan map[string]any, currentDeltas ...map[string]any) (string, string) {
@@ -75,15 +72,37 @@ func executionWorkspaceRepository(t *testing.T, plan map[string]any, currentDelt
 	}
 	change := stateString(created["change"])
 	directory := filepath.Join(repo, ".bianchini", "changes", change)
+	if err := os.WriteFile(filepath.Join(directory, "SCOPE.md"), []byte("# Escopo\n\n### REQ-001 Workspace criado\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "specs", "expected", "workspace.md"), []byte("# Workspace\n\n## WS-001: Cria workspace\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifestBytes, _ := json.MarshalIndent(map[string]any{
+		"schema_version": 1, "spec_contract": 1,
+		"specs":         []any{map[string]any{"id": "workspace", "path": "workspace.md", "requirements": []any{map[string]any{"id": "WS-001", "scope": []any{"REQ-001"}}}}},
+		"risk_coverage": []any{},
+	}, "", "  ")
+	if err := os.WriteFile(filepath.Join(directory, "specs", "MANIFEST.json"), append(manifestBytes, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	planDocument, err := frontmatterDocument(plan, "# P01", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, "plans", "P01.md"), planDocument, 0o644); err != nil {
+	writePlanTest(t, directory, "P01", planDocument)
+	if err := syncPlanningSpecs(newMethodWorkspace(repo), directory, map[string]any{"schema_version": 2, "spec_contract": 1}); err != nil {
 		t.Fatal(err)
 	}
 	workspace, _, plans, err := loadRoadmapPackage(repo, change)
 	if err != nil {
+		t.Fatal(err)
+	}
+	roadmap, err := roadmapDocument(plans)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "ROADMAP.md"), roadmap, 0600); err != nil {
 		t.Fatal(err)
 	}
 	current, err := loadProjectModel(workspace.currentMod)
@@ -100,13 +119,20 @@ func executionWorkspaceRepository(t *testing.T, plan map[string]any, currentDelt
 	}
 	findings := []any{}
 	semantic := map[string]any{"available": true, "findings": []any{}, "sources": []any{"fixture"}}
+	specPackage, err := loadModelSpecPackage(workspace, directory, map[string]any{"schema_version": 2})
+	if err != nil {
+		t.Fatal(err)
+	}
 	coherence := map[string]any{
-		"schema_version": 1, "planning_contract": 2, "status": "approved",
+		"schema_version": 2, "planning_contract": 2, "spec_contract": 1, "status": "approved",
 		"change": change, "findings": findings, "semantic": semantic,
 		"artifact_manifest":   manifest,
-		"review_input_digest": coherenceReviewDigest(2, manifest, nil),
-		"digest":              coherencePackageDigest(current, expected, plans, findings, semantic, 2, manifest, nil),
+		"review_input_digest": coherenceReviewDigest(2, manifest, specPackage),
+		"digest":              coherencePackageDigest(current, expected, plans, findings, semantic, 2, manifest, specPackage),
 		"stale_plans":         []any{},
+	}
+	for key, value := range specPackage {
+		coherence[key] = value
 	}
 	coherenceDocument, err := frontmatterDocument(coherence, "# Coerência\n\nStatus: approved.", false)
 	if err != nil {
@@ -292,11 +318,11 @@ func TestExecutionWorkspaceCreateGates(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				path := filepath.Join(repo, ".bianchini", "changes", change, "results", "P01.md")
+				path := filepath.Join(repo, ".bianchini", "changes", change, "plans", "P01", "RESULT.md")
 				if err := os.WriteFile(path, document, 0o644); err != nil {
 					t.Fatal(err)
 				}
-				executionWorkspaceGit(t, repo, "add", filepath.ToSlash(filepath.Join(".bianchini", "changes", change, "results", "P01.md")))
+				executionWorkspaceGit(t, repo, "add", filepath.ToSlash(filepath.Join(".bianchini", "changes", change, "plans", "P01", "RESULT.md")))
 				executionWorkspaceGit(t, repo, "commit", "-q", "-m", "complete plan")
 			},
 			wantError: "COHERENCE_ERROR: P01 já foi concluído",
@@ -398,7 +424,7 @@ func TestExecutionWorkspaceLocateAndCheckFailClosed(t *testing.T) {
 	if _, err := runExecutionWorkspace([]string{"locate", "--repo", repo, "--change", change, "--plan", "P01"}); err == nil || err.Error() != "DIRTY_WORKSPACE: workspace não localizado para c001-p01" {
 		t.Fatalf("locate err=%v", err)
 	}
-	if _, err := runExecutionWorkspace([]string{"check", "--repo", repo}); err == nil || err.Error() != "DIRTY_WORKSPACE: branch de execução 0.4 inválida" {
+	if _, err := runExecutionWorkspace([]string{"check", "--repo", repo}); err == nil || err.Error() != "DIRTY_WORKSPACE: branch de execução inválida" {
 		t.Fatalf("check err=%v", err)
 	}
 }

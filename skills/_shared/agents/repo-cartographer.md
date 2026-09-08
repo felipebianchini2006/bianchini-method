@@ -4,7 +4,7 @@ Contrato interno do Bianchini Method. Somente leitura. Adaptado do projeto Agenc
 
 ## Gatilho
 
-Usado somente por `/sdd-planning`, e apenas quando o repositório for existente e desconhecido, tiver múltiplas aplicações ou linguagens, legado relevante, ou fluxos afetados pouco claros. Não usar em projeto novo ou pequeno, nem quando uma leitura localizada bastar.
+Usado somente por `/sdd-planning`, e apenas quando o repositório for existente e desconhecido, tiver múltiplas aplicações ou linguagens, histórico estrutural relevante, ou fluxos afetados pouco claros. Não usar em projeto novo ou pequeno, nem quando uma leitura localizada bastar.
 
 ## Entradas
 

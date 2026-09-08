@@ -101,7 +101,7 @@ func TestRealReleaseArtifactInstallsRunsFixtureAndRollsBack(t *testing.T) {
 		if metadata.Version != Version || metadata.Engine != "go" || metadata.BuildCommit != commit || !metadata.Official || metadata.Preview {
 			t.Fatalf("identidade instalada inesperada: %#v", metadata)
 		}
-		runInstalledContractFixture(t, root, binary, "change-policy-read-only.json")
+		runInstalledContractFixture(t, root, binary, "change-policy.json")
 	})
 
 	t.Run("rename failure restores previous installation", func(t *testing.T) {
@@ -144,7 +144,7 @@ func exactBuiltReleaseFetcher(version string, manifest, checksums []byte, archiv
 
 func runInstalledContractFixture(t *testing.T, root, binary, fixtureName string) {
 	t.Helper()
-	fixtureBytes := mustReadReleaseIntegrationFile(t, filepath.Join(root, "tests", "fixtures", "cli_contract", fixtureName))
+	fixtureBytes := mustReadReleaseIntegrationFile(t, filepath.Join(root, "internal", "gokernel", "testdata", fixtureName))
 	var fixture publicContractFixture
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatal(err)

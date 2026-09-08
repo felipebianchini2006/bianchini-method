@@ -49,8 +49,6 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "version":
 		result, err = runVersion(args[1:])
-	case "validate-state":
-		result, err = runValidateState(args[1:])
 	case "model":
 		result, err = runModel(args[1:])
 	case "scope":
@@ -71,36 +69,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		result, err = runPolicy(args[1:])
 	case "adapter":
 		result, err = runAdapter(args[1:])
-	case "snapshot":
-		result, err = runSnapshot(args[1:])
-	case "planning-audit":
-		result, err = runPlanningAudit(args[1:])
 	case "design-audit":
 		result, err = runDesignAudit(args[1:])
-	case "planning-check":
-		result, err = runPlanningCheck(args[1:])
 	case "direct":
 		result, err = runDirect(args[1:])
 	case "debug":
 		result, err = runDebug(args[1:])
 	case "learn":
 		result, err = runLearning(args[1:])
-	case "migrate":
-		result, err = runMigrate(args[1:])
-	case "task-brief":
-		result, err = runTaskBrief(args[1:])
-	case "report":
-		result, err = runReport(args[1:])
-	case "review-package":
-		result, err = runReviewPackage(args[1:])
-	case "checkpoint":
-		result, err = runCheckpoint(args[1:])
-	case "proof-map":
-		result, err = runProofMap(args[1:])
-	case "mutation-evidence":
-		result, err = runMutationEvidence(args[1:])
-	case "telemetry":
-		result, err = runTelemetry(args[1:])
 	case "spec-diff":
 		result, err = runSpecDiff(args[1:])
 	case "status":
@@ -191,32 +167,17 @@ var actionCommandSpecs = map[string]actionCommandSpec{
 	"learn": {
 		actions: []string{"propose", "list", "approve", "reject", "deactivate"}, valueFlags: learningValueFlags, booleanFlags: flagSet(),
 	},
-	"migrate": {
-		actions: []string{"check", "apply"}, valueFlags: flagSet("--repo"), booleanFlags: flagSet(),
-	},
 	"model": {
 		actions: []string{"init", "validate"}, valueFlags: flagSet("--repo", "--change"), booleanFlags: flagSet(),
 	},
-	"mutation-evidence": {
-		actions: []string{"verify"}, valueFlags: flagSet("--state", "--root", "--plan", "--risk-seam", "--tool", "--command", "--report", "--revision", "--classifications", "--output"), booleanFlags: flagSet(),
-	},
 	"plan": {
 		actions: []string{"complete", "reopen"}, valueFlags: flagSet("--repo", "--change", "--plan", "--task", "--context-pack", "--actual-delta", "--result", "--verification", "--proof", "--review", "--reason", "--completed-task"), booleanFlags: flagSet(),
-	},
-	"planning-check": {
-		actions: []string{"record"}, valueFlags: flagSet("--state", "--root", "--report"), booleanFlags: flagSet(),
 	},
 	"roadmap": {
 		actions: []string{"sync", "next-wave"}, valueFlags: flagSet("--repo", "--change", "--format"), booleanFlags: flagSet(),
 	},
 	"scope": {
 		actions: []string{"seal", "verify"}, valueFlags: flagSet("--repo", "--change", "--source", "--draft", "--pages", "--extraction"), booleanFlags: flagSet(),
-	},
-	"snapshot": {
-		actions: []string{"create", "verify"}, valueFlags: flagSet("--root"), booleanFlags: flagSet(),
-	},
-	"telemetry": {
-		actions: []string{"record", "summary"}, valueFlags: flagSet("--state", "--root", "--plan", "--phase", "--at", "--input-tokens", "--output-tokens", "--duration-ms", "--fix-rounds", "--gate-failures", "--homologation-bugs"), booleanFlags: flagSet(),
 	},
 	"workspace": {
 		actions: []string{"create", "check", "locate", "resume", "finish"}, valueFlags: flagSet("--repo", "--plan", "--change", "--target"), booleanFlags: flagSet(),

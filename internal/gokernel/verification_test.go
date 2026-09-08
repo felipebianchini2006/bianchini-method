@@ -25,72 +25,6 @@ func verificationPlan(argv []string) map[string]any {
 
 func verificationContextPack(t *testing.T, repo, change string) string {
 	t.Helper()
-	directory := filepath.Join(repo, ".bianchini", "changes", change)
-	if err := os.WriteFile(filepath.Join(directory, "SCOPE.md"), []byte("# Escopo\n\n### REQ-001 — Contrato\n\nContrato verificável.\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	specPath := filepath.Join(directory, "specs", "expected", "system.md")
-	if err := os.WriteFile(specPath, []byte("# Sistema\n\n## REQ-001\n\nO contrato deve ser observável.\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	manifestValue := map[string]any{
-		"schema_version": 1, "spec_contract": 1,
-		"specs": []any{map[string]any{
-			"id": "system", "path": "system.md",
-			"requirements": []any{map[string]any{"id": "REQ-001", "scope": []any{"REQ-001"}}},
-		}},
-		"risk_coverage": []any{},
-	}
-	manifestBytes, _ := json.MarshalIndent(manifestValue, "", "  ")
-	if err := os.WriteFile(filepath.Join(directory, "specs", "MANIFEST.json"), append(manifestBytes, '\n'), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runRoadmap([]string{"sync", "--repo", repo, "--change", change}); err != nil {
-		t.Fatal(err)
-	}
-	workspace, _, plans, err := loadRoadmapPackage(repo, change)
-	if err != nil {
-		t.Fatal(err)
-	}
-	current, err := loadProjectModel(workspace.currentMod)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected, err := loadProjectModel(filepath.Join(directory, "SYSTEM_MODEL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest, err := coherenceArtifactManifest(workspace, directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	coherencePath := filepath.Join(directory, "COHERENCE.md")
-	coherence, err := readStructuredFrontmatter(coherencePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	findings := stateArray(coherence["findings"])
-	semantic := stateObject(coherence["semantic"])
-	coherence["artifact_manifest"] = manifest
-	coherence["review_input_digest"] = coherenceReviewDigest(2, manifest, nil)
-	coherence["digest"] = coherencePackageDigest(current, expected, plans, findings, semantic, 2, manifest, nil)
-	document, err := frontmatterDocument(coherence, "# Coerência\n\nStatus: approved.", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(coherencePath, document, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	state, err := workspace.readState()
-	if err != nil {
-		t.Fatal(err)
-	}
-	state["digest"] = coherence["digest"]
-	if err := workspace.writeState(state, "# Estado atual"); err != nil {
-		t.Fatal(err)
-	}
-	executionWorkspaceGit(t, repo, "add", ".bianchini")
-	executionWorkspaceGit(t, repo, "commit", "-q", "-m", "prepare context scope")
 	code, stdout, stderr := runCLI(t, "context", "pack", "--repo", repo, "--unit", strings.SplitN(change, "-", 2)[0]+"/P01/T01")
 	if code != 0 {
 		t.Fatalf("context pack: code=%d stderr=%q", code, stderr)
@@ -221,18 +155,18 @@ func TestManualProofCoverageRequiresExistingMatchingArtifact(t *testing.T) {
 		"plan": "P01", "task": "T01", "evidence": "evidence.txt",
 		"evidence_sha256": sha256Bytes(content),
 	}}
-	if !manualProofCoverage(repo, requirements, proofs) {
+	if !manualProofCoverage(repo, repo, requirements, proofs) {
 		t.Fatal("artefato real e íntegro deveria cobrir o procedimento")
 	}
 	stateObject(proofs[0])["evidence_sha256"] = strings.Repeat("a", 64)
-	if manualProofCoverage(repo, requirements, proofs) {
+	if manualProofCoverage(repo, repo, requirements, proofs) {
 		t.Fatal("hash forjado não pode cobrir o procedimento")
 	}
 	stateObject(proofs[0])["evidence_sha256"] = sha256Bytes(content)
 	if err := os.WriteFile(evidence, []byte("alterado\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if manualProofCoverage(repo, requirements, proofs) {
+	if manualProofCoverage(repo, repo, requirements, proofs) {
 		t.Fatal("artefato alterado não pode cobrir o procedimento")
 	}
 }
@@ -360,6 +294,7 @@ func TestTypedLifecycleRequiresProofReviewReleaseAndHomologation(t *testing.T) {
 		"change": change, "status": "accepted", "gates": []any{map[string]any{"proof_id": releaseProofs[0], "result": "passed"}},
 		"blockers": []any{}, "findings": []any{}, "required_refs": []any{"results/RELEASE.md"},
 	}
+	homologation["scenarios"] = passingScenarioResults(t, repo, release)
 	for _, bad := range []struct {
 		name   string
 		mutate func(map[string]any)
@@ -390,7 +325,7 @@ func TestTypedLifecycleRequiresProofReviewReleaseAndHomologation(t *testing.T) {
 			h := cloneMap(homologation)
 			bad.mutate(h)
 			doc, _ := frontmatterDocument(h, "# Homologação", false)
-			if err := os.WriteFile(filepath.Join(repo, ".bianchini", "changes", change, "results", "HOMOLOGATION.md"), doc, 0600); err != nil {
+			if err := os.WriteFile(stateString(release["homologation"]), doc, 0600); err != nil {
 				t.Fatal(err)
 			}
 			p, c, err := approvedPlanPackage(repo, change)
@@ -406,7 +341,7 @@ func TestTypedLifecycleRequiresProofReviewReleaseAndHomologation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, ".bianchini", "changes", change, "results", "HOMOLOGATION.md"), document, 0o600); err != nil {
+	if err := os.WriteFile(stateString(release["homologation"]), document, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executionWorkspaceGit(t, repo, "add", ".bianchini")

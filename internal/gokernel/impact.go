@@ -239,9 +239,6 @@ func projectImpact(plans []planContract, model projectModel, changedPlan string,
 }
 
 func coherenceAssertCurrent(pack coherencePackage, payload map[string]any) error {
-	if pack.planningContract < 2 {
-		return nil
-	}
 	findings, findingsOK := payload["findings"].([]any)
 	semantic, semanticOK := payload["semantic"].(map[string]any)
 	if !findingsOK || !semanticOK {

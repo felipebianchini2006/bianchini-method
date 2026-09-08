@@ -1,9 +1,7 @@
 package gokernel
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -11,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,16 +18,13 @@ const (
 	officialUpdateRepository = "felipebianchini2006/bianchini-method"
 	officialUpdateBranch     = "main"
 	maxUpdateVersionBytes    = 128
-	maxUpdateManifestBytes   = 8 * 1024
 	maxUpdateArchiveBytes    = 64 * 1024 * 1024
-	lineageResetVersion      = "0.4.0"
-	lineageResetManifest     = "_shared/releases/0.4.0.json"
 )
 
 var managedSkillDirectories = []string{
 	"_shared", "preparar-escopo", "design-projeto", "sdd-planning",
 	"executar-plano", "executar-direto", "auditar-arquitetura", "status-projeto",
-	"corrigir-bug", "migrar-bianchini", "homologar-sistema", "update-bm",
+	"corrigir-bug", "homologar-sistema", "update-bm",
 }
 
 type updateFetch func(url string, timeout time.Duration) ([]byte, error)
@@ -137,33 +131,18 @@ func updateBianchiniMethodLocked(request updateRequest, root string) (map[string
 	if gitRoot != "" {
 		mode = "git_checkout"
 	}
-	var lineageManifest []byte
-	if isLineageReset(installedVersion, latestVersion) {
-		if gitRoot != "" {
-			if err := verifyGitLineageSource(gitRoot); err != nil {
-				return nil, err
-			}
-		}
-		lineageManifest, err = fetchUpdateLimited(request.fetch, lineageManifestURL(), request.timeout, maxUpdateManifestBytes, "manifesto de reset")
-		if err != nil {
-			return nil, err
-		}
-		if err := validateLineageManifest(lineageManifest, installed, latest); err != nil {
-			return nil, err
-		}
-	}
 	comparison := compareUpdateVersion(installedVersion, latestVersion)
 	if comparison == 0 {
 		return updateBaseResult(installed, latest, root, mode, "up_to_date", false, ""), nil
 	}
-	if comparison > 0 && lineageManifest == nil {
+	if comparison > 0 {
 		return updateBaseResult(installed, latest, root, mode, "ahead", false, ""), nil
 	}
 	if request.checkOnly {
 		return updateBaseResult(installed, latest, root, mode, "update_available", false, ""), nil
 	}
 	if gitRoot != "" {
-		return updateGitCheckout(gitRoot, root, installed, latest, lineageManifest)
+		return updateGitCheckout(gitRoot, root, installed, latest)
 	}
 	archiveURL, archiveName, binaryPath, err := updateArchiveIdentity(latest, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
@@ -202,7 +181,7 @@ func updateBianchiniMethodLocked(request updateRequest, root string) (map[string
 	if err != nil {
 		return nil, err
 	}
-	if err := validateRemoteSkills(remoteSkills, latest, installed, lineageManifest); err != nil {
+	if err := validateRemoteSkills(remoteSkills, latest); err != nil {
 		return nil, err
 	}
 	backup, err := installSkillsAtomically(root, remoteSkills, installed, request.fs)
@@ -252,11 +231,6 @@ func compareUpdateVersion(left, right semanticVersion) int {
 	return 0
 }
 
-func isLineageReset(installed, latest semanticVersion) bool {
-	reset, _ := parseUpdateVersion(lineageResetVersion)
-	return compareUpdateVersion(latest, reset) == 0 && compareUpdateVersion(installed, latest) > 0 && installed.major > 0
-}
-
 func updateVersionURL() string {
 	base := "https://raw.githubusercontent.com/" + officialUpdateRepository + "/" + officialUpdateBranch
 	return base + "/skills/_shared/VERSION"
@@ -276,10 +250,6 @@ func updateArchiveURL(version, goos, goarch string) (string, error) {
 	}
 	name := "bianchini-method_" + version + "_" + target + ".tar.gz"
 	return "https://github.com/" + officialUpdateRepository + "/releases/download/v" + version + "/" + name, nil
-}
-
-func lineageManifestURL() string {
-	return "https://raw.githubusercontent.com/" + officialUpdateRepository + "/" + officialUpdateBranch + "/skills/" + lineageResetManifest
 }
 
 func defaultUpdateFetch(url string, timeout time.Duration) ([]byte, error) {
@@ -439,7 +409,7 @@ func runUpdateGit(repo string, checked bool, args ...string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-func updateGitCheckout(repo, skillsRoot, installed, latest string, lineageManifest []byte) (map[string]any, error) {
+func updateGitCheckout(repo, skillsRoot, installed, latest string) (map[string]any, error) {
 	branch, err := runUpdateGit(repo, true, "branch", "--show-current")
 	if err != nil {
 		return nil, err
@@ -473,15 +443,6 @@ func updateGitCheckout(repo, skillsRoot, installed, latest string, lineageManife
 	if remoteVersion != latest {
 		return nil, updateError("origin/main não corresponde à versão oficial consultada; atualização recusada", 3)
 	}
-	if lineageManifest != nil {
-		remoteManifest, err := runUpdateGitRaw(repo, "show", "origin/main:skills/"+lineageResetManifest)
-		if err != nil {
-			return nil, updateError("origin/main não contém o manifesto de reset versionado", 3)
-		}
-		if !bytes.Equal(remoteManifest, lineageManifest) {
-			return nil, updateError("manifesto de reset do origin/main diverge da fonte oficial consultada", 3)
-		}
-	}
 	if _, err := runUpdateGit(repo, true, "merge", "--ff-only", "origin/main"); err != nil {
 		return nil, err
 	}
@@ -493,30 +454,6 @@ func updateGitCheckout(repo, skillsRoot, installed, latest string, lineageManife
 		return nil, updateError("Git atualizou, mas a versão final é "+finalVersion+"; esperado "+latest, 3)
 	}
 	return updateBaseResult(installed, latest, skillsRoot, "git_checkout", "updated", true, ""), nil
-}
-
-func runUpdateGitRaw(repo string, args ...string) ([]byte, error) {
-	command := exec.Command("git", args...)
-	command.Dir = repo
-	output, err := command.Output()
-	if err != nil {
-		return nil, err
-	}
-	return output, nil
-}
-
-func verifyGitLineageSource(repo string) error {
-	branch, err := runUpdateGit(repo, true, "branch", "--show-current")
-	if err != nil {
-		return err
-	}
-	if branch != officialUpdateBranch {
-		if branch == "" {
-			branch = "detached"
-		}
-		return updateError("reset de linhagem exige checkout na branch main; atual: "+branch, 3)
-	}
-	return verifyOfficialUpdateOrigin(repo)
 }
 
 func verifyOfficialUpdateOrigin(repo string) error {
@@ -545,56 +482,6 @@ func normalizeGitHubRepository(value string) string {
 		}
 	}
 	return ""
-}
-
-type lineageResetDocument struct {
-	SchemaVersion  int    `json:"schema_version"`
-	ReleaseVersion string `json:"release_version"`
-	LineageReset   struct {
-		Authorized        bool   `json:"authorized"`
-		FromMajorVersions []int  `json:"from_major_versions"`
-		ToVersion         string `json:"to_version"`
-	} `json:"lineage_reset"`
-}
-
-func validateLineageManifest(content []byte, installed, latest string) error {
-	decoder := json.NewDecoder(bytes.NewReader(content))
-	decoder.DisallowUnknownFields()
-	var document lineageResetDocument
-	if err := decoder.Decode(&document); err != nil {
-		return userError("manifesto de reset inválido: " + err.Error())
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return userError("manifesto de reset possui estrutura inválida")
-	}
-	if document.SchemaVersion != 1 || document.ReleaseVersion != lineageResetVersion || latest != lineageResetVersion {
-		return userError("manifesto de reset diverge da release 0.4.0")
-	}
-	reset := document.LineageReset
-	if !reset.Authorized {
-		return userError("manifesto de reset não autoriza a transição")
-	}
-	if reset.ToVersion != lineageResetVersion {
-		return userError("manifesto de reset autoriza destino diferente de 0.4.0")
-	}
-	if len(reset.FromMajorVersions) == 0 || !sort.IntsAreSorted(reset.FromMajorVersions) {
-		return userError("manifesto de reset possui linhagens de origem inválidas")
-	}
-	seen := map[int]bool{}
-	for _, major := range reset.FromMajorVersions {
-		if major <= 0 || seen[major] {
-			return userError("manifesto de reset possui linhagens de origem inválidas")
-		}
-		seen[major] = true
-	}
-	installedVersion, err := parseUpdateVersion(installed)
-	if err != nil {
-		return err
-	}
-	if !seen[installedVersion.major] {
-		return userError("manifesto de reset não autoriza a linhagem instalada " + installed)
-	}
-	return nil
 }
 
 func updateError(message string, code int) error {

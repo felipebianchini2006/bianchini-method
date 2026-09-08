@@ -3,6 +3,7 @@ package gokernel
 import (
 	"context"
 	"encoding/json"
+	"github.com/felipebianchini2006/bianchini-method/internal/acceptance"
 	"io"
 	"net/http"
 	"os"
@@ -64,7 +65,7 @@ func releaseArtifactIdentity(root, kind, build, expected string) (string, error)
 	return actual, nil
 }
 
-func validateHomologationGates(root string, homologation map[string]any, proofIDs []string) error {
+func validateHomologationGates(root, evidenceRoot string, homologation map[string]any, proofIDs []string) error {
 	findings, ok := homologation["findings"].([]any)
 	if !ok {
 		return workflowError("HOMOLOGATION_REQUIRED", "findings deve ser lista explícita")
@@ -75,18 +76,19 @@ func validateHomologationGates(root string, homologation map[string]any, proofID
 		if !oneOf(status, "open", "resolved", "accepted") || !oneOf(severity, "critical", "high", "medium", "low", "info") {
 			return workflowError("HOMOLOGATION_REQUIRED", "finding inválido")
 		}
-		if (oneOf(severity, "critical", "high") || finding["blocking"] == true) && status != "resolved" {
+		if value, exists := finding["blocking"]; exists {
+			if _, ok := value.(bool); !ok {
+				return workflowError("HOMOLOGATION_REQUIRED", "finding.blocking exige booleano")
+			}
+		}
+		if (severity != "info" || finding["blocking"] == true) && status != "resolved" {
 			return workflowError("HOMOLOGATION_BLOCKED", "finding bloqueante não resolvido")
 		}
 		if status == "resolved" {
-			path, err := confinedPath(root, stateString(finding["resolution_evidence"]), "finding.resolution_evidence", true)
-			if err != nil || !regularFile(path) {
-				return workflowError("HOMOLOGATION_BLOCKED", "resolução exige arquivo real")
+			if err := inspectHomologationEvidence(root, evidenceRoot, acceptance.Evidence{Kind: "observation", Path: stateString(finding["resolution_evidence"]), SHA256: stateString(finding["resolution_sha256"])}); err != nil {
+				return workflowError("HOMOLOGATION_BLOCKED", err.Error())
 			}
-			content, err := os.ReadFile(path)
-			if err != nil || len(content) == 0 || sha256Bytes(content) != stateString(finding["resolution_sha256"]) {
-				return workflowError("HOMOLOGATION_BLOCKED", "evidência de resolução ausente ou alterada")
-			}
+
 		}
 	}
 	covered := map[string]bool{}

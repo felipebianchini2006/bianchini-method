@@ -2,6 +2,19 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 1.1.0 — 2026-09-08
+
+- consolida o backend Go e um único contrato operacional em `.bianchini/`;
+- reúne `PLAN.md`, `RESULT.md` e `evidence/` em `changes/Cxxx-*/plans/Pxx-slug/`;
+- registra homologações por release candidate em `homologation/<RC-id>/`;
+- exige cenários rastreáveis por requisito, perfil, plataforma, estado e evidência;
+- distingue integridade de bytes, processamento declarado, cobertura por página e revisão semântica;
+- remove comandos, adaptadores, schemas e implementações de outras gerações;
+- integra planejamento de verificação, simplificação, revisão pós-refatoração, segurança proporcional e auditoria de arquitetura;
+- homologa o produto real com inspeção visual, screenshots, correção de defeitos e reteste;
+- executa testes, vet e build nativos em Ubuntu, macOS e Windows;
+- mantém Python apenas em wrappers e verificações auxiliares atuais.
+
 ## 1.0.0 — 2026-09-05
 
 - apresenta a versão instalada nas skills, sem confundir com o formato interno do estado;

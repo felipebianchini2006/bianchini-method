@@ -36,11 +36,6 @@ func TestEndOfOptionsMatchesPublicCLIContract(t *testing.T) {
 		t.Fatalf("direct separator diverged: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 
-	code, stdout, stderr = runCLI(t, "status", "--", "missingfile")
-	if code != 2 || stdout != "" || stderr != "estado não encontrado: missingfile\n" {
-		t.Fatalf("status separator diverged: code=%d stdout=%q stderr=%q", code, stdout, stderr)
-	}
-
 	code, stdout, stderr = runCLI(t, "change-policy", "--")
 	if code != 2 || stdout != "" || !strings.HasSuffix(stderr, "bm: error: unrecognized arguments: --\n") {
 		t.Fatalf("flag-only separator diverged: code=%d stdout=%q stderr=%q", code, stdout, stderr)

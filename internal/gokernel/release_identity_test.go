@@ -36,7 +36,7 @@ func TestDeploymentIdentityObservesRunningTarget(t *testing.T) {
 
 func TestHomologationRejectsFictitiousResolution(t *testing.T) {
 	h := map[string]any{"findings": []any{map[string]any{"severity": "critical", "status": "resolved", "resolution_evidence": "does-not-exist", "resolution_sha256": strings.Repeat("a", 64)}}, "gates": []any{map[string]any{"proof_id": "p1", "result": "passed"}}}
-	if err := validateHomologationGates(t.TempDir(), h, []string{"p1"}); err == nil {
+	if err := validateHomologationGates(t.TempDir(), t.TempDir(), h, []string{"p1"}); err == nil {
 		t.Fatal("fictitious resolution accepted")
 	}
 }

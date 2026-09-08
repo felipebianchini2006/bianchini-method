@@ -32,7 +32,7 @@ func runRoadmap(args []string) (any, error) {
 	if repo == "" {
 		repo, err = os.Getwd()
 		if err != nil {
-			return nil, workflowError("WAVE_INCOMPLETE", "repo 0.4 exige .bianchini")
+			return nil, workflowError("WAVE_INCOMPLETE", "repositório exige .bianchini")
 		}
 	}
 	if action == "next-wave" {
@@ -51,16 +51,8 @@ func syncRoadmap(repo, change string) (map[string]any, error) {
 		return nil, workflowError("COHERENCE_ERROR", err.Error())
 	}
 	planningContract := stateInt(coherence["planning_contract"])
-	if planningContract == 0 {
-		planningContract = 1
-	}
-	if planningContract < 2 {
+	if planningContract != 2 {
 		return nil, workflowError("COHERENCE_ERROR", "roadmap sync exige planning_contract 2")
-	}
-	for _, plan := range plans {
-		if plan.schema != 2 {
-			return nil, workflowError("COHERENCE_ERROR", "roadmap v2 exige todos os planos em schema_version 2")
-		}
 	}
 	content, err := roadmapDocument(plans)
 	if err != nil {
@@ -112,7 +104,7 @@ func loadRoadmapPackage(repo, change string) (methodWorkspace, string, []planCon
 	if _, err := loadProjectModel(filepath.Join(directory, "SYSTEM_MODEL.md")); err != nil {
 		return methodWorkspace{}, "", nil, workflowError("MODEL_MISMATCH", err.Error())
 	}
-	paths, err := filepath.Glob(filepath.Join(directory, "plans", "P*.md"))
+	paths, err := planFiles(workspace.layout.Plans(filepath.Base(directory)))
 	if err != nil || len(paths) == 0 {
 		return methodWorkspace{}, "", nil, workflowError("COHERENCE_ERROR", "a mudança exige ao menos um plano")
 	}
@@ -122,7 +114,7 @@ func loadRoadmapPackage(repo, change string) (methodWorkspace, string, []planCon
 	for _, path := range paths {
 		identifier, valid := planFileID(path)
 		if !valid {
-			return methodWorkspace{}, "", nil, workflowError("COHERENCE_ERROR", "arquivo de plano com identidade inválida: "+filepath.Base(path))
+			return methodWorkspace{}, "", nil, workflowError("COHERENCE_ERROR", "diretório de plano com identidade inválida: "+planSlug(path))
 		}
 		if seen[identifier] {
 			return methodWorkspace{}, "", nil, workflowError("COHERENCE_ERROR", "arquivos de plano duplicam identidade: "+identifier)
@@ -132,7 +124,7 @@ func loadRoadmapPackage(repo, change string) (methodWorkspace, string, []planCon
 			return methodWorkspace{}, "", nil, workflowError("MODEL_MISMATCH", loadErr.Error())
 		}
 		if plan.id != identifier {
-			return methodWorkspace{}, "", nil, workflowError("MODEL_MISMATCH", "arquivo "+filepath.Base(path)+" diverge do id "+plan.id)
+			return methodWorkspace{}, "", nil, workflowError("MODEL_MISMATCH", "diretório "+planSlug(path)+" diverge do id "+plan.id)
 		}
 		seen[identifier] = true
 		plans = append(plans, plan)
@@ -167,10 +159,10 @@ func roadmapDocument(plans []planContract) ([]byte, error) {
 			dependsLabel = "nenhum"
 		}
 		if requirementLabel == "" {
-			requirementLabel = "legado"
+			requirementLabel = "nenhum"
 		}
 		if taskLabel == "" {
-			taskLabel = "legado"
+			taskLabel = "nenhuma"
 		}
 		body = append(body, "", "## "+plan.id+" — "+title, "", "- Depende de: "+dependsLabel, "- Escopo: "+requirementLabel, "- Tarefas: "+taskLabel)
 	}

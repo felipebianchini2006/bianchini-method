@@ -11,7 +11,7 @@ Pesquise somente o necessário para decidir o ciclo atual. O objetivo é reduzir
    - `full`: garantia Full explícita, auditoria/regulação, arquitetura nova de alto impacto ou várias decisões críticas.
 3. Listar decisões do escopo que dependem da stack. Ignorar famílias não aplicáveis.
 4. Em modo web, consultar fontes primárias atuais: documentação oficial da versão, padrões/RFCs, repositório/release notes upstream, provedor e normas.
-5. Comparar a prática recomendada com o código existente. Preferir compatibilidade e mudança mínima.
+5. Comparar a prática recomendada com o código existente. Preferir aderência aos contratos atuais e mudança mínima.
 6. Transformar cada achado em decisão aplicada, alternativa rejeitada, risco ou lacuna. Se não altera o design, não ocupar o contexto ativo.
 
 ## Regras de evidência

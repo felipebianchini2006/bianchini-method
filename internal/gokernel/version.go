@@ -5,12 +5,11 @@ package gokernel
 var BuildCommit = "unknown"
 
 const (
-	Version         = "1.0.0"
-	ContractVersion = "0.4"
+	Version         = "1.1.0"
+	ContractVersion = "bianchini"
 )
 
 var ImplementedSurfaces = []string{
-	"validate-state",
 	"model.init",
 	"model.validate",
 	"scope.seal",
@@ -42,14 +41,8 @@ var ImplementedSurfaces = []string{
 	"debug.resume",
 	"debug.checkpoint",
 	"debug.finish",
-	"migrate.check",
-	"migrate.apply",
-	"snapshot.create",
-	"snapshot.verify",
-	"planning-audit",
 	"design-audit.seal",
 	"design-audit.verify",
-	"planning-check.record",
 	"change-policy",
 	"cycle-close",
 	"policy",
@@ -58,15 +51,7 @@ var ImplementedSurfaces = []string{
 	"workspace.locate",
 	"workspace.resume",
 	"workspace.finish",
-	"task-brief",
 	"spec-diff",
-	"mutation-evidence.verify",
-	"report",
-	"review-package",
-	"checkpoint",
-	"proof-map",
-	"telemetry.record",
-	"telemetry.summary",
 	"direct.classify",
 	"direct.start",
 	"direct.status",

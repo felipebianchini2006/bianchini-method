@@ -34,7 +34,7 @@ Não recebe histórico da conversa nem planos concluídos.
 - alterar arquivos fora do escopo do brief;
 - concluir com verificação falhando ou não executada sem registrar bloqueio;
 - transformar unitários, integração, E2E, regressão ou mutação em tarefas/subagentes separados;
-- executar suíte E2E completa ou mutation testing durante uma unidade, salvo quando a própria unidade aprovada implementa esse harness;
+- executar suíte E2E completa durante uma unidade, salvo quando a própria unidade aprovada implementa esse harness;
 - push, merge, deploy ou publicação.
 
 ## Saída

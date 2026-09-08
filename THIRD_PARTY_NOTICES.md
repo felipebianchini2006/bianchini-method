@@ -1,5 +1,23 @@
 # Third-Party Notices
 
+## akitaonrails/my-skills
+
+As orientações de caminho de verificação, simplificação, revisão pós-refatoração, arquitetura profunda e auditoria de segurança foram estudadas em `akitaonrails/my-skills`, revisão `02a957219f1a607844ef6a0afd0fef6f48d78fa2`.
+
+- Projeto: https://github.com/akitaonrails/my-skills
+- Arquivos consultados: `verification-planning`, `simplify`, `post-refactor`, `improve-codebase-architecture` e `security-audit`
+
+Os textos foram reescritos e incorporados ao fluxo existente. Nenhum arquivo, agente, script, inicializador ou dependência foi copiado. O repositório consultado não declarava uma licença geral na revisão registrada.
+
+## Impeccable
+
+As orientações de craft visual, inspeção no browser, adequação ao tipo de superfície e polish foram estudadas no projeto `pbakaus/impeccable`, revisão `12ffee04c2a3682e0ccf09bf34d6711951dd551d`, distribuído sob Apache License 2.0.
+
+- Projeto: https://github.com/pbakaus/impeccable
+- Licença: Apache-2.0
+
+Somente critérios selecionados foram reescritos nas skills do Bianchini Method. Não foram copiados `.slim`, agentes, inicializadores, estado `.impeccable`, scripts ou dependências.
+
 ## Agency Agents
 
 Os contratos internos em `skills/_shared/agents/` (repo-cartographer, implementation-worker, plan-reviewer, security-reviewer, ui-finish-reviewer) adaptam conceitos e trechos de texto do projeto **Agency Agents** (agency-agents), distribuído sob a licença MIT.

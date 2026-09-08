@@ -24,7 +24,7 @@ func verificationAttemptPolicy(request verificationRequest, source string) (map[
 	prior := []map[string]any{}
 	for _, proof := range proofs {
 		sequence = maxInt(sequence, stateInt(proof["execution_sequence"]))
-		if stateString(proof["risk_seam"]) == request.seam {
+		if stateString(proof["risk_seam"]) == request.seam && stateString(proof["plan"]) == request.plan {
 			prior = append(prior, proof)
 		}
 	}

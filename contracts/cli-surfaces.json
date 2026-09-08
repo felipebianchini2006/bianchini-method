@@ -1,212 +1,605 @@
 {
-  "schema_version": 1,
-  "contract_version": "0.4",
-  "base_commit": "7c9fa23f524623f3360ebae579048e1765095220",
-  "parser": "skills/_shared/scripts/bm.py:parser",
-  "dispatcher": "skills/_shared/scripts/bm.py:main",
-  "command_count": 32,
-  "surface_count": 65,
-  "handler_modules": {
-    "$local": "skills/_shared/scripts/bm.py",
-    "v04": "skills/_shared/scripts/bm_v04_workflows.py",
-    "v04_planning": "skills/_shared/scripts/bm_v04_planning.py",
-    "bm_scope": "skills/_shared/scripts/bm_scope.py",
-    "compile_context_pack": "skills/_shared/scripts/bm_context.py",
-    "verify_context_pack": "skills/_shared/scripts/bm_context.py",
-    "next_wave": "skills/_shared/scripts/bm_wave.py",
-    "render_adapter": "skills/_shared/scripts/bm_host_adapters.py",
-    "install_adapter": "skills/_shared/scripts/bm_host_adapters.py",
-    "propose_learning": "skills/_shared/scripts/bm_learning.py",
-    "list_learning": "skills/_shared/scripts/bm_learning.py",
-    "approve_learning": "skills/_shared/scripts/bm_learning.py",
-    "reject_learning": "skills/_shared/scripts/bm_learning.py",
-    "deactivate_learning": "skills/_shared/scripts/bm_learning.py",
-    "spec_diff": "skills/_shared/scripts/bm_spec_diff.py",
-    "mutation_evidence_verify": "skills/_shared/scripts/bm_mutation.py",
-    "update_bianchini_method": "skills/_shared/scripts/bm_update.py",
-    "render_update_result": "skills/_shared/scripts/bm_update.py"
-  },
-  "behavior_profiles": {
-    "json_read_only": {
-      "stdout": "JSON object indentado, chaves ordenadas, UTF-8 e newline final",
-      "stderr": "vazio no sucesso; uma mensagem canônica no erro",
-      "exit_codes": {"0": "sucesso", "2": "entrada inválida", "3": "gate bloqueado", "4": "workspace inseguro"},
-      "mutations": ["nenhuma"]
-    },
-    "json_mutating": {
-      "stdout": "JSON object indentado, chaves ordenadas, UTF-8 e newline final",
-      "stderr": "vazio no sucesso; uma mensagem canônica no erro",
-      "exit_codes": {"0": "sucesso", "2": "entrada inválida", "3": "gate bloqueado", "4": "workspace inseguro"},
-      "mutations": ["somente os paths declarados pela superfície; superfícies que persistem evidência em bloqueio declaram essa escrita explicitamente"]
-    },
-    "text_or_json_read_only": {
-      "stdout": "texto UTF-8 ou JSON conforme --format, sempre com newline final",
-      "stderr": "vazio no sucesso; uma mensagem canônica no erro",
-      "exit_codes": {"0": "sucesso", "2": "entrada inválida", "3": "gate bloqueado", "4": "workspace inseguro"},
-      "mutations": ["nenhuma"]
-    },
-    "text_or_json_mutating": {
-      "stdout": "texto UTF-8 ou JSON conforme --format, sempre com newline final",
-      "stderr": "vazio no sucesso; uma mensagem canônica no erro",
-      "exit_codes": {"0": "sucesso", "2": "entrada inválida ou update indisponível", "3": "gate bloqueado", "4": "workspace inseguro"},
-      "mutations": ["somente a instalação explicitada por --skills-root quando --check não foi usado"]
-    },
-    "parser_terminal_error": {
-      "stdout": "vazio",
-      "stderr": "ORDER_VIOLATION: quick 0.4 terminal é imutável + newline",
-      "exit_codes": {"2": "erro terminal conhecido"},
-      "mutations": ["nenhuma"]
-    },
-    "negative_argparse": {
-      "stdout": "vazio",
-      "stderr": "usage do argparse e erro canônico de escolha ou flag inválida",
-      "exit_codes": {"2": "superfície aposentada ou incompatível"},
-      "mutations": ["nenhuma"]
-    }
-  },
+  "schema_version": 2,
+  "contract_version": "bianchini",
+  "command_count": 20,
+  "surface_count": 50,
   "commands": {
-    "validate-state": {"generation": "legacy_internal", "interface": "state;type=Path;required | --schema;type=Path;default=null"},
-    "model": {"generation": "core_0_4", "interface": "action;choices=init,validate;required | --repo;type=Path;default=\"$CWD\" | --change;default=null"},
-    "scope": {"generation": "core_0_4", "interface": "action;choices=seal,verify;required | --repo;type=Path;default=\"$CWD\" | --change;required | --source;type=Path;default=null | --draft;type=Path;default=null | --pages;type=int;default=null | --extraction;choices=native,ocr,mixed;default=null"},
-    "roadmap": {"generation": "core_0_4", "interface": "action;choices=sync,next-wave;required | --repo;type=Path;default=\"$CWD\" | --change;required | --format;choices=json;default=\"json\""},
-    "coherence": {"generation": "core_0_4", "interface": "action;choices=check,approve;required | --repo;type=Path;default=\"$CWD\" | --change;required | --structural-only;action=store_true;default=false | --semantic-report;type=Path;default=null | --digest;default=null | --approved-by;default=null"},
-    "impact": {"generation": "core_0_4", "interface": "action;choices=analyze;required | --repo;type=Path;default=\"$CWD\" | --change;required | --plan;required | --changed-contract;action=append;default=[] | --changed-ownership;action=append;default=[] | --changed-interface;action=append;default=[] | --changed-data;action=append;default=[] | --changed-migration;action=append;default=[] | --changed-journey;action=append;default=[] | --changed-effect;action=append;default=[] | --changed-invariant;action=append;default=[] | --global-change;action=store_true;default=false"},
-    "plan": {"generation": "core_0_4", "interface": "action;choices=complete,reopen;required | --repo;type=Path;default=\"$CWD\" | --change;required | --plan;required | --task;default=null | --context-pack;type=Path;default=null | --actual-delta;type=Path;default=null | --result;default=null | --verification;action=append;default=[] | --proof;action=append;default=[] | --review;default=null | --reason;default=null | --completed-task;action=append;default=[]"},
-    "verify": {"generation": "core_0_4", "interface": "action;choices=task,plan,release,review,status;required | --repo;type=Path;default=\"$CWD\" | --change;default=null | --plan;default=null | --task;default=null | --context-pack;type=Path;default=null | --evidence;type=Path;default=null | --retry-reason;default=null | --scope;choices=task,plan,release;default=null | --reviewer;default=null | --verdict;choices=approved,changes_requested;default=null | --proof;action=append;default=[] | --finding;action=append;default=[] | --build;default=null | --checksum;default=null | --delivery;choices=ready,not_applicable;default=null"},
-    "context": {"generation": "core_0_4", "interface": "action;choices=pack,verify;required | --repo;type=Path;default=\"$CWD\" | --unit;default=null | --output;type=Path;default=null | --max-bytes;type=int;default=16384 | --path;type=Path;default=null"},
-    "adapter": {"generation": "operational", "interface": "action;choices=render,install;required | --host;choices=generic,codex,claude-compatible;required | --repo;type=Path;default=\"$CWD\" | --overwrite;action=store_true;default=false"},
-    "learn": {"generation": "core_0_4", "interface": "action;choices=propose,list,approve,reject,deactivate;required | --repo;type=Path;default=\"$CWD\" | --since;default=null | --candidate;default=null | --digest;default=null | --approved-by;default=null | --reason;default=null"},
-    "debug": {"generation": "core_0_4", "interface": "action;choices=start,list,status,resume,checkpoint,finish;required | --repo;type=Path;default=\"$CWD\" | --id;default=null | --objective;default=null | --expected;default=null | --actual;default=null | --environment;default=null | --origin-ref;action=append;default=[] | --origin-evidence;default=null | --relation;choices=caused_by,detected_in,regression_of;default=null | --event;choices=reproduced,diagnosed,red,fixing,green,regression_checked,documented;default=null | --evidence;default=null | --hypothesis;action=append;default=[] | --experiment;action=append;default=[] | --eliminated-hypothesis;action=append;default=[] | --root-cause;default=null | --neighbor-regression;action=append;default=[] | --residual-risk;default=null | --status;choices=resolved,blocked,escalated;default=null | --reason;default=null | --docviva-kind;choices=internal,behavioral,contract,architecture,rule;default=null | --docviva-outcome;choices=updated,not_applicable,no_op;default=null | --docviva-artifact;action=append;default=[] | --docviva-justification;default=null | --learning-classification;choices=environment_fact,human_preference,repeatable_procedure,deterministic_invariant,architecture_decision,isolated_error;default=null | --learning-statement;default=null | --learning-tag;action=append;default=[] | --learning-validity;default=null | --learning-conflict;action=append;default=[]"},
-    "migrate": {"generation": "core_0_4", "interface": "action;choices=check,apply;required | --repo;type=Path;default=\"$CWD\""},
-    "snapshot": {"generation": "legacy_internal", "interface": "action;choices=create,verify;required | state;type=Path;required | --root;type=Path;required"},
-    "planning-audit": {"generation": "legacy_internal", "interface": "state;type=Path;required | --root;type=Path;required | --strict;action=store_true;default=false"},
-    "design-audit": {"generation": "operational", "interface": "action;choices=seal,verify;required | --root;type=Path;required | --scope;type=Path;required | --manifest;type=Path;required"},
-    "planning-check": {"generation": "legacy_internal", "interface": "action;choices=record;required | --state;type=Path;required | --root;type=Path;required | --report;type=Path;required"},
-    "change-policy": {"generation": "companion", "interface": "--scope-change;action=store_true;default=false | --public-contract-change;action=store_true;default=false | --approved-design-change;action=store_true;default=false | --new-cost;action=store_true;default=false | --irreversible-action;action=store_true;default=false | --external-impossibility;action=store_true;default=false | --critical-invariant;action=store_true;default=false | --plan-command;action=store_true;default=false | --file-location;action=store_true;default=false | --internal-order;action=store_true;default=false"},
-    "cycle-close": {"generation": "core_0_4", "interface": "--repo;type=Path;default=\"$CWD\" | --change;required"},
-    "policy": {"generation": "operational", "interface": "--profile;choices=lean,standard,full;required | --risk;choices=low,medium,high,critical;required | --change;default=\"behavioral\" | --manual-pdf;choices=none,quick_start,full,scope;default=\"scope\" | --manual-in-scope;action=store_true;default=false | --round;type=int;default=0 | --risk-seam;default=null | --seam-round;type=int;default=null | --structural-finding;choices=crash_window,partial_commit,toctou,external_effect_before_persistence,retry_after_timeout,concurrent_idempotency,recovery_after_restart;action=append;default=[] | --consecutive-seam-findings;type=int;default=0"},
-    "workspace": {"generation": "core_0_4", "interface": "action;choices=create,check,locate,resume,finish;required | --repo;type=Path;default=\"$CWD\" | --plan;default=null | --change;default=null | --target;type=Path;default=null"},
-    "task-brief": {"generation": "companion", "interface": "--plan;type=Path;required | --task;default=null | --tasks;default=null | --group;default=null | --state;type=Path;default=null | --root;type=Path;default=null | --hydrate-context;action=store_true;default=false | --ledger-tail-lines;type=int;default=40 | --output;type=Path;required"},
-    "spec-diff": {"generation": "operational", "interface": "--root;type=Path;required | --base;type=Path;required | --target;type=Path;required | --output;type=Path;required"},
-    "mutation-evidence": {"generation": "operational", "interface": "action;choices=verify;required | --state;type=Path;required | --root;type=Path;required | --plan;required | --risk-seam;required | --tool;choices=normalized,stryker;required | --command;required | --report;type=Path;required | --revision;required | --classifications;type=Path;default=null | --output;type=Path;required"},
-    "report": {"generation": "companion", "interface": "--brief;type=Path;required | --output;type=Path;required"},
-    "review-package": {"generation": "companion", "interface": "--cwd;type=Path;default=\"$CWD\" | --base;required | --head;default=\"HEAD\" | --brief;type=Path;required | --report;type=Path;required | --output;type=Path;required"},
-    "checkpoint": {"generation": "companion", "interface": "--state;type=Path;required | --ledger;type=Path;required | --cwd;type=Path;default=\"$CWD\" | --output;type=Path;required"},
-    "proof-map": {"generation": "operational", "interface": "--state;type=Path;required | --evidence;type=Path;required | --mutation-evidence;type=Path;action=append;default=[] | --output;type=Path;required"},
-    "telemetry": {"generation": "operational", "interface": "action;choices=record,summary;required | --state;type=Path;required | --root;type=Path;required | --plan;default=null | --phase;choices=planning,execution,gate,homologation,final_review;default=\"execution\" | --at;default=null | --input-tokens;type=int;default=0 | --output-tokens;type=int;default=0 | --duration-ms;type=int;default=0 | --fix-rounds;type=int;default=0 | --gate-failures;type=int;default=0 | --homologation-bugs;type=int;default=0"},
-    "direct": {"generation": "core_0_4", "interface": "action;choices=classify,start,status,checkpoint,finish,reopen;required | --repo;type=Path;default=\"$CWD\" | --slug;default=null | --objective;default=null | --scope;default=null | --acceptance;action=append;default=[] | --verification;action=append;default=[] | --checkpoint;default=null | --changed-file;action=append;default=[] | --command;action=append;default=[] | --blocker;action=append;default=[] | --next-action;default=null | --status;choices=completed,blocked;default=null | --behavior;action=append;default=[] | --limitation;action=append;default=[] | --evidence;action=append;default=[] | --scope-score;type=int;choices=0,1,2;default=0 | --external-effect-score;type=int;choices=0,1,2;default=0 | --migration-score;type=int;choices=0,1,2;default=0 | --concurrency-score;type=int;choices=0,1,2;default=0 | --money-score;type=int;choices=0,1,2;default=0 | --guard;action=append;default=[] | --webhook-flow;action=store_true;default=false | --payment-flow;action=store_true;default=false | --production-authorized;action=store_true;default=false | --multiple-objectives;action=store_true;default=false | --destructive-migration;action=store_true;default=false | --uncontrolled-concurrency;action=store_true;default=false | --undefined-ownership;action=store_true;default=false | --ambiguous-financial-rule;action=store_true;default=false | --new-material-architecture;action=store_true;default=false | --docviva-kind;choices=internal,behavioral,contract,architecture,rule;default=null | --docviva-outcome;choices=updated,not_applicable,no_op;default=null | --docviva-artifact;action=append;default=[] | --docviva-justification;default=null"},
-    "update-bm": {"generation": "operational", "interface": "--check;action=store_true;default=false | --skills-root;type=Path;default=\"$PACKAGED_SKILLS_ROOT\" | --timeout;type=float;default=15.0 | --format;choices=text,json;default=\"text\""},
-    "status": {"generation": "core_0_4", "interface": "state;type=Path;required | --root;type=Path;default=null | --format;choices=json,text;default=\"json\""}
-  },
-  "surfaces": [
-    {"id":"validate-state","command":"validate-state","action":null,"generation":"legacy_internal","behavior":"json_read_only","handlers":["validate_state"],"allowed_mutations":["nenhuma"],"consumers":["codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_package.py::test_v2_state_validates_and_status_is_structured"],"fixtures":["validate-state","success-legacy-operations"]},
-    {"id":"model.init","command":"model","action":"init","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.init_workspace","v04_planning.create_change"],"allowed_mutations":[".bianchini/**"],"consumers":["skills/design-projeto/SKILL.md","skills/preparar-escopo/SKILL.md","skills/sdd-planning/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_model_init_creates_only_bianchini_workspace"],"fixtures":["model-init","success-model"]},
-    {"id":"model.validate","command":"model","action":"validate","generation":"core_0_4","behavior":"json_read_only","handlers":["v04.validate_workspace","v04_planning.validate_change_model"],"allowed_mutations":["nenhuma"],"consumers":["skills/auditar-arquitetura/SKILL.md","skills/executar-plano/SKILL.md","skills/homologar-sistema/SKILL.md","skills/migrar-bianchini/SKILL.md","skills/sdd-planning/SKILL.md","skills/status-projeto/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_change_model_coherence_and_impact_are_integrated"],"fixtures":["model-validate","success-model"]},
-    {"id":"scope.seal","command":"scope","action":"seal","generation":"core_0_4","behavior":"json_mutating","handlers":["bm_scope.seal_scope"],"allowed_mutations":[".bianchini/changes/<change>/SCOPE.md",".bianchini/changes/<change>/COHERENCE.md",".bianchini/STATE.md"],"consumers":["skills/preparar-escopo/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_scope_seal_creates_verified_scope_and_preserves_foreign_planning"],"fixtures":["scope-seal","success-full-lifecycle"]},
-    {"id":"scope.verify","command":"scope","action":"verify","generation":"core_0_4","behavior":"json_read_only","handlers":["bm_scope.verify_scope"],"allowed_mutations":["nenhuma"],"consumers":["skills/preparar-escopo/SKILL.md","skills/sdd-planning/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_scope_verify_detects_tampering_and_different_pdf"],"fixtures":["scope-verify","success-full-lifecycle"]},
-    {"id":"roadmap.sync","command":"roadmap","action":"sync","generation":"core_0_4","behavior":"json_mutating","handlers":["v04_planning.sync_roadmap"],"allowed_mutations":[".bianchini/changes/<change>/ROADMAP.md",".bianchini/STATE.md"],"consumers":["skills/sdd-planning/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_typed_planning_binds_scope_roadmap_tasks_semantic_review_and_package"],"fixtures":["roadmap-sync","success-full-lifecycle"]},
-    {"id":"roadmap.next-wave","command":"roadmap","action":"next-wave","generation":"core_0_4","behavior":"json_read_only","handlers":["next_wave"],"allowed_mutations":["nenhuma"],"consumers":["skills/executar-plano/SKILL.md"],"behavior_tests":["tests/test_phase3_cli.py::test_next_wave_is_public_read_only_projection"],"fixtures":["roadmap-next-wave","success-full-lifecycle"]},
-    {"id":"coherence.check","command":"coherence","action":"check","generation":"core_0_4","behavior":"json_mutating","handlers":["v04_planning.coherence_check"],"allowed_mutations":[".bianchini/changes/<change>/COHERENCE.md"],"consumers":["skills/sdd-planning/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_change_model_coherence_and_impact_are_integrated"],"fixtures":["coherence-check","success-full-lifecycle"]},
-    {"id":"coherence.approve","command":"coherence","action":"approve","generation":"core_0_4","behavior":"json_mutating","handlers":["v04_planning.coherence_approve"],"allowed_mutations":[".bianchini/changes/<change>/COHERENCE.md",".bianchini/STATE.md"],"consumers":["skills/sdd-planning/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_typed_planning_binds_scope_roadmap_tasks_semantic_review_and_package"],"fixtures":["coherence-approve","success-full-lifecycle"]},
-    {"id":"impact.analyze","command":"impact","action":"analyze","generation":"core_0_4","behavior":"json_mutating","handlers":["v04_planning.impact_analyze"],"allowed_mutations":[".bianchini/changes/<change>/COHERENCE.md",".bianchini/STATE.md"],"consumers":["skills/executar-plano/SKILL.md","skills/sdd-planning/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_change_model_coherence_and_impact_are_integrated"],"fixtures":["impact-analyze","success-full-lifecycle"]},
-    {"id":"plan.complete","command":"plan","action":"complete","generation":"core_0_4","behavior":"json_mutating","handlers":["v04_planning.plan_complete","v04_planning.task_complete"],"allowed_mutations":[".bianchini/changes/<change>/results/<plan>.md",".bianchini/changes/<change>/results/tasks/<plan>/<task>.md",".bianchini/STATE.md"],"consumers":["skills/executar-plano/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_typed_plan_completion_requires_every_task","tests/test_next_wave.py::test_public_task_completion_verifies_pack_and_advances_wave","internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation"],"fixtures":["plan-complete","success-full-lifecycle"]},
-    {"id":"plan.reopen","command":"plan","action":"reopen","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.require_workspace"],"allowed_mutations":[".bianchini/changes/<change>/results/reopened/**",".bianchini/changes/<change>/results/<plan>.md ou tarefa selecionada",".bianchini/STATE.md"],"consumers":["skills/executar-plano/SKILL.md"],"behavior_tests":["internal/gokernel/plan_test.go::TestPlanReopenRestoresExecutableStateAndKeepsAudit"],"fixtures":["plan-reopen"],"golden_success_exception":"sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"},
-    {"id":"verify.task","command":"verify","action":"task","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.require_workspace"],"allowed_mutations":[".bianchini/changes/<change>/results/proofs/**"],"consumers":["skills/executar-plano/SKILL.md"],"behavior_tests":["internal/gokernel/verification_test.go::TestVerifyTaskExecutesStructuredCommandAndReusesPassingProof"],"fixtures":["verify-task"],"golden_success_exception":"sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"},
-    {"id":"verify.plan","command":"verify","action":"plan","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.require_workspace"],"allowed_mutations":[".bianchini/changes/<change>/results/proofs/**"],"consumers":["skills/executar-plano/SKILL.md"],"behavior_tests":["internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation"],"fixtures":["verify-plan"],"golden_success_exception":"sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"},
-    {"id":"verify.release","command":"verify","action":"release","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.require_workspace"],"allowed_mutations":[".bianchini/changes/<change>/results/proofs/**",".bianchini/changes/<change>/results/RELEASE.md"],"consumers":["skills/executar-plano/SKILL.md","skills/homologar-sistema/SKILL.md"],"behavior_tests":["internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation"],"fixtures":["verify-release"],"golden_success_exception":"sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"},
-    {"id":"verify.review","command":"verify","action":"review","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.require_workspace"],"allowed_mutations":[".bianchini/changes/<change>/results/reviews/**",".bianchini/changes/<change>/results/RELEASE.md quando scope=release"],"consumers":["skills/executar-plano/SKILL.md"],"behavior_tests":["internal/gokernel/verification_test.go::TestProofAndReviewBecomeStaleAfterCodeChanges"],"fixtures":["verify-review"],"golden_success_exception":"sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"},
-    {"id":"verify.status","command":"verify","action":"status","generation":"core_0_4","behavior":"json_read_only","handlers":["v04.require_workspace"],"allowed_mutations":["nenhuma"],"consumers":["skills/executar-plano/SKILL.md","skills/status-projeto/SKILL.md"],"behavior_tests":["internal/gokernel/verification_test.go::TestTypedLifecycleRequiresProofReviewReleaseAndHomologation"],"fixtures":["verify-status"],"golden_success_exception":"sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"},
-    {"id":"context.pack","command":"context","action":"pack","generation":"core_0_4","behavior":"json_mutating","handlers":["compile_context_pack"],"allowed_mutations":[".bianchini/.runtime/context/**"],"consumers":["skills/corrigir-bug/SKILL.md","skills/executar-direto/SKILL.md","skills/executar-plano/SKILL.md","skills/homologar-sistema/SKILL.md","skills/status-projeto/SKILL.md"],"behavior_tests":["tests/test_context_cli.py::test_context_pack_and_verify_are_public_and_json_observable"],"fixtures":["context-pack","success-context"]},
-    {"id":"context.verify","command":"context","action":"verify","generation":"core_0_4","behavior":"json_read_only","handlers":["verify_context_pack"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_context_cli.py::test_context_pack_and_verify_are_public_and_json_observable"],"fixtures":["context-verify","success-context"]},
-    {"id":"adapter.render","command":"adapter","action":"render","generation":"operational","behavior":"json_read_only","handlers":["render_adapter"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_phase3_cli.py::test_adapter_render_and_explicit_install_are_public"],"fixtures":["adapter-render"]},
-    {"id":"adapter.install","command":"adapter","action":"install","generation":"operational","behavior":"json_mutating","handlers":["install_adapter"],"allowed_mutations":["bloco gerenciado em AGENTS.md ou CLAUDE.md no --repo explícito"],"consumers":[],"behavior_tests":["tests/test_phase3_cli.py::test_adapter_render_and_explicit_install_are_public"],"fixtures":["adapter-install","success-adapter-install"]},
-    {"id":"learn.propose","command":"learn","action":"propose","generation":"core_0_4","behavior":"json_mutating","handlers":["propose_learning"],"allowed_mutations":[".bianchini/.runtime/learning/pending/**"],"consumers":["skills/corrigir-bug/SKILL.md"],"behavior_tests":["tests/test_learning.py::test_cli_exposes_opt_in_propose_list_approve_reject_and_deactivate"],"fixtures":["learn-propose","success-learning-governance"]},
-    {"id":"learn.list","command":"learn","action":"list","generation":"core_0_4","behavior":"json_read_only","handlers":["list_learning"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_learning.py::test_cli_exposes_opt_in_propose_list_approve_reject_and_deactivate"],"fixtures":["learn-list","success-learning-governance"]},
-    {"id":"learn.approve","command":"learn","action":"approve","generation":"core_0_4","behavior":"json_mutating","handlers":["approve_learning"],"allowed_mutations":[".bianchini/current/lessons/<candidate>.json","remove candidato correspondente de .bianchini/.runtime/learning/pending"],"consumers":[],"behavior_tests":["tests/test_learning.py::test_human_approval_promotes_only_governed_project_lesson"],"fixtures":["learn-approve","success-learning-governance"]},
-    {"id":"learn.reject","command":"learn","action":"reject","generation":"core_0_4","behavior":"json_mutating","handlers":["reject_learning"],"allowed_mutations":[".bianchini/.runtime/learning/rejected/<candidate>.json","remove candidato correspondente de .bianchini/.runtime/learning/pending"],"consumers":[],"behavior_tests":["tests/test_learning.py::test_rejection_preserves_history_without_active_lesson"],"fixtures":["learn-reject","success-learning-reject"]},
-    {"id":"learn.deactivate","command":"learn","action":"deactivate","generation":"core_0_4","behavior":"json_mutating","handlers":["deactivate_learning"],"allowed_mutations":[".bianchini/current/lessons/<candidate>.json preservando histórico"],"consumers":[],"behavior_tests":["tests/test_learning.py::test_approved_lesson_can_be_deactivated_without_deleting_history"],"fixtures":["learn-deactivate","success-learning-governance"]},
-    {"id":"debug.start","command":"debug","action":"start","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.debug_start"],"allowed_mutations":[".bianchini/debug/active/<id>/**",".bianchini/STATE.md"],"consumers":["skills/corrigir-bug/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order"],"fixtures":["debug-start","success-debug"]},
-    {"id":"debug.list","command":"debug","action":"list","generation":"core_0_4","behavior":"json_read_only","handlers":["v04.debug_status"],"allowed_mutations":["nenhuma"],"consumers":["skills/corrigir-bug/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order"],"fixtures":["debug-list","success-debug"]},
-    {"id":"debug.status","command":"debug","action":"status","generation":"core_0_4","behavior":"json_read_only","handlers":["v04.debug_status"],"allowed_mutations":["nenhuma"],"consumers":["skills/corrigir-bug/SKILL.md","skills/status-projeto/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order"],"fixtures":["debug-status","success-debug"]},
-    {"id":"debug.resume","command":"debug","action":"resume","generation":"core_0_4","behavior":"json_read_only","handlers":["v04.debug_status"],"allowed_mutations":["nenhuma"],"consumers":["skills/corrigir-bug/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order"],"fixtures":["debug-resume","success-debug"]},
-    {"id":"debug.checkpoint","command":"debug","action":"checkpoint","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.debug_checkpoint"],"allowed_mutations":[".bianchini/debug/active/<id>/**",".bianchini/STATE.md"],"consumers":["skills/corrigir-bug/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order"],"fixtures":["debug-checkpoint","success-debug"]},
-    {"id":"debug.finish","command":"debug","action":"finish","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.debug_finish"],"allowed_mutations":[".bianchini/debug/active/<id>/**",".bianchini/debug/resolved/<id>/** ou .bianchini/debug/blocked/<id>/**",".bianchini/STATE.md"],"consumers":["skills/corrigir-bug/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_debug_persists_red_green_and_rejects_wrong_order","tests/test_learning.py::test_resolved_debug_can_explicitly_nominate_pending_learning"],"fixtures":["debug-finish","success-debug"]},
-    {"id":"migrate.check","command":"migrate","action":"check","generation":"core_0_4","behavior":"json_read_only","handlers":["v04.migration_check"],"allowed_mutations":["nenhuma"],"consumers":["skills/migrar-bianchini/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_migration_is_explicit_and_never_touches_planning"],"fixtures":["migrate-check","success-migration"]},
-    {"id":"migrate.apply","command":"migrate","action":"apply","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.migration_apply"],"allowed_mutations":[".bianchini/**","docs/bianchini/legacy/**"],"consumers":["skills/migrar-bianchini/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_migration_is_explicit_and_never_touches_planning"],"fixtures":["migrate-apply","success-migration"]},
-    {"id":"snapshot.create","command":"snapshot","action":"create","generation":"legacy_internal","behavior":"json_mutating","handlers":["snapshot"],"allowed_mutations":["manifest_path declarado no estado"],"consumers":[],"behavior_tests":["tests/test_method_package.py::test_snapshot_detects_tampering"],"fixtures":["snapshot-create","success-legacy-operations"]},
-    {"id":"snapshot.verify","command":"snapshot","action":"verify","generation":"legacy_internal","behavior":"json_read_only","handlers":["snapshot"],"allowed_mutations":["nenhuma"],"consumers":["codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_package.py::test_snapshot_detects_tampering"],"fixtures":["snapshot-verify","success-legacy-operations"]},
-    {"id":"planning-audit","command":"planning-audit","action":null,"generation":"legacy_internal","behavior":"json_read_only","handlers":["planning_audit"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_package.py::test_strict_audit_accepts_researched_compact_plan"],"fixtures":["planning-audit","success-planning-check"]},
-    {"id":"design-audit.seal","command":"design-audit","action":"seal","generation":"operational","behavior":"json_mutating","handlers":["design_audit"],"allowed_mutations":["manifest informado por --manifest"],"consumers":["skills/design-projeto/SKILL.md"],"behavior_tests":["tests/test_method_package.py::test_design_can_be_sealed_and_verified_before_project_state"],"fixtures":["design-audit-seal","success-full-lifecycle"]},
-    {"id":"design-audit.verify","command":"design-audit","action":"verify","generation":"operational","behavior":"json_read_only","handlers":["design_audit"],"allowed_mutations":["nenhuma"],"consumers":["skills/design-projeto/SKILL.md"],"behavior_tests":["tests/test_method_package.py::test_design_can_be_sealed_and_verified_before_project_state"],"fixtures":["design-audit-verify","success-full-lifecycle"]},
-    {"id":"planning-check.record","command":"planning-check","action":"record","generation":"legacy_internal","behavior":"json_mutating","handlers":["planning_check_record"],"allowed_mutations":["report informado por --report","estado informado por --state"],"consumers":[],"behavior_tests":["tests/test_method_package.py::test_planning_checker_allows_one_correction_only"],"fixtures":["planning-check-record","success-planning-check"]},
-    {"id":"change-policy","command":"change-policy","action":null,"generation":"companion","behavior":"json_read_only","handlers":["change_policy"],"allowed_mutations":["nenhuma"],"consumers":["codex/skills/executar-plano-codex/SKILL.md","codex/skills/executar-plano-codex/references/CODEX_CONVERGENCE.md","codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md","codex/skills/executar-plano-codex/references/plan-reviewer-codex.md"],"behavior_tests":["tests/test_method_package.py::test_change_policy_prevents_redesign_for_internal_adjustments"],"fixtures":["change-policy-read-only","change-policy-material"]},
-    {"id":"cycle-close","command":"cycle-close","action":null,"generation":"core_0_4","behavior":"json_mutating","handlers":["v04_planning.close_change"],"allowed_mutations":[".bianchini/current/**",".bianchini/archive/<change>/**",".bianchini/STATE.md","remove .bianchini/changes/<change> após promoção"],"consumers":["skills/executar-plano/SKILL.md","codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_cycle_close_legacy_schema1_preserves_specs"],"fixtures":["cycle-close","success-full-lifecycle"]},
-    {"id":"policy","command":"policy","action":null,"generation":"operational","behavior":"json_read_only","handlers":["policy"],"allowed_mutations":["nenhuma"],"consumers":["skills/homologar-sistema/SKILL.md","codex/skills/executar-plano-codex/references/CODEX_CONVERGENCE.md","codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_package.py::test_manual_policy_supports_none_quick_start_and_full"],"fixtures":["policy","success-policy"]},
-    {"id":"workspace.create","command":"workspace","action":"create","generation":"core_0_4","behavior":"json_mutating","handlers":["v04_planning.execution_workspace_create"],"allowed_mutations":["git worktree alvo",".bianchini/STATE.md"],"consumers":["skills/executar-plano/SKILL.md","codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_execution_workspace_uses_change_and_plan_identity"],"fixtures":["workspace-create","success-full-lifecycle"]},
-    {"id":"workspace.check","command":"workspace","action":"check","generation":"core_0_4","behavior":"json_read_only","handlers":["v04_planning.execution_workspace_check"],"allowed_mutations":["nenhuma"],"consumers":["codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_execution_workspace_uses_change_and_plan_identity"],"fixtures":["workspace-check","success-full-lifecycle"]},
-    {"id":"workspace.locate","command":"workspace","action":"locate","generation":"core_0_4","behavior":"json_read_only","handlers":["v04_planning.execution_workspace_locate"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_execution_workspace_uses_change_and_plan_identity"],"fixtures":["workspace-locate","success-full-lifecycle"]},
-    {"id":"workspace.resume","command":"workspace","action":"resume","generation":"core_0_4","behavior":"json_read_only","handlers":["v04_planning.execution_workspace_locate"],"allowed_mutations":["nenhuma"],"consumers":["codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_execution_workspace_uses_change_and_plan_identity"],"fixtures":["workspace-resume","success-full-lifecycle"]},
-    {"id":"workspace.finish","command":"workspace","action":"finish","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.require_workspace"],"allowed_mutations":["worktrees bm/<change>-<plan> limpos e integrados","branches locais bm/<change>-<plan> integradas"],"consumers":["skills/executar-plano/SKILL.md"],"behavior_tests":["internal/gokernel/execution_workspace_test.go::TestExecutionWorkspaceFinishRemovesOnlyCleanMergedWorkspaceAndBranch"],"fixtures":["workspace-finish"],"golden_success_exception":"sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"},
-    {"id":"task-brief","command":"task-brief","action":null,"generation":"companion","behavior":"json_mutating","handlers":["write_task_brief"],"allowed_mutations":["arquivo informado por --output"],"consumers":["codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_context_efficiency.py::test_hydrated_task_brief_contains_only_referenced_context"],"fixtures":["task-brief","success-legacy-operations"]},
-    {"id":"spec-diff","command":"spec-diff","action":null,"generation":"operational","behavior":"json_mutating","handlers":["spec_diff"],"allowed_mutations":["arquivo informado por --output"],"consumers":[],"behavior_tests":["tests/test_context_efficiency.py::test_spec_diff_derives_added_modified_and_removed_requirements"],"fixtures":["spec-diff-created-output"]},
-    {"id":"mutation-evidence.verify","command":"mutation-evidence","action":"verify","generation":"operational","behavior":"json_mutating","handlers":["mutation_evidence_verify"],"allowed_mutations":["arquivo informado por --output"],"consumers":[],"behavior_tests":["tests/test_context_efficiency.py::test_mutation_evidence_accepts_classified_survivors_and_ignores_score"],"fixtures":["mutation-evidence-verify","success-mutation-evidence"]},
-    {"id":"report","command":"report","action":null,"generation":"companion","behavior":"json_mutating","handlers":["write_report"],"allowed_mutations":["arquivo informado por --output"],"consumers":["codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_package.py::test_real_low_risk_project_runs_snapshot_group_status_and_telemetry"],"fixtures":["report","success-legacy-operations"]},
-    {"id":"review-package","command":"review-package","action":null,"generation":"companion","behavior":"json_mutating","handlers":["write_review_package"],"allowed_mutations":["arquivo informado por --output"],"consumers":["codex/skills/executar-plano-codex/references/CODEX_CONVERGENCE.md"],"behavior_tests":["tests/test_codex_overlay.py::test_codex_preserves_frozen_plan_and_autonomy_envelope"],"fixtures":["review-package","success-legacy-operations"]},
-    {"id":"checkpoint","command":"checkpoint","action":null,"generation":"companion","behavior":"json_mutating","handlers":["write_checkpoint"],"allowed_mutations":["arquivo informado por --output"],"consumers":["codex/skills/executar-plano-codex/references/EXECUTION_CORE_CODEX.md"],"behavior_tests":["tests/test_method_package.py::test_real_low_risk_project_runs_snapshot_group_status_and_telemetry"],"fixtures":["checkpoint","success-legacy-operations"]},
-    {"id":"proof-map","command":"proof-map","action":null,"generation":"operational","behavior":"json_mutating","handlers":["write_proof_map"],"allowed_mutations":["arquivo informado por --output"],"consumers":["skills/homologar-sistema/SKILL.md"],"behavior_tests":["tests/test_method_package.py::test_proof_map_rejects_evidence_from_old_candidate_fingerprint"],"fixtures":["proof-map","success-legacy-operations"]},
-    {"id":"telemetry.record","command":"telemetry","action":"record","generation":"operational","behavior":"json_mutating","handlers":["telemetry_record"],"allowed_mutations":["telemetry path declarado no estado, somente quando enabled"],"consumers":[],"behavior_tests":["tests/test_method_package.py::test_real_low_risk_project_runs_snapshot_group_status_and_telemetry"],"fixtures":["telemetry-record","success-legacy-operations"]},
-    {"id":"telemetry.summary","command":"telemetry","action":"summary","generation":"operational","behavior":"json_read_only","handlers":["telemetry_summary"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_package.py::test_real_low_risk_project_runs_snapshot_group_status_and_telemetry"],"fixtures":["telemetry-summary","success-legacy-operations"]},
-    {"id":"direct.classify","command":"direct","action":"classify","generation":"core_0_4","behavior":"json_read_only","handlers":["direct_risk_from_args"],"allowed_mutations":["nenhuma"],"consumers":["skills/executar-direto/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_direct_risk_classification_is_deterministic"],"fixtures":["direct-classify-default","direct-classify-protected"]},
-    {"id":"direct.start","command":"direct","action":"start","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.quick_start"],"allowed_mutations":[".bianchini/quick/<id>/**",".bianchini/STATE.md"],"consumers":["skills/executar-direto/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_critical_direct_work_stays_active_without_planning_redirect"],"fixtures":["direct-start","success-direct"]},
-    {"id":"direct.status","command":"direct","action":"status","generation":"core_0_4","behavior":"json_read_only","handlers":["v04.quick_status"],"allowed_mutations":["nenhuma"],"consumers":["skills/executar-direto/SKILL.md","skills/status-projeto/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_critical_direct_work_stays_active_without_planning_redirect"],"fixtures":["direct-status","success-direct"]},
-    {"id":"direct.checkpoint","command":"direct","action":"checkpoint","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.quick_checkpoint"],"allowed_mutations":[".bianchini/quick/<id>/**",".bianchini/STATE.md"],"consumers":["skills/executar-direto/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_critical_direct_work_stays_active_without_planning_redirect"],"fixtures":["direct-checkpoint","success-direct"]},
-    {"id":"direct.finish","command":"direct","action":"finish","generation":"core_0_4","behavior":"json_mutating","handlers":["v04.quick_finish"],"allowed_mutations":[".bianchini/quick/<id>/**",".bianchini/STATE.md"],"consumers":["skills/executar-direto/SKILL.md"],"behavior_tests":["tests/test_method_v04_cli.py::test_direct_finish_rejects_escalated_status"],"fixtures":["direct-finish","success-direct"]},
-    {"id":"direct.reopen","command":"direct","action":"reopen","generation":"core_0_4","behavior":"parser_terminal_error","handlers":[],"handler_mode":"parser_only_terminal_error","allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_fallback_arguments_are_not_public_in_v04"],"fixtures":["direct-reopen-terminal"]},
-    {"id":"update-bm","command":"update-bm","action":null,"generation":"operational","behavior":"text_or_json_mutating","handlers":["update_bianchini_method","render_update_result"],"allowed_mutations":["instalação informada por --skills-root quando sem --check"],"consumers":["skills/update-bm/SKILL.md"],"behavior_tests":["tests/test_self_update.py::test_public_skill_and_cli_expose_explicit_update"],"fixtures":["update-bm"],"golden_success_exception":"sucesso e rollback exigem fonte injetada no teste de distribuição; a CLI congelada não expõe URL de teste e esta suíte nunca usa rede real"},
-    {"id":"status","command":"status","action":null,"generation":"core_0_4","behavior":"text_or_json_read_only","handlers":["state_summary","render_status"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_package.py::test_status_reports_active_plan_unit_mode_and_workspace"],"fixtures":["status-legacy-text","status-legacy-json"]}
-  ],
-  "negative_surfaces": [
-    {"id":"route.retired","argv":["route","--repo","{repo}","--new-project"],"status":"retired","generation":"legacy_internal","behavior":"negative_argparse","exit_code":2,"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public"],"fixtures":["retired-route"]},
-    {"id":"legacy-transition.retired","argv":["legacy-transition","--repo","{repo}"],"status":"retired","generation":"legacy_internal","behavior":"negative_argparse","exit_code":2,"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public"],"fixtures":["retired-legacy-transition"]},
-    {"id":"repo-hygiene.retired","argv":["repo-hygiene","check","--repo","{repo}"],"status":"retired","generation":"legacy_internal","behavior":"negative_argparse","exit_code":2,"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_adapter_commands_are_not_public"],"fixtures":["retired-repo-hygiene"]},
-    {"id":"workspace.companion-v2-flags","argv":["workspace","create","--repo","{repo}","--plan","P01","--planning-version","v2","--state","{repo}/legacy-state.json"],"status":"known_incompatibility","generation":"companion","behavior":"negative_argparse","exit_code":2,"rejected_flags":["--planning-version","--state"],"allowed_mutations":["nenhuma"],"consumers":[],"behavior_tests":["tests/test_method_v04_cli.py::test_legacy_fallback_arguments_are_not_public_in_v04"],"fixtures":["workspace-old-companion-flags"]}
-  ],
-  "native_extensions": {
-    "coherence": {
-      "value_flags": [
-        "--decided-by"
-      ],
-      "help": "--decided-by <agente>: decisão técnica autônoma. --approved-by só registra aprovação humana ocorrida."
+    "model": {
+      "interface": "action;choices=init,validate;required | --repo;type=Path;default=\"$CWD\" | --change;default=null"
     },
-    "debug": {
-      "value_flags": [
-        "--command",
-        "--test-file",
-        "--failure-pattern",
-        "--retry-reason"
-      ],
-      "help": "RED: --command <comando> --test-file <regressão> --failure-pattern <assinatura>. GREEN/regression_checked: --command. GREEN repete o teste sem alterá-lo. --retry-reason explica reexecução."
-    },
-    "direct": {
-      "value_flags": [
-        "--retry-reason"
-      ],
-      "help": "checkpoint --command executa os gates declarados no brief. finish exige provas atuais de todos os gates; narrativa não é prova. --retry-reason explica reexecução."
-    },
-    "verify": {
-      "value_flags": [
-        "--artifact-kind",
-        "--resolves-review"
-      ],
-      "help": "release --artifact-kind file|container|deployment --build <arquivo|imagem|endpoint> --delivery ready. --checksum é expectativa opcional; identidade é verificada. Cache de tarefa: verify.cache fresh (padrão) ou deterministic. review --finding recebe JSON estruturado; --resolves-review <id> resolve achado com provas atuais."
+    "scope": {
+      "interface": "action;choices=seal,verify;required | --repo;type=Path;default=\"$CWD\" | --change;required | --source;type=Path;default=null | --draft;type=Path;default=null | --pages;type=int;default=null | --page-manifest;type=Path;default=null | --extraction;choices=native,ocr,mixed;default=null"
     },
     "roadmap": {
-      "value_flags": [],
-      "help": "sync gera ROADMAP.md e specs/diff.md; specs com IDs iguais ao escopo geram MANIFEST.json inicial."
+      "interface": "action;choices=sync,next-wave;required | --repo;type=Path;default=\"$CWD\" | --change;required | --format;choices=json;default=\"json\""
+    },
+    "coherence": {
+      "interface": "action;choices=check,approve;required | --repo;type=Path;default=\"$CWD\" | --change;required | --structural-only;action=store_true;default=false | --semantic-report;type=Path;default=null | --digest;default=null | --approved-by;default=null"
+    },
+    "impact": {
+      "interface": "action;choices=analyze;required | --repo;type=Path;default=\"$CWD\" | --change;required | --plan;required | --changed-contract;action=append;default=[] | --changed-ownership;action=append;default=[] | --changed-interface;action=append;default=[] | --changed-data;action=append;default=[] | --changed-migration;action=append;default=[] | --changed-journey;action=append;default=[] | --changed-effect;action=append;default=[] | --changed-invariant;action=append;default=[] | --global-change;action=store_true;default=false"
     },
     "plan": {
-      "value_flags": [],
-      "help": "grouped: tarefa com --proof, revisão integrada no plano. strict/slice: tarefa com --proof e --review; revisão extra do plano opcional. Cada Txx de slice é a fronteira vertical revisada."
+      "interface": "action;choices=complete,reopen;required | --repo;type=Path;default=\"$CWD\" | --change;required | --plan;required | --task;default=null | --context-pack;type=Path;default=null | --actual-delta;type=Path;default=null | --result;default=null | --verification;action=append;default=[] | --proof;action=append;default=[] | --review;default=null | --reason;default=null | --completed-task;action=append;default=[]"
+    },
+    "verify": {
+      "interface": "action;choices=task,plan,release,review,status;required | --repo;type=Path;default=\"$CWD\" | --change;default=null | --plan;default=null | --task;default=null | --context-pack;type=Path;default=null | --evidence;type=Path;default=null | --retry-reason;default=null | --scope;choices=task,plan,release;default=null | --reviewer;default=null | --verdict;choices=approved,changes_requested;default=null | --proof;action=append;default=[] | --finding;action=append;default=[] | --build;default=null | --checksum;default=null | --delivery;choices=ready,not_applicable;default=null"
+    },
+    "context": {
+      "interface": "action;choices=pack,verify;required | --repo;type=Path;default=\"$CWD\" | --unit;default=null | --output;type=Path;default=null | --max-bytes;type=int;default=16384 | --path;type=Path;default=null"
+    },
+    "adapter": {
+      "interface": "action;choices=render,install;required | --host;choices=generic,codex,claude-compatible;required | --repo;type=Path;default=\"$CWD\" | --overwrite;action=store_true;default=false"
+    },
+    "learn": {
+      "interface": "action;choices=propose,list,approve,reject,deactivate;required | --repo;type=Path;default=\"$CWD\" | --since;default=null | --candidate;default=null | --digest;default=null | --approved-by;default=null | --reason;default=null"
+    },
+    "debug": {
+      "interface": "action;choices=start,list,status,resume,checkpoint,finish;required | --repo;type=Path;default=\"$CWD\" | --id;default=null | --objective;default=null | --expected;default=null | --actual;default=null | --environment;default=null | --origin-ref;action=append;default=[] | --origin-evidence;default=null | --relation;choices=caused_by,detected_in,regression_of;default=null | --event;choices=reproduced,diagnosed,red,fixing,green,regression_checked,documented;default=null | --evidence;default=null | --hypothesis;action=append;default=[] | --experiment;action=append;default=[] | --eliminated-hypothesis;action=append;default=[] | --root-cause;default=null | --neighbor-regression;action=append;default=[] | --residual-risk;default=null | --status;choices=resolved,blocked,escalated;default=null | --reason;default=null | --docviva-kind;choices=internal,behavioral,contract,architecture,rule;default=null | --docviva-outcome;choices=updated,not_applicable,no_op;default=null | --docviva-artifact;action=append;default=[] | --docviva-justification;default=null | --learning-classification;choices=environment_fact,human_preference,repeatable_procedure,deterministic_invariant,architecture_decision,isolated_error;default=null | --learning-statement;default=null | --learning-tag;action=append;default=[] | --learning-validity;default=null | --learning-conflict;action=append;default=[]"
+    },
+    "design-audit": {
+      "interface": "action;choices=seal,verify;required | --root;type=Path;required | --scope;type=Path;required | --manifest;type=Path;required"
+    },
+    "change-policy": {
+      "interface": "--scope-change;action=store_true;default=false | --public-contract-change;action=store_true;default=false | --approved-design-change;action=store_true;default=false | --new-cost;action=store_true;default=false | --irreversible-action;action=store_true;default=false | --external-impossibility;action=store_true;default=false | --critical-invariant;action=store_true;default=false | --plan-command;action=store_true;default=false | --file-location;action=store_true;default=false | --internal-order;action=store_true;default=false"
+    },
+    "cycle-close": {
+      "interface": "--repo;type=Path;default=\"$CWD\" | --change;required"
+    },
+    "policy": {
+      "interface": "--profile;choices=lean,standard,full;required | --risk;choices=low,medium,high,critical;required | --change;default=\"behavioral\" | --manual-pdf;choices=none,quick_start,full,scope;default=\"scope\" | --manual-in-scope;action=store_true;default=false | --round;type=int;default=0 | --risk-seam;default=null | --seam-round;type=int;default=null | --structural-finding;choices=crash_window,partial_commit,toctou,external_effect_before_persistence,retry_after_timeout,concurrent_idempotency,recovery_after_restart;action=append;default=[] | --consecutive-seam-findings;type=int;default=0"
+    },
+    "workspace": {
+      "interface": "action;choices=create,check,locate,resume,finish;required | --repo;type=Path;default=\"$CWD\" | --plan;default=null | --change;default=null | --target;type=Path;default=null"
+    },
+    "spec-diff": {
+      "interface": "--root;type=Path;required | --base;type=Path;required | --target;type=Path;required | --output;type=Path;required"
+    },
+    "direct": {
+      "interface": "action;choices=classify,start,status,checkpoint,finish,reopen;required | --repo;type=Path;default=\"$CWD\" | --slug;default=null | --objective;default=null | --scope;default=null | --acceptance;action=append;default=[] | --verification;action=append;default=[] | --checkpoint;default=null | --changed-file;action=append;default=[] | --command;action=append;default=[] | --blocker;action=append;default=[] | --next-action;default=null | --status;choices=completed,blocked;default=null | --behavior;action=append;default=[] | --limitation;action=append;default=[] | --evidence;action=append;default=[] | --scope-score;type=int;choices=0,1,2;default=0 | --external-effect-score;type=int;choices=0,1,2;default=0 | --migration-score;type=int;choices=0,1,2;default=0 | --concurrency-score;type=int;choices=0,1,2;default=0 | --money-score;type=int;choices=0,1,2;default=0 | --guard;action=append;default=[] | --webhook-flow;action=store_true;default=false | --payment-flow;action=store_true;default=false | --production-authorized;action=store_true;default=false | --multiple-objectives;action=store_true;default=false | --destructive-migration;action=store_true;default=false | --uncontrolled-concurrency;action=store_true;default=false | --undefined-ownership;action=store_true;default=false | --ambiguous-financial-rule;action=store_true;default=false | --new-material-architecture;action=store_true;default=false | --docviva-kind;choices=internal,behavioral,contract,architecture,rule;default=null | --docviva-outcome;choices=updated,not_applicable,no_op;default=null | --docviva-artifact;action=append;default=[] | --docviva-justification;default=null"
+    },
+    "update-bm": {
+      "interface": "--check;action=store_true;default=false | --skills-root;type=Path;default=\"$PACKAGED_SKILLS_ROOT\" | --timeout;type=float;default=15.0 | --format;choices=text,json;default=\"text\""
+    },
+    "status": {
+      "interface": "--repo;type=Path;default=\"$CWD\" | --format;choices=json,text;default=\"json\""
     }
-  }
+  },
+  "surfaces": [
+    {
+      "id": "model.init",
+      "command": "model",
+      "action": "init",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/**"
+      ]
+    },
+    {
+      "id": "model.validate",
+      "command": "model",
+      "action": "validate",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "scope.seal",
+      "command": "scope",
+      "action": "seal",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/SCOPE.md",
+        ".bianchini/changes/<change>/COHERENCE.md",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "scope.verify",
+      "command": "scope",
+      "action": "verify",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "roadmap.sync",
+      "command": "roadmap",
+      "action": "sync",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/ROADMAP.md",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "roadmap.next-wave",
+      "command": "roadmap",
+      "action": "next-wave",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "coherence.check",
+      "command": "coherence",
+      "action": "check",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/COHERENCE.md"
+      ]
+    },
+    {
+      "id": "coherence.approve",
+      "command": "coherence",
+      "action": "approve",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/COHERENCE.md",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "impact.analyze",
+      "command": "impact",
+      "action": "analyze",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/COHERENCE.md",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "plan.complete",
+      "command": "plan",
+      "action": "complete",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/results/<plan>.md",
+        ".bianchini/changes/<change>/results/tasks/<plan>/<task>.md",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "plan.reopen",
+      "command": "plan",
+      "action": "reopen",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/results/reopened/**",
+        ".bianchini/changes/<change>/results/<plan>.md ou tarefa selecionada",
+        ".bianchini/STATE.md"
+      ],
+      "golden_success_exception": "sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"
+    },
+    {
+      "id": "verify.task",
+      "command": "verify",
+      "action": "task",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/results/proofs/**"
+      ],
+      "golden_success_exception": "sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"
+    },
+    {
+      "id": "verify.plan",
+      "command": "verify",
+      "action": "plan",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/results/proofs/**"
+      ],
+      "golden_success_exception": "sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"
+    },
+    {
+      "id": "verify.release",
+      "command": "verify",
+      "action": "release",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/results/proofs/**",
+        ".bianchini/changes/<change>/results/RELEASE.md"
+      ],
+      "golden_success_exception": "sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"
+    },
+    {
+      "id": "verify.review",
+      "command": "verify",
+      "action": "review",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/changes/<change>/results/reviews/**",
+        ".bianchini/changes/<change>/results/RELEASE.md quando scope=release"
+      ],
+      "golden_success_exception": "sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"
+    },
+    {
+      "id": "verify.status",
+      "command": "verify",
+      "action": "status",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ],
+      "golden_success_exception": "sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"
+    },
+    {
+      "id": "context.pack",
+      "command": "context",
+      "action": "pack",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/.runtime/context/**"
+      ]
+    },
+    {
+      "id": "context.verify",
+      "command": "context",
+      "action": "verify",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "adapter.render",
+      "command": "adapter",
+      "action": "render",
+      "generation": "operational",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "adapter.install",
+      "command": "adapter",
+      "action": "install",
+      "generation": "operational",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        "bloco gerenciado em AGENTS.md ou CLAUDE.md no --repo explícito"
+      ]
+    },
+    {
+      "id": "learn.propose",
+      "command": "learn",
+      "action": "propose",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/.runtime/learning/pending/**"
+      ]
+    },
+    {
+      "id": "learn.list",
+      "command": "learn",
+      "action": "list",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "learn.approve",
+      "command": "learn",
+      "action": "approve",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/current/lessons/<candidate>.json",
+        "remove candidato correspondente de .bianchini/.runtime/learning/pending"
+      ]
+    },
+    {
+      "id": "learn.reject",
+      "command": "learn",
+      "action": "reject",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/.runtime/learning/rejected/<candidate>.json",
+        "remove candidato correspondente de .bianchini/.runtime/learning/pending"
+      ]
+    },
+    {
+      "id": "learn.deactivate",
+      "command": "learn",
+      "action": "deactivate",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/current/lessons/<candidate>.json preservando histórico"
+      ]
+    },
+    {
+      "id": "debug.start",
+      "command": "debug",
+      "action": "start",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/debug/active/<id>/**",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "debug.list",
+      "command": "debug",
+      "action": "list",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "debug.status",
+      "command": "debug",
+      "action": "status",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "debug.resume",
+      "command": "debug",
+      "action": "resume",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "debug.checkpoint",
+      "command": "debug",
+      "action": "checkpoint",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/debug/active/<id>/**",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "debug.finish",
+      "command": "debug",
+      "action": "finish",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/debug/active/<id>/**",
+        ".bianchini/debug/resolved/<id>/** ou .bianchini/debug/blocked/<id>/**",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "design-audit.seal",
+      "command": "design-audit",
+      "action": "seal",
+      "generation": "operational",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        "manifest informado por --manifest"
+      ]
+    },
+    {
+      "id": "design-audit.verify",
+      "command": "design-audit",
+      "action": "verify",
+      "generation": "operational",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "change-policy",
+      "command": "change-policy",
+      "action": null,
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "cycle-close",
+      "command": "cycle-close",
+      "action": null,
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/current/**",
+        ".bianchini/archive/<change>/**",
+        ".bianchini/STATE.md",
+        "remove .bianchini/changes/<change> após promoção"
+      ]
+    },
+    {
+      "id": "policy",
+      "command": "policy",
+      "action": null,
+      "generation": "operational",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "workspace.create",
+      "command": "workspace",
+      "action": "create",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        "git worktree alvo",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "workspace.check",
+      "command": "workspace",
+      "action": "check",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "workspace.locate",
+      "command": "workspace",
+      "action": "locate",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "workspace.resume",
+      "command": "workspace",
+      "action": "resume",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "workspace.finish",
+      "command": "workspace",
+      "action": "finish",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        "worktrees bm/<change>-<plan> limpos e integrados",
+        "branches locais bm/<change>-<plan> integradas"
+      ],
+      "golden_success_exception": "sucesso pertence ao backend Go oficial e é coberto pelo teste nativo; o oráculo Python valida somente interface e falha segura"
+    },
+    {
+      "id": "spec-diff",
+      "command": "spec-diff",
+      "action": null,
+      "generation": "operational",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        "arquivo informado por --output"
+      ]
+    },
+    {
+      "id": "direct.classify",
+      "command": "direct",
+      "action": "classify",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "direct.start",
+      "command": "direct",
+      "action": "start",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/quick/<id>/**",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "direct.status",
+      "command": "direct",
+      "action": "status",
+      "generation": "core",
+      "behavior": "json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "direct.checkpoint",
+      "command": "direct",
+      "action": "checkpoint",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/quick/<id>/**",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "direct.finish",
+      "command": "direct",
+      "action": "finish",
+      "generation": "core",
+      "behavior": "json_mutating",
+      "allowed_mutations": [
+        ".bianchini/quick/<id>/**",
+        ".bianchini/STATE.md"
+      ]
+    },
+    {
+      "id": "direct.reopen",
+      "command": "direct",
+      "action": "reopen",
+      "generation": "core",
+      "behavior": "parser_terminal_error",
+      "handler_mode": "parser_only_terminal_error",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    },
+    {
+      "id": "update-bm",
+      "command": "update-bm",
+      "action": null,
+      "generation": "operational",
+      "behavior": "text_or_json_mutating",
+      "allowed_mutations": [
+        "instalação informada por --skills-root quando sem --check"
+      ],
+      "golden_success_exception": "sucesso e rollback exigem fonte injetada no teste de distribuição; a CLI congelada não expõe URL de teste e esta suíte nunca usa rede real"
+    },
+    {
+      "id": "status",
+      "command": "status",
+      "action": null,
+      "generation": "core",
+      "behavior": "text_or_json_read_only",
+      "allowed_mutations": [
+        "nenhuma"
+      ]
+    }
+  ],
+  "method_version": "1.1.0"
 }

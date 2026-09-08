@@ -18,7 +18,7 @@ import (
 const (
 	contextDefaultMaxBytes = 16_384
 	contextSchemaVersion   = 1
-	contextContract        = "0.4"
+	contextContract        = "bianchini"
 )
 
 var (

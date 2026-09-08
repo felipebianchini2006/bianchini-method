@@ -78,7 +78,7 @@ func TestRunServesEveryEmbeddedHelpPathExactly(t *testing.T) {
 			t.Fatalf("Run(%q) exit=%d stderr=%q", args, code, stderr.String())
 		}
 		if stderr.Len() != 0 || stdout.String() != want {
-			t.Fatalf("Run(%q) diverged from embedded oracle help", args)
+			t.Fatalf("Run(%q) diverged from embedded contract help", args)
 		}
 	}
 }

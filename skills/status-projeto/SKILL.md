@@ -14,7 +14,7 @@ Ao mencionar a versão na abertura, no status ou na entrega, execute o binário 
 ## Fluxo
 
 1. Localizar `.bianchini/STATE.md`.
-2. Sem ele, informar `MIGRATION_REQUIRED` quando houver documentação anterior do Bianchini; caso contrário, informar que o método ainda não foi iniciado. Não ler `.planning/`.
+2. Sem ele, informar que o método ainda não foi iniciado. Não usar documentação externa a `.bianchini/` como estado.
 3. Validar o estado com `bm model validate --repo <repo>`. Estado inválido é reportado como erro; não inferir valores.
 4. Ler somente o frontmatter e os ponteiros necessários.
 5. Se `active_work.kind` for `quick`, usar `bm direct status --repo <repo>` e abrir apenas `PROGRESS.md` quando necessário.

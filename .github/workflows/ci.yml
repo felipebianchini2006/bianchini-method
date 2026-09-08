@@ -2,23 +2,56 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  go:
+    name: Go (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.x"
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Race detection
+        if: runner.os != 'Windows'
+        run: go test -race ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        shell: bash
+        run: |
+          suffix=""
+          if [ "${{ runner.os }}" = "Windows" ]; then suffix=".exe"; fi
+          go build -trimpath -o "build/bm${suffix}" ./cmd/bm
+          "./build/bm${suffix}" version --json
+          test "$(cat skills/_shared/VERSION)" = "1.1.0"
+
+  python-checks:
+    name: Auxiliary Python checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -28,70 +61,16 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: "1.27.x"
+          cache: true
 
-      - name: Validate Python syntax
+      - name: Build official CLI
+        run: go build -trimpath -o /tmp/bm ./cmd/bm
+
+      - name: Validate maintained Python files
         run: |
-          python3 -m py_compile \
-            scripts/bm.py \
-            scripts/bm_python_oracle.py \
-            skills/_shared/scripts/bm.py \
-            skills/_shared/scripts/bm_feature_support.py \
-            skills/_shared/scripts/bm_context.py \
-            skills/_shared/scripts/bm_spec_diff.py \
-            skills/_shared/scripts/bm_mutation.py \
-            skills/_shared/scripts/bm_scope.py \
-            skills/_shared/scripts/bm_update.py \
-            tests/test_method_package.py \
-            tests/test_context_efficiency.py \
-            tests/test_context_efficiency_review.py \
-            tests/test_self_update.py
+          python -m py_compile scripts/bm.py scripts/run_service_example.py scripts/run_test_shards.py tests/test_cli_help.py tests/test_method_package.py
+          python -m unittest tests.test_cli_help tests.test_method_package
 
-      - name: Validate native backend
-        run: |
-          go test ./...
-          go vet ./...
-          go build -trimpath -o /tmp/bm ./cmd/bm
-
-      - name: Run Python compatibility and public Go journeys
-        env:
-          BM_FULL_JOURNEY_BACKEND: go
-          BM_FULL_JOURNEY_GO_BINARY: /tmp/bm
-          BM_GO_SUITE_ALREADY_RUN: "1"
-        run: python3 scripts/run_test_shards.py
-
-      - name: Exercise service requests through the official Go CLI
-        run: python3 scripts/run_service_example.py --binary /tmp/bm --protocol-test
-
-      - name: Validate CLI entrypoints
-        run: |
-          /tmp/bm version --json | python3 -c 'import json, sys; assert json.load(sys.stdin)["official"] is True'
-          test "$(cat skills/_shared/VERSION)" = "1.0.0"
-
-  windows-portability:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Validate packaged Python modules
-        shell: pwsh
-        run: |
-          python -m unittest tests.test_windows_portability
-          python -c "import sys; sys.path.insert(0, r'skills/_shared/scripts'); import bm"
-
-      - name: Validate native Windows CLI
-        shell: pwsh
-        run: |
-          go build -trimpath -o bm.exe ./cmd/bm
-          .\bm.exe version --json | python -c "import json, sys; assert json.load(sys.stdin)['official'] is True"
+      - name: Exercise public service journey
+        run: python scripts/run_service_example.py --binary /tmp/bm --protocol-test

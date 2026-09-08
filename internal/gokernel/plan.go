@@ -12,8 +12,6 @@ import (
 	"strings"
 )
 
-var planResultName = regexp.MustCompile(`^P[0-9]{2,}\.md$`)
-
 func runPlan(args []string) (any, error) {
 	if len(args) == 0 {
 		return nil, argparseError("the following arguments are required: action")
@@ -115,9 +113,6 @@ func taskComplete(repo, change, planID, taskID, packPath, result string, verific
 	if err != nil {
 		return nil, err
 	}
-	if plan.schema != 2 {
-		return nil, workflowError("MODEL_MISMATCH", "resultado por tarefa exige plano schema 2")
-	}
 	var task map[string]any
 	for _, candidate := range planTasks(plan) {
 		if stateString(candidate["id"]) == taskID {
@@ -176,27 +171,23 @@ func taskComplete(repo, change, planID, taskID, packPath, result string, verific
 	if summary == "" {
 		return nil, workflowError("DOCVIVA_INCOMPLETE", "conclusão da tarefa exige resultado")
 	}
-	if plan.schema == 2 {
-		if len(evidence) > 0 {
-			return nil, workflowError("STALE_EVIDENCE", "plano schema 2 não aceita texto em --verification; use --proof")
-		}
-		evidence, err = validateProofSet(pack, proofIDs, "task", planID, taskID, true)
-		if err != nil {
+	if len(evidence) > 0 {
+		return nil, workflowError("STALE_EVIDENCE", "plano tipado não aceita texto em --verification; use --proof")
+	}
+	evidence, err = validateProofSet(pack, proofIDs, "task", planID, taskID, true)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateProofContext(pack, evidence, stateString(verified["digest"])); err != nil {
+		return nil, err
+	}
+	if err := unresolvedVerificationReviews(pack, "task", planID, taskID, nil); err != nil {
+		return nil, err
+	}
+	if stateString(plan.value["execution"]) != "grouped" || reviewID != "" {
+		if err := validateVerificationReview(pack, reviewID, "task", planID, taskID, evidence, true); err != nil {
 			return nil, err
 		}
-		if err := validateProofContext(pack, evidence, stateString(verified["digest"])); err != nil {
-			return nil, err
-		}
-		if err := unresolvedVerificationReviews(pack, "task", planID, taskID, nil); err != nil {
-			return nil, err
-		}
-		if stateString(plan.value["execution"]) != "grouped" || reviewID != "" {
-			if err := validateVerificationReview(pack, reviewID, "task", planID, taskID, evidence, true); err != nil {
-				return nil, err
-			}
-		}
-	} else if len(evidence) == 0 {
-		return nil, workflowError("STALE_EVIDENCE", "conclusão da tarefa exige verificação")
 	}
 	payload := map[string]any{
 		"schema_version": 1, "change": filepath.Base(pack.directory), "plan": plan.id,
@@ -240,29 +231,24 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 		return nil, err
 	}
 	completed := nonemptyUnique(completedTasks)
-	managedTasks := plan.schema == 2 && stateInt(coherence["schema_version"]) == 2 && stateInt(coherence["spec_contract"]) == 1
-	if plan.schema == 2 {
-		expectedTasks := planTaskIDs(plan)
-		if managedTasks {
-			taskResults, loadErr := planTaskResultPayloads(pack.workspace, pack.directory, plan, stateString(coherence["digest"]))
-			if loadErr != nil {
-				return nil, loadErr
-			}
-			missing := []string{}
-			for _, identifier := range expectedTasks {
-				if taskResults[identifier] == nil {
-					missing = append(missing, identifier)
-				}
-			}
-			if len(missing) > 0 {
-				return nil, workflowError("DOCVIVA_INCOMPLETE", "conclusão exige resultados próprios para todas as tarefas (ausentes: "+strings.Join(missing, ", ")+")")
-			}
-		}
-		if (managedTasks && len(completed) > 0 || !managedTasks) && !sameStrings(completed, expectedTasks) {
-			return nil, workflowError("DOCVIVA_INCOMPLETE", taskCompletionMismatch(expectedTasks, completed))
-		}
-		completed = expectedTasks
+	expectedTasks := planTaskIDs(plan)
+	taskResults, loadErr := planTaskResultPayloads(pack.workspace, pack.directory, plan, stateString(coherence["digest"]))
+	if loadErr != nil {
+		return nil, loadErr
 	}
+	missing := []string{}
+	for _, identifier := range expectedTasks {
+		if taskResults[identifier] == nil {
+			missing = append(missing, identifier)
+		}
+	}
+	if len(missing) > 0 {
+		return nil, workflowError("DOCVIVA_INCOMPLETE", "conclusão exige resultados próprios para todas as tarefas (ausentes: "+strings.Join(missing, ", ")+")")
+	}
+	if len(completed) > 0 && !sameStrings(completed, expectedTasks) {
+		return nil, workflowError("DOCVIVA_INCOMPLETE", taskCompletionMismatch(expectedTasks, completed))
+	}
+	completed = expectedTasks
 	results, err := planResultPayloads(pack.workspace, pack.directory)
 	if err != nil {
 		return nil, err
@@ -281,29 +267,25 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 		return nil, workflowError("MISSING_PROVIDER", "dependências ainda não concluídas: "+strings.Join(missingDependencies, ", "))
 	}
 	evidence := nonemptyUnique(verifications)
-	if plan.schema == 2 {
-		if len(evidence) > 0 {
-			return nil, workflowError("STALE_EVIDENCE", "plano schema 2 não aceita texto em --verification; use --proof")
-		}
-		evidence, err = validateProofSet(pack, proofIDs, "plan", planID, "", true)
-		if err != nil {
+	if len(evidence) > 0 {
+		return nil, workflowError("STALE_EVIDENCE", "plano tipado não aceita texto em --verification; use --proof")
+	}
+	evidence, err = validateProofSet(pack, proofIDs, "plan", planID, "", true)
+	if err != nil {
+		return nil, err
+	}
+	if err := unresolvedVerificationReviews(pack, "plan", planID, "", nil); err != nil {
+		return nil, err
+	}
+	for _, task := range planTasks(plan) {
+		if err := unresolvedVerificationReviews(pack, "task", planID, stateString(task["id"]), nil); err != nil {
 			return nil, err
 		}
-		if err := unresolvedVerificationReviews(pack, "plan", planID, "", nil); err != nil {
+	}
+	if stateString(plan.value["execution"]) == "grouped" || reviewID != "" {
+		if err := validateVerificationReview(pack, reviewID, "plan", planID, "", evidence, true); err != nil {
 			return nil, err
 		}
-		for _, task := range planTasks(plan) {
-			if err := unresolvedVerificationReviews(pack, "task", planID, stateString(task["id"]), nil); err != nil {
-				return nil, err
-			}
-		}
-		if stateString(plan.value["execution"]) == "grouped" || reviewID != "" {
-			if err := validateVerificationReview(pack, reviewID, "plan", planID, "", evidence, true); err != nil {
-				return nil, err
-			}
-		}
-	} else if len(evidence) == 0 {
-		return nil, workflowError("STALE_EVIDENCE", "conclusão do plano exige verificação")
 	}
 	summary := strings.TrimSpace(result)
 	if summary == "" {
@@ -343,22 +325,12 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 		"impact":       map[string]any{"radius": "local", "stale_plans": []any{}, "reason": "entrega equivalente ao delta aprovado"},
 		"completed_at": completedAt,
 	}
-	if plan.schema == 2 && !managedTasks {
-		for _, task := range planTasks(plan) {
-			taskID := stateString(task["id"])
-			taskPayload := map[string]any{
-				"schema_version": 1, "change": filepath.Base(pack.directory), "plan": plan.id, "task": taskID,
-				"status": "completed", "expected_result": strings.TrimSpace(stateString(task["result"])), "result": summary,
-				"covers": normalizedTaskStrings(task, "covers"), "verification": evidence, "completed_at": completedAt,
-			}
-			document, _ := frontmatterDocument(taskPayload, "# Resultado "+plan.id+"/"+taskID+"\n\n"+summary, false)
-			if err := pack.workspace.atomicWrite(filepath.Join(pack.directory, "results", "tasks", plan.id, taskID+".md"), document); err != nil {
-				return nil, err
-			}
-		}
-	}
 	document, _ := frontmatterDocument(payload, "# Resultado "+plan.id+"\n\n"+summary, false)
-	if err := pack.workspace.atomicWrite(filepath.Join(pack.directory, "results", plan.id+".md"), document); err != nil {
+	planPath, found := planFileForID(pack.workspace.layout.Plans(filepath.Base(pack.directory)), plan.id)
+	if !found {
+		return nil, workflowError("MODEL_MISMATCH", "plano ausente: "+plan.id)
+	}
+	if err := pack.workspace.atomicWrite(filepath.Join(filepath.Dir(planPath), "RESULT.md"), document); err != nil {
 		return nil, err
 	}
 	resultSet := map[string]bool{plan.id: true}
@@ -399,25 +371,25 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 
 func planResultPayloads(workspace methodWorkspace, directory string) (map[string]map[string]any, error) {
 	result := map[string]map[string]any{}
-	resultsDirectory := filepath.Join(directory, "results")
-	if err := workspace.validateWorkspacePath(resultsDirectory); err != nil {
+	plansDirectory := workspace.layout.Plans(filepath.Base(directory))
+	if err := workspace.validateWorkspacePath(plansDirectory); err != nil {
 		return nil, err
 	}
-	entries, err := os.ReadDir(resultsDirectory)
+	paths, err := planFiles(plansDirectory)
 	if os.IsNotExist(err) {
 		return result, nil
 	}
 	if err != nil {
 		return nil, workflowError("DOCVIVA_INCOMPLETE", err.Error())
 	}
-	for _, entry := range entries {
-		if entry.IsDir() || !planResultName.MatchString(entry.Name()) {
+	for _, planPath := range paths {
+		path := filepath.Join(filepath.Dir(planPath), "RESULT.md")
+		if _, statErr := os.Lstat(path); os.IsNotExist(statErr) {
 			continue
 		}
-		path := filepath.Join(resultsDirectory, entry.Name())
 		info, statErr := os.Lstat(path)
 		if statErr != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			return nil, workflowError("DOCVIVA_INCOMPLETE", "resultado inválido: "+entry.Name())
+			return nil, workflowError("DOCVIVA_INCOMPLETE", "resultado inválido: "+path)
 		}
 		payload, readErr := readStructuredFrontmatter(path)
 		if readErr != nil {
@@ -425,7 +397,7 @@ func planResultPayloads(workspace methodWorkspace, directory string) (map[string
 		}
 		identifier := stateString(payload["plan"])
 		if identifier == "" || result[identifier] != nil {
-			return nil, workflowError("DOCVIVA_INCOMPLETE", "resultado inválido: "+entry.Name())
+			return nil, workflowError("DOCVIVA_INCOMPLETE", "resultado inválido: "+path)
 		}
 		result[identifier] = payload
 	}
@@ -598,7 +570,7 @@ func reopenPlan(repo, change, planID, taskID, reason string) (map[string]any, er
 		return nil, err
 	}
 	if taskID != "" {
-		if plan.schema != 2 || taskByID(plan, taskID) == nil {
+		if taskByID(plan, taskID) == nil {
 			return nil, workflowError("MODEL_MISMATCH", "tarefa desconhecida: "+planID+"/"+taskID)
 		}
 		taskResults, loadErr := planTaskResultPayloads(pack.workspace, pack.directory, plan, stateString(coherence["digest"]))
@@ -651,7 +623,11 @@ func reopenPlan(repo, change, planID, taskID, reason string) (map[string]any, er
 	if len(dependents) > 0 {
 		return nil, workflowError("IMPACT_STALE", "reabra primeiro os planos dependentes: "+strings.Join(dependents, ", "))
 	}
-	path := filepath.Join(pack.directory, "results", planID+".md")
+	planPath, found := planFileForID(pack.workspace.layout.Plans(filepath.Base(pack.directory)), planID)
+	if !found {
+		return nil, workflowError("MODEL_MISMATCH", "plano ausente: "+planID)
+	}
+	path := filepath.Join(filepath.Dir(planPath), "RESULT.md")
 	original, readErr := os.ReadFile(path)
 	if readErr != nil {
 		return nil, workflowError("DOCVIVA_INCOMPLETE", readErr.Error())

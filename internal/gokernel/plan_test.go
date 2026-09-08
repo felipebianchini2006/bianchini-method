@@ -17,6 +17,7 @@ func TestPlanCompleteFrozenActualDeltaRequirement(t *testing.T) {
 }
 
 func TestPlanCompleteSchemaOneWritesResultAndPendingCloseState(t *testing.T) {
+	t.Skip("contrato schema 1 removido do método único")
 	repo := t.TempDir()
 	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
@@ -104,7 +105,7 @@ func TestPlanReopenRestoresExecutableStateAndKeepsAudit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultPath := filepath.Join(directory, "results", "P01.md")
+	resultPath := filepath.Join(directory, "plans", "P01", "RESULT.md")
 	if err := os.WriteFile(resultPath, document, 0o600); err != nil {
 		t.Fatal(err)
 	}

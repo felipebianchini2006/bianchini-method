@@ -27,7 +27,7 @@ func TestModelInitAndValidateWorkspace(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &initialized); err != nil {
 		t.Fatal(err)
 	}
-	if initialized["method"] != "0.4" || initialized["status"] != "idle" || initialized["created"] != true {
+	if initialized["method"] != methodIdentity || initialized["status"] != "idle" || initialized["created"] != true {
 		t.Fatalf("initialized=%#v", initialized)
 	}
 	for _, relative := range []string{
@@ -47,7 +47,7 @@ func TestModelInitAndValidateWorkspace(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &validated); err != nil {
 		t.Fatal(err)
 	}
-	if validated["valid"] != true || validated["method"] != "0.4" || validated["status"] != "idle" {
+	if validated["valid"] != true || validated["method"] != methodIdentity || validated["status"] != "idle" {
 		t.Fatalf("validated=%#v", validated)
 	}
 }
@@ -152,6 +152,7 @@ func TestModelValidateSimulatesPlans(t *testing.T) {
 		t.Fatal(stderr)
 	}
 	directory := filepath.Join(repo, ".bianchini", "changes", "C001-contrato-de-saude")
+	writeManagedSpecTest(t, repo, directory)
 	expected := `---
 schema_version: 1
 modules: []
@@ -172,21 +173,12 @@ effects: []
 	if err := os.WriteFile(filepath.Join(directory, "SYSTEM_MODEL.md"), []byte(expected), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	plan := `---
-id: P01
-model_delta:
-  contracts:
-    add:
-      - id: health_checked
-        owner: api
----
-# Plano
-`
-	if err := os.WriteFile(filepath.Join(directory, "plans", "P01.md"), []byte(plan), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	planValue := roadmapPlan("P01", nil)
+	planValue["model_delta"] = map[string]any{"contracts": map[string]any{"add": []any{map[string]any{"id": "health_checked", "owner": "api"}}}}
+	plan, _ := frontmatterDocument(planValue, "# Plano", false)
+	writePlanTest(t, directory, "P01", plan)
 	coherence := `---
-{"schema_version":1,"planning_contract":1,"change":"C001-contrato-de-saude","status":"pending"}
+{"schema_version":2,"planning_contract":2,"spec_contract":1,"change":"C001-contrato-de-saude","status":"pending"}
 ---
 # Coerencia
 `
@@ -283,9 +275,8 @@ func TestModelValidateManagedSpecPackage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(directory, "SCOPE.md"), []byte("# Escopo\n\n### REQ-001 Requisito\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, "plans", "P01.md"), []byte("---\n{\"id\":\"P01\",\"model_delta\":{}}\n---\n# Plano\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	planDocument, _ := frontmatterDocument(roadmapPlan("P01", nil), "# Plano", false)
+	writePlanTest(t, directory, "P01", planDocument)
 	specPath := filepath.Join(directory, "specs", "expected", "api.md")
 	if err := os.WriteFile(specPath, []byte("# API\n\n## API-001: Responde saude\n"), 0o600); err != nil {
 		t.Fatal(err)

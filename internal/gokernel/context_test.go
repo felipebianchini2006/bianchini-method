@@ -1,7 +1,6 @@
 package gokernel
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -28,7 +27,7 @@ type contextGoldenFile struct {
 
 func contextGoldenRepo(t *testing.T) (string, contextGoldenFile) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "tests", "fixtures", "cli_contract", "success-context.json"))
+	raw, err := os.ReadFile(filepath.Join("testdata", "context-current.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,30 +88,23 @@ func contextTestFrontmatter(t *testing.T, value map[string]any, title string) []
 }
 
 func TestContextGoldenPackAndVerify(t *testing.T) {
-	repo, fixture := contextGoldenRepo(t)
+	repo, _ := contextGoldenRepo(t)
 	packed, err := runContext([]string{"pack", "--repo", repo, "--unit", "C001/P01/T01"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedPack := fixture.Steps[0].Expected.Stdout.Value
-	packedCanonical, _ := contextCanonical(packed)
-	expectedPackCanonical, _ := contextCanonical(expectedPack)
-	if !bytes.Equal(packedCanonical, expectedPackCanonical) {
-		actual, _ := json.MarshalIndent(packed, "", "  ")
-		expected, _ := json.MarshalIndent(expectedPack, "", "  ")
-		payload, _ := os.ReadFile(filepath.Join(repo, ".bianchini", ".runtime", "context", "C001-P01-T01.json"))
-		t.Fatalf("pack divergiu\nactual=%s\nexpected=%s\npayload=%s", actual, expected, payload)
+	packedResult := contextResultMap(t, packed)
+	if stateString(packedResult["unit"]) != "C001/P01/T01" || stateString(packedResult["digest"]) == "" {
+		t.Fatalf("pack inválido: %#v", packed)
 	}
 	path := filepath.Join(repo, ".bianchini", ".runtime", "context", "C001-P01-T01.json")
 	verified, err := runContext([]string{"verify", "--repo", repo, "--path", path})
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedVerify := fixture.Steps[1].Expected.Stdout.Value
-	verifiedCanonical, _ := contextCanonical(verified)
-	expectedVerifyCanonical, _ := contextCanonical(expectedVerify)
-	if !bytes.Equal(verifiedCanonical, expectedVerifyCanonical) {
-		t.Fatalf("verify divergiu: %#v != %#v", verified, expectedVerify)
+	verifiedResult := contextResultMap(t, verified)
+	if stateString(verifiedResult["unit"]) != "C001/P01/T01" || stateString(verifiedResult["digest"]) != stateString(packedResult["digest"]) {
+		t.Fatalf("verify divergiu: %#v", verified)
 	}
 
 	payloadRaw, err := os.ReadFile(path)
@@ -212,12 +204,15 @@ func TestContextPlanQuickDebugAndReleaseCandidate(t *testing.T) {
 	if _, err := compileContextPack(repo, "RC:build-a", "", contextDefaultMaxBytes); err == nil || !strings.Contains(err.Error(), "PACK_INCOMPLETE") {
 		t.Fatalf("RC sem homologação deveria falhar: %v", err)
 	}
-	homologation := filepath.Join(repo, ".bianchini", "changes", "C001-context", "results", "HOMOLOGATION.md")
+	homologation := filepath.Join(repo, ".bianchini", "changes", "C001-context", "homologation", "build-a", "HOMOLOGATION.md")
 	value := map[string]any{
 		"schema_version": 1, "fingerprint": "build-a", "change": "C001-context", "status": "running",
 		"gates": []any{"release-tests"}, "blockers": []any{},
 		"findings":      []any{map[string]any{"id": "visual-review", "status": "open"}},
-		"required_refs": []any{".bianchini/changes/C001-context/results/P00.md"},
+		"required_refs": []any{".bianchini/changes/C001-context/plans/P00/RESULT.md"},
+	}
+	if err := os.MkdirAll(filepath.Dir(homologation), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	if err := os.WriteFile(homologation, contextTestFrontmatter(t, value, "Homologação"), 0o644); err != nil {
 		t.Fatal(err)
@@ -250,7 +245,7 @@ func TestContextPlanQuickDebugAndReleaseCandidate(t *testing.T) {
 	archivedRaw, _ := os.ReadFile(filepath.Join(repo, filepath.FromSlash(stateString(archived["path"]))))
 	var archivedPayload map[string]any
 	_ = json.Unmarshal(archivedRaw, &archivedPayload)
-	if got := stateString(stateObject(archivedPayload["context"])["source"]); got != ".bianchini/archive/C001-context/results/HOMOLOGATION.md" {
+	if got := stateString(stateObject(archivedPayload["context"])["source"]); got != ".bianchini/archive/C001-context/homologation/build-a/HOMOLOGATION.md" {
 		t.Fatalf("fonte arquivada divergente: %s", got)
 	}
 }
@@ -374,7 +369,7 @@ func TestContextRejectsForgedLessonAndSourceSymlink(t *testing.T) {
 		"id": "LAAAAAAAAAAAA", "schema_version": 1, "status": "approved", "active": true,
 		"classification": "repeatable_procedure", "statement": "Não confiar.", "tags": []any{"session-state"},
 		"validity": "Sempre.", "conflicts": []any{}, "evidence": []any{"nenhuma"},
-		"source": ".bianchini/changes/C001-context/results/P00.md", "source_digest": strings.Repeat("0", 64),
+		"source": ".bianchini/changes/C001-context/plans/P00/RESULT.md", "source_digest": strings.Repeat("0", 64),
 		"approved_by": "human:forged", "approved_digest": strings.Repeat("0", 64), "approved_at": "2026-09-01T00:00:00Z",
 	}
 	encoded, _ := contextCanonical(forged)

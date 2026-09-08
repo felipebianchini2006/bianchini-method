@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -75,7 +74,7 @@ func loadCoherencePackage(repo, change string) (coherencePackage, error) {
 	if err != nil {
 		return coherencePackage{}, workflowError("MODEL_MISMATCH", err.Error())
 	}
-	expected, err := loadProjectModel(filepath.Join(directory, "SYSTEM_MODEL.md"))
+	expected, err := loadProjectModel(workspace.layout.ChangeModel(filepath.Base(directory)))
 	if err != nil {
 		return coherencePackage{}, workflowError("MODEL_MISMATCH", err.Error())
 	}
@@ -84,28 +83,16 @@ func loadCoherencePackage(repo, change string) (coherencePackage, error) {
 		return coherencePackage{}, workflowError("COHERENCE_ERROR", err.Error())
 	}
 	schema := stateInt(contract["schema_version"])
-	if schema == 0 {
-		schema = 1
-	}
-	if schema != 1 && schema != 2 {
-		return coherencePackage{}, workflowError("COHERENCE_ERROR", "schema_version de COHERENCE inválido")
+	if schema != 2 {
+		return coherencePackage{}, workflowError("COHERENCE_ERROR", "COHERENCE exige schema_version 2")
 	}
 	planning := stateInt(contract["planning_contract"])
-	if planning == 0 {
-		planning = 1
+	if planning != 2 {
+		return coherencePackage{}, workflowError("COHERENCE_ERROR", "COHERENCE exige planning_contract 2")
 	}
-	if planning != 1 && planning != 2 {
-		return coherencePackage{}, workflowError("COHERENCE_ERROR", "planning_contract inválido")
-	}
-	specContract := 0
-	if schema == 2 {
-		if planning != 2 {
-			return coherencePackage{}, workflowError("COHERENCE_ERROR", "COHERENCE schema 2 exige planning_contract: 2")
-		}
-		specContract = stateInt(contract["spec_contract"])
-		if specContract != 1 {
-			return coherencePackage{}, workflowError("SPEC_CONTRACT_UNSUPPORTED", "COHERENCE schema 2 exige spec_contract: 1")
-		}
+	specContract := stateInt(contract["spec_contract"])
+	if specContract != 1 {
+		return coherencePackage{}, workflowError("SPEC_CONTRACT_UNSUPPORTED", "COHERENCE schema 2 exige spec_contract: 1")
 	}
 	return coherencePackage{workspace, directory, current, expected, plans, contract, planning, specContract}, nil
 }
@@ -120,12 +107,7 @@ func coherenceCheck(repo, change string, structuralOnly bool, semanticPath strin
 	reviewDigest := any(nil)
 	var schedule any
 	specDigests := map[string]any{}
-	if pack.planningContract >= 2 {
-		for _, plan := range pack.plans {
-			if plan.schema != 2 {
-				return nil, workflowError("COHERENCE_ERROR", "mudança v2 exige todos os planos em schema_version 2")
-			}
-		}
+	{
 		expectedRoadmap, _ := roadmapDocument(pack.plans)
 		roadmapPath := filepath.Join(pack.directory, "ROADMAP.md")
 		roadmap, readErr := coherenceReadRequired(pack.workspace, roadmapPath, "ROADMAP.md")
@@ -149,11 +131,9 @@ func coherenceCheck(repo, change string, structuralOnly bool, semanticPath strin
 		}
 		reviewDigest = coherenceReviewDigest(pack.planningContract, manifest, specDigests)
 	}
-	findings := coherenceStructuralFindings(pack.current, pack.expected, pack.plans, requirements, pack.planningContract >= 2)
-	if pack.planningContract >= 2 {
-		if projected, scheduleErr := coherenceSchedule(pack.plans); scheduleErr == nil {
-			schedule = projected
-		}
+	findings := coherenceStructuralFindings(pack.current, pack.expected, pack.plans, requirements, true)
+	if projected, scheduleErr := coherenceSchedule(pack.plans); scheduleErr == nil {
+		schedule = projected
 	}
 	var semantic any
 	if structuralOnly {
@@ -273,17 +253,15 @@ func coherenceApprove(repo, change, digest, approvedBy string, decisionKind ...s
 			return nil, err
 		}
 	}
-	if pack.planningContract >= 2 {
-		manifest, err = coherenceArtifactManifest(pack.workspace, pack.directory)
-		if err != nil {
-			return nil, err
-		}
-		if !coherenceManifestEqual(payload["artifact_manifest"], manifest) {
-			return nil, workflowError("STALE_EVIDENCE", "artefatos mudaram depois da revisão semântica")
-		}
-		if stateString(payload["review_input_digest"]) != coherenceReviewDigest(pack.planningContract, manifest, specDigests) {
-			return nil, workflowError("STALE_EVIDENCE", "manifest revisado diverge do pacote atual")
-		}
+	manifest, err = coherenceArtifactManifest(pack.workspace, pack.directory)
+	if err != nil {
+		return nil, err
+	}
+	if !coherenceManifestEqual(payload["artifact_manifest"], manifest) {
+		return nil, workflowError("STALE_EVIDENCE", "artefatos mudaram depois da revisão semântica")
+	}
+	if stateString(payload["review_input_digest"]) != coherenceReviewDigest(pack.planningContract, manifest, specDigests) {
+		return nil, workflowError("STALE_EVIDENCE", "manifest revisado diverge do pacote atual")
 	}
 	currentDigest := coherencePackageDigest(pack.current, pack.expected, pack.plans, findings, semantic, pack.planningContract, manifest, specDigests)
 	if digest != stateString(payload["digest"]) || digest != currentDigest {
@@ -341,8 +319,7 @@ func coherenceReadRequired(workspace methodWorkspace, path, label string) ([]byt
 
 func coherenceArtifactManifest(workspace methodWorkspace, directory string) (map[string]string, error) {
 	paths := []string{"SCOPE.md", "RESEARCH.md", "ARCHITECTURE.md", "SYSTEM_MODEL.md", "ROADMAP.md"}
-	planPaths, _ := filepath.Glob(filepath.Join(directory, "plans", "P*.md"))
-	sort.Strings(planPaths)
+	planPaths, _ := planFiles(workspace.layout.Plans(filepath.Base(directory)))
 	for _, path := range planPaths {
 		relative, _ := filepath.Rel(directory, path)
 		paths = append(paths, filepath.ToSlash(relative))
@@ -428,9 +405,6 @@ func coherenceSchedule(plans []planContract) (map[string]any, error) {
 	}
 	taskWaves := map[string]any{}
 	for _, plan := range plans {
-		if plan.schema != 2 {
-			continue
-		}
 		waves, waveErr := coherenceTaskWaves(planTasks(plan))
 		if waveErr != nil {
 			return nil, waveErr

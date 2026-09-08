@@ -31,6 +31,41 @@ func roadmapPlan(identifier string, dependsOn []string, tasks ...map[string]any)
 		"provides": []any{}, "consumes": []any{}, "modules": []any{}, "interfaces": []any{}, "ownership": []any{}, "data": []any{},
 		"model_delta": map[string]any{}, "migrations": []any{}, "effects": []any{}, "rollback": "Reverter " + identifier,
 		"verifications": []any{"go test ./..."}, "future_constraints": []any{}, "execution": "slice", "review": "per_slice", "tasks": rawTasks,
+		"scenarios": []any{map[string]any{"id": "S01", "requirements": []any{"REQ-001"}, "platform": "cli", "profile": "default", "state": "success", "expected": "Resultado observável", "risk": "regressão do contrato declarado", "evidence_kinds": []any{"observation", "log"}}},
+	}
+}
+
+func writePlanTest(t *testing.T, changeDirectory, slug string, document []byte) string {
+	t.Helper()
+	directory := filepath.Join(changeDirectory, "plans", slug)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "PLAN.md")
+	if err := os.WriteFile(path, document, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeManagedSpecTest(t *testing.T, repo, changeDirectory string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(changeDirectory, "SCOPE.md"), []byte("# Escopo\n\n### REQ-001 Resultado esperado\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(changeDirectory, "specs", "expected", "contract.md"), []byte("# Contrato\n\n## CT-001: Resultado esperado\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest, _ := json.MarshalIndent(map[string]any{
+		"schema_version": 1, "spec_contract": 1,
+		"specs":         []any{map[string]any{"id": "contract", "path": "contract.md", "requirements": []any{map[string]any{"id": "CT-001", "scope": []any{"REQ-001"}}}}},
+		"risk_coverage": []any{},
+	}, "", "  ")
+	if err := os.WriteFile(filepath.Join(changeDirectory, "specs", "MANIFEST.json"), append(manifest, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := syncPlanningSpecs(newMethodWorkspace(repo), changeDirectory, map[string]any{"schema_version": 2, "spec_contract": 1}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -52,9 +87,7 @@ func TestRoadmapSyncRendersCanonicalPlans(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(directory, "plans", stateString(plan["id"])+".md"), document, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		writePlanTest(t, directory, stateString(plan["id"]), document)
 	}
 	code, stdout, stderr = runCLI(t, "roadmap", "sync", "--repo", repo, "--change", "C001")
 	if code != 0 || stderr != "" {
@@ -103,11 +136,9 @@ func TestRoadmapSyncRequiresV2Plans(t *testing.T) {
 	var created map[string]any
 	_ = json.Unmarshal([]byte(stdout), &created)
 	directory := filepath.Join(repo, ".bianchini", "changes", stateString(created["change"]))
-	if err := os.WriteFile(filepath.Join(directory, "plans", "P01.md"), []byte("---\n{\"id\":\"P01\",\"model_delta\":{}}\n---\n# P01\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writePlanTest(t, directory, "P01", []byte("---\n{\"id\":\"P01\",\"model_delta\":{}}\n---\n# P01\n"))
 	code, stdout, stderr = runCLI(t, "roadmap", "sync", "--repo", repo, "--change", "C001")
-	if code != 3 || stdout != "" || !strings.Contains(stderr, "roadmap v2 exige") {
+	if code != 3 || stdout != "" || !strings.Contains(stderr, "schema_version exige 2") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
@@ -128,10 +159,8 @@ func TestRoadmapSyncRejectsDuplicatePlanFileIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"P01.md", "P01-fundacao.md"} {
-		if err := os.WriteFile(filepath.Join(directory, "plans", name), document, 0o600); err != nil {
-			t.Fatal(err)
-		}
+	for _, name := range []string{"P01", "P01-fundacao"} {
+		writePlanTest(t, directory, name, document)
 	}
 	code, stdout, stderr = runCLI(t, "roadmap", "sync", "--repo", repo, "--change", "C001")
 	if code != 3 || stdout != "" || !strings.Contains(stderr, "arquivos de plano duplicam identidade: P01") {
