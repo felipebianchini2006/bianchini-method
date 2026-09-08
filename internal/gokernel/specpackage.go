@@ -97,7 +97,7 @@ func validateManagedSpecPath(value, label string) (string, error) {
 }
 
 func specConfined(root, candidate, label string) (string, error) {
-	if strings.Contains(candidate, "\\") {
+	if strings.Contains(candidate, "\\") && (filepath.Separator != '\\' || !filepath.IsAbs(candidate)) {
 		return "", specError("SPEC_PATH_INVALID", label+" contém traversal")
 	}
 	for _, part := range strings.Split(filepath.ToSlash(candidate), "/") {

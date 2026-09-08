@@ -16,7 +16,7 @@ func contextRoot(value string) (string, error) {
 			return "", contextError("PACK_INCOMPLETE", "repo ausente")
 		}
 	}
-	if strings.Contains(value, "\\") {
+	if filepath.Separator != '\\' && strings.Contains(value, "\\") {
 		return "", contextError("PATH_UNSAFE", "repo contém separador inválido")
 	}
 	absolute, err := filepath.Abs(value)
@@ -45,7 +45,7 @@ func contextRoot(value string) (string, error) {
 }
 
 func contextSafePath(root, value, label string) (string, error) {
-	if strings.Contains(value, "\\") {
+	if strings.Contains(value, "\\") && (filepath.Separator != '\\' || !filepath.IsAbs(value)) {
 		return "", contextError("PATH_UNSAFE", label+" contém separador inválido")
 	}
 	if value == "" {

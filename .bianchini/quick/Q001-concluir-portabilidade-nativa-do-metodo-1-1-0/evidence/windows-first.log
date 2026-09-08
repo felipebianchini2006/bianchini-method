@@ -1,0 +1,228 @@
+Go (windows-latest)	Test	﻿2026-09-08T22:35:11.4104904Z ##[group]Run go test ./...
+Go (windows-latest)	Test	2026-09-08T22:35:11.4105639Z ^[[36;1mgo test ./...^[[0m
+Go (windows-latest)	Test	2026-09-08T22:35:11.6373000Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+Go (windows-latest)	Test	2026-09-08T22:35:11.6373757Z ##[endgroup]
+Go (windows-latest)	Test	2026-09-08T22:35:12.1620936Z go: downloading golang.org/x/text v0.23.0
+Go (windows-latest)	Test	2026-09-08T22:35:46.8546579Z ?   	github.com/felipebianchini2006/bianchini-method/cmd/bm	[no test files]
+Go (windows-latest)	Test	2026-09-08T22:35:47.7125185Z ok  	github.com/felipebianchini2006/bianchini-method/internal/acceptance	0.034s
+Go (windows-latest)	Test	2026-09-08T22:36:23.1421020Z --- FAIL: TestAdapterRenderMatchesCanonicalFixtures (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1421970Z     --- FAIL: TestAdapterRenderMatchesCanonicalFixtures/generic (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1429741Z         adapter_test.go:26: payload mismatch: map[string]interface {}{"content":"<!-- bianchini-method:host-adapter:start -->\n## Bianchini Method — adapter de host\n\n- Host: `generic`\n- Arquivo: `AGENTS.md`\n- Capabilities: `AGENTS.md`, `Agent Skills`\n\n### Contrato comum\n\n- Consuma somente o context pack validado para a unidade; não releia o contrato completo quando o pack estiver válido.\n- Exija a mesma `pack_identity`, o mesmo `pack_digest` e o mesmo `package_digest` usados pelo CLI antes de executar ou revisar a unidade.\n- Trate o CLI `bm` como autoridade para schema, digest, DAG, impacto, evidência e gates.\n- Peça a próxima onda ao CLI; o host agenda agentes, modelos e paralelismo sem gravar decisões de host no kernel.\n- Preserve o fluxo público e nunca acesse o namespace estrangeiro `.planning/`.\n\n### Política do host\n\n- Descubra e carregue as Agent Skills declaradas pelo projeto antes de executar uma unidade.\n- Execute cada unidade com o pack recebido e devolva evidência ao CLI sem reimplementar gates.\n<!-- bianchini-method:host-adapter:end -->\n", "digest":"cf8af66ed29c9bc147cf915ac1ff9c1e76886ed0c0d315db9d223c274b4b3105", "host":"generic"}
+Go (windows-latest)	Test	2026-09-08T22:36:23.1433836Z     --- FAIL: TestAdapterRenderMatchesCanonicalFixtures/codex (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1440375Z         adapter_test.go:26: payload mismatch: map[string]interface {}{"content":"<!-- bianchini-method:host-adapter:start -->\n## Bianchini Method — adapter de host\n\n- Host: `codex`\n- Arquivo: `AGENTS.md`\n- Capabilities: `AGENTS.md`, `Agent Skills`, `subagents`, `commentary updates`\n\n### Contrato comum\n\n- Consuma somente o context pack validado para a unidade; não releia o contrato completo quando o pack estiver válido.\n- Exija a mesma `pack_identity`, o mesmo `pack_digest` e o mesmo `package_digest` usados pelo CLI antes de executar ou revisar a unidade.\n- Trate o CLI `bm` como autoridade para schema, digest, DAG, impacto, evidência e gates.\n- Peça a próxima onda ao CLI; o host agenda agentes, modelos e paralelismo sem gravar decisões de host no kernel.\n- Preserve o fluxo público e nunca acesse o namespace estrangeiro `.planning/`.\n\n### Política do host\n\n- Faça o menor diff compatível que satisfaça a unidade e seus testes.\n- Não crie abstrações especulativas; extraia apenas quando houver variação real comprovada.\n- Use subagentes apenas para frentes independentes, com ownership fechado e integração pelo executor principal.\n<!-- bianchini-method:host-adapter:end -->\n", "digest":"84a043c4707ccd0902dd26685a2b8bc5529abbfc22b6f9650dc3f886edc39a18", "host":"codex"}
+Go (windows-latest)	Test	2026-09-08T22:36:23.1445387Z     --- FAIL: TestAdapterRenderMatchesCanonicalFixtures/claude-compatible (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1451531Z         adapter_test.go:26: payload mismatch: map[string]interface {}{"content":"<!-- bianchini-method:host-adapter:start -->\n## Bianchini Method — adapter de host\n\n- Host: `claude-compatible`\n- Arquivo: `CLAUDE.md`\n- Capabilities: `CLAUDE.md`, `Agent Skills`, `subagents`\n\n### Contrato comum\n\n- Consuma somente o context pack validado para a unidade; não releia o contrato completo quando o pack estiver válido.\n- Exija a mesma `pack_identity`, o mesmo `pack_digest` e o mesmo `package_digest` usados pelo CLI antes de executar ou revisar a unidade.\n- Trate o CLI `bm` como autoridade para schema, digest, DAG, impacto, evidência e gates.\n- Peça a próxima onda ao CLI; o host agenda agentes, modelos e paralelismo sem gravar decisões de host no kernel.\n- Preserve o fluxo público e nunca acesse o namespace estrangeiro `.planning/`.\n\n### Política do host\n\n- Carregue as instruções compatíveis de `CLAUDE.md` e as Agent Skills declaradas pelo projeto.\n- Use subagentes e hooks do host somente para executar a onda recebida, sem decidir gates no prompt.\n<!-- bianchini-method:host-adapter:end -->\n", "digest":"d99506a1c474c6f9889ccc02e92c55ea319ede9ab694625cc0bda0fe4ac71a29", "host":"claude-compatible"}
+Go (windows-latest)	Test	2026-09-08T22:36:23.1457215Z --- FAIL: TestAdapterInstallIsIdempotentAndPreservesForeignBytes (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1457936Z     adapter_test.go:41: code=3 stderr="HOST_ADAPTER_PATH_INVALID: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1458437Z --- FAIL: TestAdapterInstallRejectsSymlinkWithoutMutation (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1459080Z     adapter_test.go:88: code=3 stdout="" stderr="HOST_ADAPTER_PATH_INVALID: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1459550Z --- FAIL: TestSpecDiffFixtureAndPathSafety (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1460031Z     cli_test.go:170: code=2 stderr="PATH_SAFETY: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1460419Z --- FAIL: TestCycleCloseFrozenRepositoryError (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1460964Z     close_test.go:14: code=3 stdout="" stderr="DIRTY_WORKSPACE: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1461414Z --- FAIL: TestCoherenceAndImpactFrozenInputErrors (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1461909Z     --- FAIL: TestCoherenceAndImpactFrozenInputErrors/check_missing_workspace (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1462630Z         coherence_test.go:40: code=2 stdout="" stderr="PATH_SAFETY: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1463049Z --- FAIL: TestCoherenceRejectsSchemaOne (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1463581Z     coherence_test.go:53: change code=3 stderr="DIRTY_WORKSPACE: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1464141Z --- FAIL: TestCoherenceSchemaTwoCheckReviewApproveAndStartDescriptivePlan (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1464739Z     coherence_test.go:84: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1465066Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1465268Z --- FAIL: TestContextGoldenPackAndVerify (0.15s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1465974Z     context_test.go:94: PATH_UNSAFE: repo contém separador inválido
+Go (windows-latest)	Test	2026-09-08T22:36:23.1466339Z --- FAIL: TestContextLimitAndStaleFailClosed (0.16s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1466920Z     context_test.go:138: erro de limite inesperado: PATH_UNSAFE: repo contém separador inválido
+Go (windows-latest)	Test	2026-09-08T22:36:23.1467968Z --- FAIL: TestContextPlanQuickDebugAndReleaseCandidate (0.24s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1468521Z     context_test.go:193: pack C001/P01: PATH_UNSAFE: repo contém separador inválido
+Go (windows-latest)	Test	2026-09-08T22:36:23.1468943Z --- FAIL: TestContextCacheHeadAndCanonicalTampering (0.27s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1469419Z     context_test.go:257: PATH_UNSAFE: repo contém separador inválido
+Go (windows-latest)	Test	2026-09-08T22:36:23.1469827Z --- FAIL: TestContextIncludesOnlyGovernedRelevantLessons (1.14s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1470302Z     context_test.go:339: PATH_UNSAFE: repo contém separador inválido
+Go (windows-latest)	Test	2026-09-08T22:36:23.1470686Z --- FAIL: TestContextRejectsForgedLessonAndSourceSymlink (0.20s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1471281Z     context_test.go:380: lição forjada deveria falhar: PATH_UNSAFE: repo contém separador inválido
+Go (windows-latest)	Test	2026-09-08T22:36:23.1471736Z --- FAIL: TestDebugLifecycleMatchesFrozenSuccess (0.13s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1472226Z     debug_workflow_test.go:11: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1472636Z --- FAIL: TestDebugRejectsOutOfOrderAndStaleGreen (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1473107Z     debug_workflow_test.go:99: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1473526Z --- FAIL: TestRunDesignAuditSealVerifyAndRejectSymlink (0.02s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1474437Z     design_audit_test.go:35: seal design: raiz de design não encontrada: C:\Users\RUNNER~1\AppData\Local\Temp\TestRunDesignAuditSealVerifyAndRejectSymlink1835954433\001
+Go (windows-latest)	Test	2026-09-08T22:36:23.1475513Z --- FAIL: TestDirectLifecycleMatchesFrozenSuccess (0.08s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1476023Z     direct_lifecycle_test.go:39: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1476449Z --- FAIL: TestDirectLifecycleFailsClosedOnTamperedBrief (0.05s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1476965Z     direct_lifecycle_test.go:100: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1477376Z --- FAIL: TestQuickRejectsUnexecutedAndFailedCommands (0.95s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1477818Z     --- FAIL: TestQuickRejectsUnexecutedAndFailedCommands/#00 (0.21s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1478365Z         direct_proof_test.go:12: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1478943Z     --- FAIL: TestQuickRejectsUnexecutedAndFailedCommands/bm-command-that-does-not-exist (0.23s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1479609Z         direct_proof_test.go:12: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1480171Z     --- FAIL: TestQuickRejectsUnexecutedAndFailedCommands/go_command-that-does-not-exist (0.52s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1480836Z         direct_proof_test.go:12: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1481188Z --- FAIL: TestDebugRejectsNarrativeRed (0.40s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1481627Z     direct_proof_test.go:48: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1482019Z --- FAIL: TestQuickRejectsForeignAndStaleProofs (0.36s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1482481Z     direct_proof_test.go:66: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1482983Z --- FAIL: TestExecutionWorkspaceCreateAcceptsConsumedEffectiveModelComponent (0.22s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1483655Z     execution_workspace_test.go:165: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1484102Z --- FAIL: TestExecutionWorkspaceCreateLocateResumeAndCheck (0.21s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1484643Z     execution_workspace_test.go:185: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1485039Z --- FAIL: TestExecutionWorkspaceCreateGates (1.86s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1485443Z     --- FAIL: TestExecutionWorkspaceCreateGates/dirty_repository (0.18s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1486341Z         execution_workspace_test.go:359: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1486852Z     --- FAIL: TestExecutionWorkspaceCreateGates/missing_dependency (0.29s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1487465Z         execution_workspace_test.go:359: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1488160Z     --- FAIL: TestExecutionWorkspaceCreateGates/missing_consumed_contract (0.27s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1488938Z         execution_workspace_test.go:359: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1489405Z     --- FAIL: TestExecutionWorkspaceCreateGates/stale_plan (0.39s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1489977Z         execution_workspace_test.go:359: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1490447Z     --- FAIL: TestExecutionWorkspaceCreateGates/completed_plan (0.24s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1491044Z         execution_workspace_test.go:359: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1491560Z     --- FAIL: TestExecutionWorkspaceCreateGates/approved_package_drift (0.28s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1492175Z         execution_workspace_test.go:359: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1492693Z     --- FAIL: TestExecutionWorkspaceCreateGates/package_differs_from_head (0.21s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1493310Z         execution_workspace_test.go:359: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1493773Z --- FAIL: TestExecutionWorkspaceRejectsNestedDestination (0.24s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1494310Z     execution_workspace_test.go:388: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1494766Z --- FAIL: TestExecutionWorkspaceRejectsExistingTargetAndBranch (0.70s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1495279Z     --- FAIL: TestExecutionWorkspaceRejectsExistingTargetAndBranch/target (0.49s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1496006Z         execution_workspace_test.go:400: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1496537Z     --- FAIL: TestExecutionWorkspaceRejectsExistingTargetAndBranch/branch (0.21s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1497171Z         execution_workspace_test.go:412: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1497606Z --- FAIL: TestExecutionWorkspaceLocateAndCheckFailClosed (0.23s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1498154Z     execution_workspace_test.go:423: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1498627Z --- FAIL: TestExecutionWorkspaceRollbackRemovesWorktreeAndBranch (0.20s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1499196Z     execution_workspace_test.go:433: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1499669Z --- FAIL: TestExecutionWorkspaceResumeAndCheckRejectUnsafeMetadata (0.29s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1500242Z     execution_workspace_test.go:454: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1500657Z --- FAIL: TestExecutionWorkspaceMetadataIsJSON (0.36s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1501149Z     execution_workspace_test.go:482: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1501682Z --- FAIL: TestExecutionWorkspaceFinishRemovesOnlyCleanMergedWorkspaceAndBranch (0.21s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1502312Z     execution_workspace_test.go:501: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1502816Z --- FAIL: TestExecutionWorkspaceFinishPreservesDirtyOrUnmergedWorkspace (0.37s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1503429Z     --- FAIL: TestExecutionWorkspaceFinishPreservesDirtyOrUnmergedWorkspace/dirty (0.19s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1504122Z         execution_workspace_test.go:532: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1504717Z     --- FAIL: TestExecutionWorkspaceFinishPreservesDirtyOrUnmergedWorkspace/unmerged (0.17s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1505402Z         execution_workspace_test.go:548: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1505808Z --- FAIL: TestImpactFrozenMissingWorkspaceError (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1506346Z     impact_test.go:14: code=2 stdout="" stderr="PATH_SAFETY: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1506778Z --- FAIL: TestGovernedLearningApproveAndDeactivate (0.49s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1507276Z     learning_workflow_test.go:49: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1507727Z --- FAIL: TestGovernedLearningTransitionRequiresExclusiveLock (0.22s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1508263Z     learning_workflow_test.go:107: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1508881Z --- FAIL: TestGovernedLearningRejectsCandidatePathBeforeFilesystemAccess (0.27s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1509491Z     learning_workflow_test.go:138: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1509939Z --- FAIL: TestGovernedLearningAcceptsTruthfulBooleanGreenOnly (1.02s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1510448Z     --- FAIL: TestGovernedLearningAcceptsTruthfulBooleanGreenOnly/true (0.18s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1511315Z         learning_workflow_test.go:164: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1511865Z     --- FAIL: TestGovernedLearningAcceptsTruthfulBooleanGreenOnly/false (0.29s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1512503Z         learning_workflow_test.go:164: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1513016Z     --- FAIL: TestGovernedLearningAcceptsTruthfulBooleanGreenOnly/zero (0.33s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1513626Z         learning_workflow_test.go:164: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1514143Z     --- FAIL: TestGovernedLearningAcceptsTruthfulBooleanGreenOnly/empty (0.22s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1514896Z         learning_workflow_test.go:164: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1515404Z --- FAIL: TestGovernedLearningRetriesCanonicalPartialTransitions (0.47s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1515958Z     --- FAIL: TestGovernedLearningRetriesCanonicalPartialTransitions/approve (0.18s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1516709Z         learning_workflow_test.go:187: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1517379Z     --- FAIL: TestGovernedLearningRetriesCanonicalPartialTransitions/reject (0.28s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1518160Z         learning_workflow_test.go:187: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1518741Z --- FAIL: TestGovernedLearningRetriesDeactivateAfterDurableReplace (0.17s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1519324Z     learning_workflow_test.go:240: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1519872Z --- FAIL: TestGovernedLearningRejectsAndDetectsTampering (0.48s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1520508Z     --- FAIL: TestGovernedLearningRejectsAndDetectsTampering/reject (0.16s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1521233Z         learning_workflow_test.go:277: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1521805Z     --- FAIL: TestGovernedLearningRejectsAndDetectsTampering/tampered_candidate (0.32s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1522469Z         learning_workflow_test.go:289: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1522941Z --- FAIL: TestLearningRejectsSymlinkedGovernedSource (0.31s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1523514Z     learning_workflow_test.go:307: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1523905Z --- FAIL: TestModelInitAndValidateWorkspace (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1524403Z     model_test.go:24: code=3 stderr="DIRTY_WORKSPACE: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1524782Z --- FAIL: TestModelInitIsIdempotent (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1525187Z     model_test.go:59: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1525498Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1525797Z --- FAIL: TestModelInitCreatesManagedChange (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1526250Z     model_test.go:98: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1526540Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1526762Z --- FAIL: TestModelRejectsNonGitAndSymlinkRoot (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1527313Z     model_test.go:133: code=3 stdout="" stderr="DIRTY_WORKSPACE: root contém barra invertida\n"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1527748Z --- FAIL: TestModelValidateSimulatesPlans (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1528168Z     model_test.go:149: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1528462Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1528670Z --- FAIL: TestModelValidateManagedSpecPackage (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1529111Z     model_test.go:269: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1529399Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1529660Z --- FAIL: TestPlanReopenRestoresExecutableStateAndKeepsAudit (0.12s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1530274Z     plan_test.go:101: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1530619Z --- FAIL: TestReviewQuickRejectsLatestFailedRun (0.32s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1531353Z     review_regressions_test.go:12: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1531820Z --- FAIL: TestReviewGroupedRejectsOpenTaskFinding (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1532331Z     review_regressions_test.go:38: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1532805Z --- FAIL: TestReviewFixLimitCannotBeBypassedByPassingOtherGate (0.22s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1533359Z     review_regressions_test.go:64: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1533780Z --- FAIL: TestReviewRedRejectsMissingPythonDependency (0.20s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1534288Z     review_regressions_test.go:92: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1534685Z --- FAIL: TestRoadmapSyncRendersCanonicalPlans (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1535138Z     roadmap_test.go:75: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1535439Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1535632Z --- FAIL: TestRoadmapSyncRequiresV2Plans (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1536082Z     roadmap_test.go:130: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1536384Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1536635Z --- FAIL: TestRoadmapSyncRejectsDuplicatePlanFileIdentity (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1537250Z     roadmap_test.go:149: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1538240Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1538449Z --- FAIL: TestScopeSealVerifyAndTamper (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1538899Z     scope_test.go:113: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1539283Z         
+Go (windows-latest)	Test	2026-09-08T22:36:23.1539538Z --- FAIL: TestScopeSealRejectsInvalidInputWithoutMutation (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1540128Z     --- FAIL: TestScopeSealRejectsInvalidInputWithoutMutation/unsourced (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1540755Z         scope_test.go:187: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1541136Z             
+Go (windows-latest)	Test	2026-09-08T22:36:23.1541485Z     --- FAIL: TestScopeSealRejectsInvalidInputWithoutMutation/page_count (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1542157Z         scope_test.go:187: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1542583Z             
+Go (windows-latest)	Test	2026-09-08T22:36:23.1542936Z --- FAIL: TestManagedManifestRejectsFractionalContractNumbersAndDuplicateKeys (0.01s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1543681Z     --- FAIL: TestManagedManifestRejectsFractionalContractNumbersAndDuplicateKeys/fractional_schema (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1544768Z         specpackage_json_test.go:44: err=SPEC_PATH_INVALID: MANIFEST.json contém traversal; want "schema_version deve ser 1"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1545580Z     --- FAIL: TestManagedManifestRejectsFractionalContractNumbersAndDuplicateKeys/fractional_contract (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1546651Z         specpackage_json_test.go:44: err=SPEC_PATH_INVALID: MANIFEST.json contém traversal; want "spec_contract deve ser 1"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1547574Z     --- FAIL: TestManagedManifestRejectsFractionalContractNumbersAndDuplicateKeys/nested_duplicate_key (0.00s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1548658Z         specpackage_json_test.go:44: err=SPEC_PATH_INVALID: MANIFEST.json contém traversal; want "chave JSON duplicada: path"
+Go (windows-latest)	Test	2026-09-08T22:36:23.1549290Z --- FAIL: TestMandatoryPlanGateCannotBeOmitted (0.32s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1549723Z     --- FAIL: TestMandatoryPlanGateCannotBeOmitted/never_executed (0.22s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1550454Z         verification_closure_test.go:15: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1550951Z     --- FAIL: TestMandatoryPlanGateCannotBeOmitted/failed (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1551855Z         verification_closure_test.go:15: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1552308Z --- FAIL: TestProofForDifferentCommandCannotCoverGate (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1552837Z     verification_closure_test.go:42: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1553954Z --- FAIL: TestGroupedTaskCompletesWithoutIndividualReview (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1554611Z     verification_closure_test.go:86: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1555176Z --- FAIL: TestVerifyTaskExecutesStructuredCommandAndReusesPassingProof (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1555853Z     verification_test.go:40: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1556389Z --- FAIL: TestVerifyTaskFailedProofCannotLoopWithoutReason (0.14s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1556918Z     verification_test.go:68: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1557365Z --- FAIL: TestProcedureProofChangesWhenEvidenceChanges (0.11s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1557884Z     verification_test.go:115: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1558302Z --- FAIL: TestProofAndReviewBecomeStaleAfterCodeChanges (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1558924Z     verification_test.go:175: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1559378Z --- FAIL: TestTypedPlanCompletionRejectsNarrativeVerification (0.11s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1559911Z     verification_test.go:211: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1560386Z --- FAIL: TestTypedLifecycleRequiresProofReviewReleaseAndHomologation (0.11s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1560944Z     verification_test.go:220: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1561439Z --- FAIL: TestStrictAndSliceRequireTheirTaskReview (0.21s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1561875Z     --- FAIL: TestStrictAndSliceRequireTheirTaskReview/strict (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1562457Z         workflow_review_test.go:21: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1562930Z     --- FAIL: TestStrictAndSliceRequireTheirTaskReview/slice (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1563488Z         workflow_review_test.go:21: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1563946Z --- FAIL: TestConcreteInspectionFindingDoesNotNeedArtificialRed (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1564634Z     workflow_review_test.go:43: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1565062Z --- FAIL: TestFixLimitSurvivesRenamingUnitAndChangingCode (0.10s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1565576Z     workflow_review_test.go:58: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1565997Z --- FAIL: TestTechnicalDecisionDoesNotClaimHumanApproval (0.11s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1566506Z     workflow_review_test.go:84: DIRTY_WORKSPACE: root contém barra invertida
+Go (windows-latest)	Test	2026-09-08T22:36:23.1566840Z FAIL
+Go (windows-latest)	Test	2026-09-08T22:36:23.1567134Z FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	33.292s
+Go (windows-latest)	Test	2026-09-08T22:36:23.1567610Z ok  	github.com/felipebianchini2006/bianchini-method/internal/workspace	0.015s
+Go (windows-latest)	Test	2026-09-08T22:36:23.1568027Z --- FAIL: TestBuiltReleaseBinaryIdentityIsChecked (19.55s)
+Go (windows-latest)	Test	2026-09-08T22:36:23.1569244Z     main_test.go:190: CLI oficial foi rejeitado: identidade do binário windows-amd64 inválida: exec: "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\TestBuiltReleaseBinaryIdentityIsChecked2644547028\\001\\bm": executable file not found in %PATH%
+Go (windows-latest)	Test	2026-09-08T22:36:23.1570254Z FAIL
+Go (windows-latest)	Test	2026-09-08T22:36:23.1570555Z FAIL	github.com/felipebianchini2006/bianchini-method/tools/bm-release	20.502s
+Go (windows-latest)	Test	2026-09-08T22:36:23.1570898Z FAIL
+Go (windows-latest)	Test	2026-09-08T22:36:23.5085064Z ##[error]Process completed with exit code 1.

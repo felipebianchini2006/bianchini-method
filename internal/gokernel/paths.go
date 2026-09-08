@@ -35,7 +35,7 @@ func rejectForeignNamespace(path, label string) error {
 	if path == "" {
 		return domainError("PATH_SAFETY", label+" vazio")
 	}
-	if strings.Contains(path, "\\") {
+	if filepath.Separator != '\\' && strings.Contains(path, "\\") {
 		return domainError("PATH_SAFETY", label+" contém barra invertida")
 	}
 	for _, part := range strings.Split(filepath.ToSlash(path), "/") {
