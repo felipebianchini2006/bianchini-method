@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "repository": "/Users/felipebianchini/Developer/bm-service-example-gjquqkib/service-requests",
+  "change": "C001-solicitacoes-de-servico",
+  "quick": "Q001-melhorar-ajuda",
+  "debug": "D001-rejeitar-descricao-em-branco",
+  "reviewer": "fixture:protocol-test-not-independent",
+  "negative_rejections": [
+    "STALE_EVIDENCE",
+    "VERIFICATION_FAILED",
+    "VERIFICATION_FAILED",
+    "GATE_COVERAGE",
+    "REVIEW_REQUIRED",
+    "HOMOLOGATION_",
+    "HOMOLOGATION_",
+    "HOMOLOGATION_",
+    "ARTIFACT_MISMATCH"
+  ],
+  "candidate": {
+    "build": ".bianchini/.runtime/service.pyz",
+    "checksum": "bd63f416f527db709ceaea774a000020286fe8db8fe556fe63105472f66b5f74",
+    "id": "RC-5a37a5206817",
+    "kind": "file",
+    "package_digest": "d7aa283a5113b9adbdc83dd8bc1579537c592ebb0131c60f4d27b27592bc006c",
+    "revision": "4d48427648757feaab537931b9e6e5644ef1d0ff"
+  },
+  "scope_pdf_sha256": "7cda35b85e298153eabc6e867d49f2dc28c3e144c09d8e95b1f9f87fe2f8b5b1"
+}

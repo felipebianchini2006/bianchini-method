@@ -1,0 +1,6 @@
+?   	github.com/felipebianchini2006/bianchini-method/cmd/bm	[no test files]
+ok  	github.com/felipebianchini2006/bianchini-method/internal/acceptance	(cached)
+ok  	github.com/felipebianchini2006/bianchini-method/internal/gokernel	24.285s
+ok  	github.com/felipebianchini2006/bianchini-method/internal/workspace	(cached)
+ok  	github.com/felipebianchini2006/bianchini-method/tools/bm-release	(cached)
+
