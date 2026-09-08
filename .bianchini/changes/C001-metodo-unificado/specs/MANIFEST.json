@@ -1,0 +1,85 @@
+{
+  "risk_coverage": [],
+  "schema_version": 1,
+  "spec_contract": 1,
+  "specs": [
+    {
+      "id": "method",
+      "path": "method.md",
+      "requirements": [
+        {
+          "id": "REQ-001",
+          "scope": [
+            "REQ-001"
+          ]
+        },
+        {
+          "id": "REQ-002",
+          "scope": [
+            "REQ-002"
+          ]
+        },
+        {
+          "id": "REQ-003",
+          "scope": [
+            "REQ-003"
+          ]
+        },
+        {
+          "id": "REQ-004",
+          "scope": [
+            "REQ-004"
+          ]
+        },
+        {
+          "id": "REQ-005",
+          "scope": [
+            "REQ-005"
+          ]
+        },
+        {
+          "id": "REQ-006",
+          "scope": [
+            "REQ-006"
+          ]
+        },
+        {
+          "id": "REQ-007",
+          "scope": [
+            "REQ-007"
+          ]
+        },
+        {
+          "id": "REQ-008",
+          "scope": [
+            "REQ-008"
+          ]
+        },
+        {
+          "id": "REQ-009",
+          "scope": [
+            "REQ-009"
+          ]
+        },
+        {
+          "id": "REQ-010",
+          "scope": [
+            "REQ-010"
+          ]
+        },
+        {
+          "id": "REQ-011",
+          "scope": [
+            "REQ-011"
+          ]
+        },
+        {
+          "id": "REQ-012",
+          "scope": [
+            "REQ-012"
+          ]
+        }
+      ]
+    }
+  ]
+}

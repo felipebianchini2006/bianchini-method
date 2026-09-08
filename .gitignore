@@ -9,4 +9,3 @@ __pycache__/
 .ruff_cache/
 /bin/
 /dist/
-/.bianchini/
