@@ -25,7 +25,7 @@ Todo estado persistente novo vive em `.bianchini/`:
 │   ├── SYSTEM_MODEL.md
 │   ├── ROADMAP.md
 │   ├── COHERENCE.md
-│   ├── plans/P01-slug/{PLAN.md,RESULT.md,evidence/}
+│   ├── plans/P01-slug/{PLAN.md,RESULT.md,evidence/INDEX.md}
 │   ├── results/
 │   ├── homologation/RC-id/{HOMOLOGATION.md,evidence/,delivery/}
 │   └── SUMMARY.md
@@ -182,7 +182,7 @@ estado atual
 
 Mudanças novas usam `planning_contract: 2`. Mudanças anteriores sem esse marcador continuam no contrato 1 e não são reescritas automaticamente.
 
-Cada plano `Pxx` usa `schema_version: 2` e declara resultado, IDs rastreáveis de escopo, aceite, `depends_on`, `provides`, `consumes`, módulos/interfaces, ownership, delta do ProjectModel, dados/migrações, efeitos externos, rollback, verificações, restrições futuras e tarefas tipadas.
+Cada plano `Pxx` usa `schema_version: 3` e declara resultado, IDs rastreáveis de escopo, aceite, `depends_on`, `provides`, `consumes`, módulos/interfaces, ownership, delta do ProjectModel, dados/migrações, efeitos externos, rollback, verificações, restrições futuras e tarefas tipadas.
 
 Cada tarefa `Txx` declara:
 
@@ -389,4 +389,4 @@ HOMOLOGATION.md contém gates `{proof_id, result: passed}` cobrindo todas as pro
 
 Finding material em `verify review --verdict changes_requested` usa `--finding` com JSON: target, observed, requirement, severity, evidence (arquivo real), expected_fix. Não exige RED artificial. Após corrigir, revisão aprovada usa provas atuais e `--resolves-review <id>`. Sugestões opcionais ficam fora dos findings bloqueantes.
 
-Logs sanitizados e limitados ficam em results/logs; a prova registra caminho, digest e resumo. Não colocar credenciais nos argumentos; usar variáveis de ambiente. Logs completos acima do limite são truncados explicitamente, sem reexecução automática.
+O índice derivado de cada plano aponta para os registros oficiais em `results/`. Logs sanitizados e limitados ficam em results/logs; a prova registra caminho, digest e resumo. Não colocar credenciais nos argumentos; usar variáveis de ambiente. Logs completos acima do limite são truncados explicitamente, sem reexecução automática.

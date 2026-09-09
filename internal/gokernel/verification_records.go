@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	methodlayout "github.com/felipebianchini2006/bianchini-method/internal/workspace"
 )
 
 func matchingVerificationProofs(pack coherencePackage, executionKey string) ([]map[string]any, error) {
@@ -24,7 +26,7 @@ func matchingVerificationProofs(pack coherencePackage, executionKey string) ([]m
 }
 
 func loadVerificationProofs(pack coherencePackage) (map[string]map[string]any, error) {
-	directory := filepath.Join(pack.directory, "results", "proofs")
+	directory := methodlayout.Proofs(pack.directory)
 	entries, err := os.ReadDir(directory)
 	if os.IsNotExist(err) {
 		return map[string]map[string]any{}, nil
@@ -171,9 +173,12 @@ func recordVerificationReview(pack coherencePackage, flags parsedFlags) (map[str
 	reviewID := "review-" + waveStableDigest(idMaterial)[:32]
 	payload["review_id"] = reviewID
 	payload["record_digest"] = verificationRecordDigest(payload)
-	path := filepath.Join(pack.directory, "results", "reviews", reviewID+".json")
+	path := filepath.Join(methodlayout.Reviews(pack.directory), reviewID+".json")
 	encoded, _ := json.MarshalIndent(payload, "", "  ")
 	if err := pack.workspace.atomicWrite(path, append(encoded, '\n')); err != nil {
+		return nil, err
+	}
+	if err := writePlanEvidenceIndex(pack, planID); err != nil {
 		return nil, err
 	}
 	if scope == "release" && verdict == "approved" {
@@ -228,7 +233,7 @@ func validateVerificationReview(pack coherencePackage, identifier, scope, plan, 
 	if !verificationReviewID.MatchString(identifier) {
 		return workflowError("REVIEW_REQUIRED", "conclusão exige review_id gerado por bm verify review")
 	}
-	path := filepath.Join(pack.directory, "results", "reviews", identifier+".json")
+	path := filepath.Join(methodlayout.Reviews(pack.directory), identifier+".json")
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return workflowError("REVIEW_REQUIRED", "review_id não encontrado: "+identifier)

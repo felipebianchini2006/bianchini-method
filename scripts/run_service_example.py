@@ -58,7 +58,7 @@ def typed_task(identifier, *, covers):
 
 
 def typed_plan(identifier, *, requirements, tasks, provides, model_delta):
-    return {"schema_version": 2, "id": identifier, "status": "planned",
+    return {"schema_version": 3, "id": identifier, "status": "planned",
             "result": f"Resultado observável de {identifier}", "requirements": requirements,
             "acceptance": [f"Aceite observável de {identifier}"], "depends_on": [], "provides": provides,
             "consumes": [], "modules": [], "interfaces": [], "ownership": [], "data": [],

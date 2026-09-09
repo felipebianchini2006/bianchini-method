@@ -1,0 +1,6 @@
+--- FAIL: TestLegacyWorkspaceReportsUpgradeBeforePlanning (0.06s)
+    workspace_upgrade_test.go:25: legacy-entry-regression: code=3 error=MODEL_MISMATCH: STATE.md não pertence ao método bianchini
+FAIL
+FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	0.474s
+FAIL
+

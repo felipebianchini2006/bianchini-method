@@ -27,3 +27,5 @@ Famílias públicas:
 Saídas estruturadas usam JSON. Erros de entrada retornam código 2, gates bloqueados retornam 3 e workspace inseguro retorna 4. Um comando pode restringir mais esses códigos; a ajuda e os testes do binário prevalecem.
 
 O contrato versionado usado por testes e empacotamento fica em `contracts/cli-surfaces.json`. Ele deve ser gerado ou atualizado a partir do backend atual e não pode apontar para implementações removidas.
+
+`verify status` é um inventário de provas de mudanças ativas ou arquivadas. Os campos `archived` e `logs` identificam a localização atual; os logs são verificados por digest. Esse comando de leitura não exige nem renova aprovação e não afirma que provas históricas valem para o código atual.

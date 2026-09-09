@@ -5,7 +5,7 @@ package gokernel
 var BuildCommit = "unknown"
 
 const (
-	Version         = "1.1.0"
+	Version         = "1.1.1"
 	ContractVersion = "bianchini"
 )
 

@@ -4,13 +4,15 @@
 
 Materialize o escopo em `.bianchini/changes/Cxxx-slug/SCOPE.md`. Quando a fonte for PDF, `scope seal` exige manifesto por página e registra o modo de extração sem afirmar revisão semântica automática.
 
-O planejamento cria arquitetura, modelo, specs e planos. Cada plano fica em `plans/Pxx-slug/PLAN.md`, declara cenários e mantém `RESULT.md` e `evidence/` ao lado.
+O planejamento cria arquitetura, modelo, specs e planos. Cada plano fica em `plans/Pxx-slug/PLAN.md`, usa `schema_version: 3`, declara cenários e mantém `RESULT.md` e `evidence/INDEX.md` ao lado. O índice aponta para os registros oficiais em `results/`.
 
 ```bash
 bm roadmap sync --repo . --change C001
 bm model validate --repo . --change C001
 bm coherence check --repo . --change C001 --structural-only
 ```
+
+A validação do plano usa o mesmo domínio de aceite do release. `coherence check` confere também jornadas, perfis, plataformas e estados; `coherence approve` repete essa verificação antes de aceitar o pacote.
 
 ## Executar
 
@@ -37,3 +39,9 @@ bm cycle-close --repo . --change C001
 ```
 
 Aceite técnico não executa deploy, cobrança, publicação ou outra ação externa sem autorização correspondente.
+
+## Consultar evidências arquivadas
+
+`bm verify status --repo . --change C001` consulta mudanças ativas ou arquivadas. A saída traz `archived` e `logs`, com caminhos atuais e integridade verificada, sem alterar provas seladas. Trata-se de um inventário histórico; não confirma validade das provas para o código atual.
+
+Para formatos anteriores, consulte [Transição de formatos](upgrading.md).

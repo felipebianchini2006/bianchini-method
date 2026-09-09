@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -82,8 +83,8 @@ func verifyTask(pack coherencePackage, coherence map[string]any, flags parsedFla
 	if err != nil {
 		return nil, err
 	}
-	if plan.schema != 2 {
-		return nil, workflowError("MODEL_MISMATCH", "verify task exige plano schema 2")
+	if plan.schema != 2 && plan.schema != 3 {
+		return nil, workflowError("MODEL_MISMATCH", "verify task exige plano schema 2 ou 3")
 	}
 	if containsString(stateStringSlice(coherence["stale_plans"]), planID) {
 		return nil, workflowError("IMPACT_STALE", planID+" está stale")
@@ -247,21 +248,44 @@ func verificationStatus(root, change string) (map[string]any, error) {
 	if change == "" {
 		return nil, userError("verify status exige --change")
 	}
-	pack, _, err := approvedPlanPackage(root, change)
+	workspace := newMethodWorkspace(root)
+	directory, err := locateChangeDirectory(workspace, change)
+	archived := false
+	if err != nil {
+		archiveWorkspace := workspace
+		archiveWorkspace.changes = workspace.layout.Archive()
+		directory, err = locateChangeDirectory(archiveWorkspace, change)
+		archived = true
+	}
 	if err != nil {
 		return nil, err
 	}
+	// Status is a read-only inventory, including historical packages. It does
+	// not approve a package or claim its proofs are current for today's code.
+	pack := coherencePackage{workspace: workspace, directory: directory}
 	proofs, err := loadVerificationProofs(pack)
 	if err != nil {
 		return nil, err
 	}
 	passed, failed := 0, 0
-	for _, proof := range proofs {
+	logs := []any{}
+	ids := make([]string, 0, len(proofs))
+	for id := range proofs {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		proof := proofs[id]
+		path, err := verificationLogPath(pack, proof)
+		if err != nil {
+			return nil, workflowError("STALE_EVIDENCE", id+": "+err.Error())
+		}
+		logs = append(logs, map[string]any{"proof_id": id, "plan": proof["plan"], "log_path": path})
 		if stateString(proof["status"]) == "passed" {
 			passed++
 		} else {
 			failed++
 		}
 	}
-	return map[string]any{"change": filepath.Base(pack.directory), "proofs": len(proofs), "passed": passed, "failed": failed}, nil
+	return map[string]any{"change": filepath.Base(pack.directory), "archived": archived, "proofs": len(proofs), "passed": passed, "failed": failed, "logs": logs}, nil
 }

@@ -22,7 +22,7 @@ Mapas de repositório e relatórios temporários ficam em `.bianchini/.runtime/`
 
 ## Resultados e fechamento
 
-Cada plano grava seu delta real, IDs de prova/revisão e impacto em `plans/Pxx-slug/RESULT.md`. Evidências do plano ficam ao lado em `evidence/`; registros técnicos compartilhados ficam em `change/results/`. `STATE.md` mantém apenas o índice atual. O fechamento recompõe o modelo pelos resultados, exige release revisado e homologação do mesmo fingerprint, confirma equivalência com o `SYSTEM_MODEL.md` final e arquiva o ciclo.
+Cada plano grava seu delta real, IDs de prova/revisão e impacto em `plans/Pxx-slug/RESULT.md`. O índice derivado `evidence/INDEX.md` fica ao lado do plano e aponta para provas, revisões, logs e resultados de tarefas em `change/results/`, sem duplicação. `STATE.md` mantém apenas o índice atual. O fechamento recompõe o modelo pelos resultados, exige release revisado e homologação do mesmo fingerprint, confirma equivalência com o `SYSTEM_MODEL.md` final e arquiva o ciclo.
 
 ## Regras
 

@@ -132,6 +132,9 @@ func coherenceCheck(repo, change string, structuralOnly bool, semanticPath strin
 		reviewDigest = coherenceReviewDigest(pack.planningContract, manifest, specDigests)
 	}
 	findings := coherenceStructuralFindings(pack.current, pack.expected, pack.plans, requirements, true)
+	if _, err := requiredAcceptanceScenarios(pack); err != nil {
+		findings = append(findings, coherenceFinding("SCENARIO_COVERAGE", "ERROR", "structural", nil, nil, err.Error(), "Completar cenários dos requisitos e dimensões das jornadas antes da aprovação."))
+	}
 	if projected, scheduleErr := coherenceSchedule(pack.plans); scheduleErr == nil {
 		schedule = projected
 	}
@@ -225,6 +228,9 @@ func coherenceCheck(repo, change string, structuralOnly bool, semanticPath strin
 func coherenceApprove(repo, change, digest, approvedBy string, decisionKind ...string) (map[string]any, error) {
 	pack, err := loadCoherencePackage(repo, change)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := requiredAcceptanceScenarios(pack); err != nil {
 		return nil, err
 	}
 	payload := pack.contract

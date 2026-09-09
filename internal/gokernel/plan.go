@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	methodlayout "github.com/felipebianchini2006/bianchini-method/internal/workspace"
 )
 
 func runPlan(args []string) (any, error) {
@@ -197,7 +199,10 @@ func taskComplete(repo, change, planID, taskID, packPath, result string, verific
 		"completed_at": utcNow(),
 	}
 	document, _ := frontmatterDocument(payload, "# Resultado "+plan.id+"/"+taskID+"\n\n"+summary, false)
-	if err := pack.workspace.atomicWrite(filepath.Join(pack.directory, "results", "tasks", plan.id, taskID+".md"), document); err != nil {
+	if err := pack.workspace.atomicWrite(filepath.Join(methodlayout.Tasks(pack.directory, plan.id), taskID+".md"), document); err != nil {
+		return nil, err
+	}
+	if err := writePlanEvidenceIndex(pack, planID); err != nil {
 		return nil, err
 	}
 	state, err := pack.workspace.readState()
@@ -342,6 +347,9 @@ func completePlan(repo, change, planID, actualDeltaPath, result string, verifica
 		if !resultSet[item.id] {
 			pending = append(pending, item.id)
 		}
+	}
+	if err := writePlanEvidenceIndex(pack, planID); err != nil {
+		return nil, err
 	}
 	state, err := pack.workspace.readState()
 	if err != nil {
@@ -674,6 +682,9 @@ func rollbackReopen(pack coherencePackage, resultPath string, result []byte, aud
 }
 
 func setReopenedState(pack coherencePackage, planID string, coherence map[string]any) error {
+	if err := writePlanEvidenceIndex(pack, planID); err != nil {
+		return err
+	}
 	state, err := pack.workspace.readState()
 	if err != nil {
 		return err

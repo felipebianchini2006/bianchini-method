@@ -105,7 +105,10 @@ func loadRoadmapPackage(repo, change string) (methodWorkspace, string, []planCon
 		return methodWorkspace{}, "", nil, workflowError("MODEL_MISMATCH", err.Error())
 	}
 	paths, err := planFiles(workspace.layout.Plans(filepath.Base(directory)))
-	if err != nil || len(paths) == 0 {
+	if err != nil {
+		return methodWorkspace{}, "", nil, err
+	}
+	if len(paths) == 0 {
 		return methodWorkspace{}, "", nil, workflowError("COHERENCE_ERROR", "a mudança exige ao menos um plano")
 	}
 	sort.Strings(paths)

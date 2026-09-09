@@ -1,0 +1,20 @@
+--- FAIL: TestRelease111Regressions (0.00s)
+    --- FAIL: TestRelease111Regressions/planning_rejects_invalid_acceptance (0.00s)
+        --- FAIL: TestRelease111Regressions/planning_rejects_invalid_acceptance/empty (0.00s)
+            release111_regression_test.go:34: regression111: invalid acceptance accepted during planning
+        --- FAIL: TestRelease111Regressions/planning_rejects_invalid_acceptance/visual (0.00s)
+            release111_regression_test.go:34: regression111: invalid acceptance accepted during planning
+        --- FAIL: TestRelease111Regressions/planning_rejects_invalid_acceptance/platform (0.00s)
+            release111_regression_test.go:34: regression111: invalid acceptance accepted during planning
+        --- FAIL: TestRelease111Regressions/planning_rejects_invalid_acceptance/requirement (0.00s)
+            release111_regression_test.go:34: regression111: invalid acceptance accepted during planning
+        --- FAIL: TestRelease111Regressions/planning_rejects_invalid_acceptance/duplicate (0.00s)
+            release111_regression_test.go:34: regression111: invalid acceptance accepted during planning
+    --- FAIL: TestRelease111Regressions/truncated_screenshot (0.00s)
+        release111_regression_test.go:53: regression111: truncated screenshot accepted
+    --- FAIL: TestRelease111Regressions/legacy_plans_are_diagnosed (0.00s)
+        release111_regression_test.go:62: regression111: legacy plan silently ignored: <nil>
+FAIL
+FAIL	github.com/felipebianchini2006/bianchini-method/internal/gokernel	0.434s
+FAIL
+

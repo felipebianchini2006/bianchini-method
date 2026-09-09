@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	methodlayout "github.com/felipebianchini2006/bianchini-method/internal/workspace"
 )
 
 func executeVerification(request verificationRequest, spec verificationSpec) (map[string]any, error) {
@@ -141,7 +143,7 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 	delete(idMaterial, "finished_at")
 	proofID := "proof-" + waveStableDigest(idMaterial)[:32]
 	record["proof_id"] = proofID
-	logPath := filepath.Join(request.pack.directory, "results", "logs", proofID+".log")
+	logPath := filepath.Join(methodlayout.Logs(request.pack.directory), proofID+".log")
 	logText := stateString(record["stdout_summary"]) + "\n" + stateString(record["stderr_summary"])
 	if outputTruncated {
 		logText += "\n[output truncated at 256 KiB per stream]\n"
@@ -149,7 +151,7 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 	if err := request.pack.workspace.atomicWrite(logPath, []byte(logText)); err != nil {
 		return nil, err
 	}
-	relativeLog, _ := filepath.Rel(request.pack.workspace.root, logPath)
+	relativeLog, _ := filepath.Rel(request.pack.directory, logPath)
 	record["log_path"], record["log_sha256"] = filepath.ToSlash(relativeLog), sha256Bytes([]byte(logText))
 	for _, key := range []string{"stdout_summary", "stderr_summary"} {
 		text := stateString(record[key])
@@ -158,9 +160,12 @@ func executeVerification(request verificationRequest, spec verificationSpec) (ma
 		}
 	}
 	record["record_digest"] = verificationRecordDigest(record)
-	path := filepath.Join(request.pack.directory, "results", "proofs", proofID+".json")
+	path := filepath.Join(methodlayout.Proofs(request.pack.directory), proofID+".json")
 	encoded, _ := json.MarshalIndent(record, "", "  ")
 	if err := request.pack.workspace.atomicWrite(path, append(encoded, '\n')); err != nil {
+		return nil, err
+	}
+	if err := writePlanEvidenceIndex(request.pack, request.plan); err != nil {
 		return nil, err
 	}
 	if status != "passed" {

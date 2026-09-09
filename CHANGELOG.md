@@ -2,6 +2,17 @@
 
 O histórico foi consolidado na linhagem pública `0.x`. Os detalhes operacionais anteriores permanecem abaixo, agrupados pelo marco em que passaram a formar uma capacidade estável do método.
 
+## 1.1.1 — 2026-09-09
+
+- aplica as regras de aceite durante o planejamento e revalida jornadas e dimensões antes da aprovação;
+- rejeita screenshots truncados e limita dimensões e quantidade de pixels antes de decodificar;
+- gera índices de provas, revisões, logs e resultados de tarefas junto aos planos, mantendo registros centrais;
+- resolve logs de mudanças arquivadas sem reescrever provas seladas; novos logs usam referências relativas à mudança;
+- identifica planos e escopos anteriores incompatíveis com orientação explícita de transição;
+- adota schema 3 para planos novos e schema 2 para escopos novos, preservando leitura dos documentos completos da 1.1.0;
+- remove executor Python obsoleto e sua referência na CI;
+- acrescenta regressões de planejamento, integridade de imagens, transição e navegação após arquivamento.
+
 ## 1.1.0 — 2026-09-08
 
 - consolida o backend Go e um único contrato operacional em `.bianchini/`;

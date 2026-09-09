@@ -41,7 +41,7 @@ O pacote distribuído instala as skills e o binário em `_shared/bin/bm` no Unix
 │   ├── plans/P01-slug/
 │   │   ├── PLAN.md
 │   │   ├── RESULT.md
-│   │   └── evidence/
+│   │   └── evidence/INDEX.md
 │   ├── results/
 │   └── homologation/RC-id/
 │       ├── HOMOLOGATION.md
@@ -53,7 +53,9 @@ O pacote distribuído instala as skills e o binário em `_shared/bin/bm` no Unix
 └── .runtime/
 ```
 
-`STATE.md` é um índice compacto. Arquitetura aceita, modelo, specs e guias ficam em `current/`. Cada mudança mantém plano, resultado e evidência juntos. O fechamento move a mudança concluída para `archive/`.
+`STATE.md` é um índice compacto. Arquitetura aceita, modelo, specs e guias ficam em `current/`. Cada plano mantém `PLAN.md`, `RESULT.md` e um índice derivado em `evidence/INDEX.md`. Provas, revisões, resultados de tarefas e logs têm uma única fonte oficial em `results/`. Os links relativos do índice sobrevivem ao arquivamento. O fechamento move a mudança concluída para `archive/`.
+
+Atualizações de projetos antigos: consulte [Transição de formatos](docs/upgrading.md).
 
 ## Fluxo planejado
 

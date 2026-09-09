@@ -174,6 +174,9 @@ func (workspace methodWorkspace) readState() (map[string]any, error) {
 }
 
 func (workspace methodWorkspace) validateState(state map[string]any) (map[string]any, error) {
+	if stateString(state["method"]) == "0.4" {
+		return nil, workflowError("WORKSPACE_UPGRADE_REQUIRED", "STATE.md usa o contrato anterior 0.4; preserve o projeto e consulte skills/_shared/UPGRADING.md")
+	}
 	for key := range state {
 		if workspaceStateHistory[key] {
 			return nil, workflowError("DOCVIVA_INCOMPLETE", "campo de histórico proibido em STATE.md: "+key)

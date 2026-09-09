@@ -289,8 +289,11 @@ func parsePlanContract(value map[string]any) (planContract, error) {
 		return planContract{}, fmt.Errorf("plano %s: model_delta exige objeto", identifier)
 	}
 	schema := stateInt(value["schema_version"])
-	if schema != 2 {
-		return planContract{}, fmt.Errorf("plano %s: schema_version exige 2", identifier)
+	if schema != 2 && schema != 3 {
+		return planContract{}, fmt.Errorf("plano %s: schema_version exige 2 ou 3; consulte skills/_shared/UPGRADING.md", identifier)
+	}
+	if _, present := value["scenarios"]; schema == 2 && !present {
+		return planContract{}, workflowError("WORKSPACE_UPGRADE_REQUIRED", "plano anterior à 1.1: cenários precisam de revisão; consulte skills/_shared/UPGRADING.md")
 	}
 	if err := validatePlan(identifier, value); err != nil {
 		return planContract{}, err
@@ -364,7 +367,8 @@ func validatePlan(identifier string, value map[string]any) error {
 			return err
 		}
 	}
-	return nil
+	_, err := planAcceptanceScenarios(planContract{id: identifier, value: value})
+	return err
 }
 
 func validatePlanScenarios(plan string, raw any) error {
@@ -381,26 +385,6 @@ func validatePlanScenarios(plan string, raw any) error {
 		for _, key := range sortedMapKeys(scenario) {
 			if !allowed[key] {
 				return fmt.Errorf("plano %s: campo desconhecido no scenario: %s", plan, key)
-			}
-		}
-		if missing := missingMapKeys(scenario, []string{"id", "requirements", "platform", "profile", "state", "expected", "risk", "evidence_kinds"}); len(missing) > 0 {
-			return fmt.Errorf("plano %s: campo obrigatório ausente no scenario: %s", plan, missing[0])
-		}
-		for _, field := range []string{"id", "platform", "profile", "state", "expected", "risk"} {
-			if strings.TrimSpace(stateString(scenario[field])) == "" {
-				return fmt.Errorf("plano %s: scenario.%s exige texto", plan, field)
-			}
-		}
-		if _, err := stringValues(scenario["requirements"], "scenario.requirements"); err != nil {
-			return err
-		}
-		kinds, err := stringValues(scenario["evidence_kinds"], "scenario.evidence_kinds")
-		if err != nil || len(kinds) == 0 {
-			return fmt.Errorf("plano %s: scenario.evidence_kinds exige lista não vazia", plan)
-		}
-		for _, kind := range kinds {
-			if !oneOf(kind, "observation", "screenshot", "log") {
-				return fmt.Errorf("plano %s: evidence_kind inválido: %s", plan, kind)
 			}
 		}
 	}

@@ -231,7 +231,7 @@ func sealScope(repo, change, source, draft string, pages int, extraction, manife
 	}
 	scopePath := filepath.Join(directory, "SCOPE.md")
 	metadata := map[string]any{
-		"schema_version": 1, "document": "bianchini-scope", "status": "ready_for_sdd", "change": change,
+		"schema_version": 2, "document": "bianchini-scope", "status": "ready_for_sdd", "change": change,
 		"source": map[string]any{
 			"kind": "pdf", "name": sourceMetadata["name"], "sha256": sourceMetadata["sha256"],
 			"pages": pages, "extraction": extraction,
@@ -303,11 +303,14 @@ func verifyScope(repo, change, source string) (map[string]any, error) {
 	if err != nil {
 		return nil, scopeError("SCOPE_FORMAT_INVALID", err.Error())
 	}
+	if _, present := metadata["extraction_record"]; stateInt(metadata["schema_version"]) == 1 && !present {
+		return nil, scopeError("WORKSPACE_UPGRADE_REQUIRED", "escopo anterior à 1.1: manifesto exige revisão da fonte; consulte skills/_shared/UPGRADING.md")
+	}
 	expectedKeys := []string{"schema_version", "document", "status", "change", "source", "coverage", "extraction_record", "sealed_at", "scope_digest"}
 	if !hasExactKeys(metadata, expectedKeys) {
 		return nil, scopeError("SCOPE_FORMAT_INVALID", "frontmatter do SCOPE.md é inválido")
 	}
-	if stateInt(metadata["schema_version"]) != 1 || stateString(metadata["document"]) != "bianchini-scope" || stateString(metadata["status"]) != "ready_for_sdd" || stateString(metadata["change"]) != change {
+	if (stateInt(metadata["schema_version"]) != 1 && stateInt(metadata["schema_version"]) != 2) || stateString(metadata["document"]) != "bianchini-scope" || stateString(metadata["status"]) != "ready_for_sdd" || stateString(metadata["change"]) != change {
 		return nil, scopeError("SCOPE_FORMAT_INVALID", "identidade do SCOPE.md é inválida")
 	}
 	sourceInfo, ok := metadata["source"].(map[string]any)

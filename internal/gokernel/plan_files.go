@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 var planDirectoryPattern = regexp.MustCompile(`^(P[0-9]{2,})(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?$`)
@@ -52,6 +53,9 @@ func planFiles(directory string) ([]string, error) {
 	}
 	paths := make([]string, 0, len(children))
 	for _, child := range children {
+		if strings.HasSuffix(child.Name(), ".md") && planDirectoryPattern.MatchString(strings.TrimSuffix(child.Name(), ".md")) {
+			return nil, workflowError("WORKSPACE_UPGRADE_REQUIRED", "plano no layout anterior: "+child.Name()+"; preserve o projeto e consulte skills/_shared/UPGRADING.md")
+		}
 		if !child.IsDir() {
 			continue
 		}

@@ -180,8 +180,12 @@ func inspectHomologationEvidence(root, evidenceRoot string, evidence acceptance.
 	}
 	if evidence.Kind == "screenshot" {
 		config, _, err := image.DecodeConfig(bytes.NewReader(content))
-		if err != nil || config.Width < 2 || config.Height < 2 {
+		// Bound allocation before decoding pixels; compressed size is insufficient.
+		if err != nil || config.Width < 2 || config.Height < 2 || config.Width > 16384 || config.Height > 16384 || int64(config.Width)*int64(config.Height) > 32*1024*1024 {
 			return fmt.Errorf("screenshot não contém imagem válida")
+		}
+		if _, _, err := image.Decode(bytes.NewReader(content)); err != nil {
+			return fmt.Errorf("screenshot incompleto ou inválido: %w", err)
 		}
 	}
 	return nil

@@ -80,7 +80,7 @@ Cada `plans/Pxx-slug/PLAN.md` representa uma entrega rejeitável ou verificável
 O frontmatter de cada plano declara:
 
 ```yaml
-schema_version: 2
+schema_version: 3
 id: P01
 status: planned
 result: <resultado observável>
